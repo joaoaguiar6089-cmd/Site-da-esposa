@@ -1,0 +1,85 @@
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+
+interface ProcedureCardProps {
+  title: string;
+  description: string;
+  price: string;
+  image: string;
+  benefits: string[];
+  duration?: string;
+}
+
+const ProcedureCard = ({ 
+  title, 
+  description, 
+  price, 
+  image, 
+  benefits, 
+  duration 
+}: ProcedureCardProps) => {
+  const whatsappLink = "https://wa.me/5597984387295";
+  
+  const handleWhatsApp = () => {
+    const message = `Olá! Gostaria de agendar uma consulta para ${title}. Poderia me fornecer mais informações?`;
+    window.open(`${whatsappLink}?text=${encodeURIComponent(message)}`, "_blank");
+  };
+
+  return (
+    <Card className="group overflow-hidden hover:shadow-elegant transition-all duration-300 hover:-translate-y-1">
+      <div className="relative overflow-hidden">
+        <img 
+          src={image} 
+          alt={title}
+          className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+        />
+        <div className="absolute top-4 right-4">
+          <Badge variant="secondary" className="bg-white/90 text-primary font-semibold">
+            {price}
+          </Badge>
+        </div>
+      </div>
+      
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-xl text-primary">{title}</CardTitle>
+          {duration && (
+            <Badge variant="outline" className="text-xs">
+              {duration}
+            </Badge>
+          )}
+        </div>
+        <CardDescription className="text-base leading-relaxed">
+          {description}
+        </CardDescription>
+      </CardHeader>
+      
+      <CardContent>
+        <div className="space-y-4">
+          <div>
+            <h4 className="font-semibold text-sm text-primary mb-2">Benefícios:</h4>
+            <ul className="space-y-1">
+              {benefits.map((benefit, index) => (
+                <li key={index} className="text-sm text-muted-foreground flex items-start">
+                  <span className="text-accent mr-2">•</span>
+                  {benefit}
+                </li>
+              ))}
+            </ul>
+          </div>
+          
+          <Button 
+            onClick={handleWhatsApp}
+            className="w-full" 
+            variant="default"
+          >
+            Agendar Consulta
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default ProcedureCard;

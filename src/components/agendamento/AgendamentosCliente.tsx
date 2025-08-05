@@ -155,9 +155,18 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
                 <div key={appointment.id} className="border rounded-lg p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <h3 className="font-medium">{appointment.procedures.name}</h3>
-                    <Badge className={getStatusColor(appointment.status)}>
-                      {getStatusText(appointment.status)}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge className={getStatusColor(appointment.status)}>
+                        {getStatusText(appointment.status)}
+                      </Badge>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => window.location.href = `/agendamento?edit=${appointment.id}`}
+                      >
+                        Alterar
+                      </Button>
+                    </div>
                   </div>
                   
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">

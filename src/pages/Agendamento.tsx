@@ -1,11 +1,12 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import LoginCPF from "@/components/agendamento/LoginCPF";
 import CadastroCliente from "@/components/agendamento/CadastroCliente";
 import AgendamentoForm from "@/components/agendamento/AgendamentoForm";
 import AgendamentosCliente from "@/components/agendamento/AgendamentosCliente";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface Client {
   id: string;
@@ -18,6 +19,8 @@ export interface Client {
 const Agendamento = () => {
   const [step, setStep] = useState<'login' | 'cadastro' | 'agendamentos' | 'novo-agendamento'>('login');
   const [client, setClient] = useState<Client | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const handleClientFound = (foundClient: Client) => {
@@ -44,6 +47,36 @@ const Agendamento = () => {
 
   const handleBack = () => {
     navigate('/');
+  };
+
+  // Carregar dados do agendamento para edição
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (editId) {
+      setEditingId(editId);
+      loadAppointmentForEdit(editId);
+    }
+  }, [searchParams]);
+
+  const loadAppointmentForEdit = async (appointmentId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          clients!appointments_client_id_fkey(*)
+        `)
+        .eq('id', appointmentId)
+        .single();
+
+      if (error) throw error;
+
+      setClient(data.clients);
+      setStep('novo-agendamento');
+    } catch (error) {
+      console.error('Erro ao carregar agendamento:', error);
+      navigate('/agendamento');
+    }
   };
 
   return (
@@ -77,8 +110,9 @@ const Agendamento = () => {
           {step === 'novo-agendamento' && client && (
             <AgendamentoForm 
               client={client}
+              editingId={editingId || undefined}
               onAppointmentCreated={handleAppointmentCreated}
-              onBack={() => setStep('agendamentos')}
+              onBack={() => editingId ? navigate('/admin') : setStep('agendamentos')}
             />
           )}
         </div>

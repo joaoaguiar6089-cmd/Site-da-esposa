@@ -336,11 +336,19 @@ const AppointmentsList = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => sendWhatsApp(appointment.client.celular, appointment.client.nome)}
+                        onClick={() => window.location.href = `/agendamento?edit=${appointment.id}`}
                         className="flex items-center gap-1 flex-1"
                       >
+                        Editar
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => sendWhatsApp(appointment.client.celular, appointment.client.nome)}
+                        className="flex items-center gap-1"
+                      >
                         <MessageCircle className="w-4 h-4" />
-                        WhatsApp
                       </Button>
                       
                       <Button

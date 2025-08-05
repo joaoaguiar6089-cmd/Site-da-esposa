@@ -41,8 +41,8 @@ const Contact = () => {
                   <div>
                     <h4 className="font-semibold text-primary">Localização</h4>
                     <p className="text-muted-foreground">
-                      Atendimento personalizado<br />
-                      Entre em contato para agendar
+                      Tefé-AM: Avenida Brasil, 63b<br />
+                      Manaus: Entre em contato pelo WhatsApp
                     </p>
                   </div>
                 </div>

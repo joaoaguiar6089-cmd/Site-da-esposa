@@ -23,6 +23,7 @@ export type Database = {
           id: string
           notes: string | null
           procedure_id: string
+          professional_id: string | null
           status: string
           updated_at: string
         }
@@ -34,6 +35,7 @@ export type Database = {
           id?: string
           notes?: string | null
           procedure_id: string
+          professional_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -45,6 +47,7 @@ export type Database = {
           id?: string
           notes?: string | null
           procedure_id?: string
+          professional_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -63,7 +66,38 @@ export type Database = {
             referencedRelation: "procedures"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "appointments_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "professionals"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       clients: {
         Row: {
@@ -97,6 +131,7 @@ export type Database = {
       }
       procedures: {
         Row: {
+          category_id: string | null
           created_at: string
           description: string | null
           duration: number
@@ -105,6 +140,7 @@ export type Database = {
           price: number | null
         }
         Insert: {
+          category_id?: string | null
           created_at?: string
           description?: string | null
           duration?: number
@@ -113,12 +149,51 @@ export type Database = {
           price?: number | null
         }
         Update: {
+          category_id?: string | null
           created_at?: string
           description?: string | null
           duration?: number
           id?: string
           name?: string
           price?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procedures_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      professionals: {
+        Row: {
+          cpf: string
+          created_at: string
+          email: string
+          id: string
+          name: string
+          phone: string
+          updated_at: string
+        }
+        Insert: {
+          cpf: string
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          phone: string
+          updated_at?: string
+        }
+        Update: {
+          cpf?: string
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          phone?: string
+          updated_at?: string
         }
         Relationships: []
       }

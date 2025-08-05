@@ -61,6 +61,8 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack }: AgendamentoFo
     loadProcedures();
   }, []);
 
+  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+
   const generateTimeOptions = () => {
     const times = [];
     for (let hour = 8; hour <= 18; hour++) {
@@ -70,6 +72,32 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack }: AgendamentoFo
       }
     }
     return times;
+  };
+
+  const loadAvailableTimes = async (date: string) => {
+    if (!date) {
+      setAvailableTimes([]);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('appointment_time')
+        .eq('appointment_date', date)
+        .eq('status', 'agendado');
+
+      if (error) throw error;
+
+      const bookedTimes = data?.map(apt => apt.appointment_time) || [];
+      const allTimes = generateTimeOptions();
+      const available = allTimes.filter(time => !bookedTimes.includes(time));
+      
+      setAvailableTimes(available);
+    } catch (error) {
+      console.error('Erro ao carregar horários:', error);
+      setAvailableTimes(generateTimeOptions());
+    }
   };
 
   const getMinDate = () => {
@@ -106,9 +134,25 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack }: AgendamentoFo
 
       if (error) throw error;
 
+      // Enviar mensagem WhatsApp de confirmação
+      try {
+        const selectedProc = procedures.find(p => p.id === formData.procedure_id);
+        const message = `🩺 *Agendamento Confirmado*\n\nOlá ${client.nome}!\n\nSeu agendamento foi confirmado:\n\n📅 Data: ${new Date(formData.appointment_date).toLocaleDateString('pt-BR')}\n⏰ Horário: ${formData.appointment_time}\n💉 Procedimento: ${selectedProc?.name}\n💰 Valor: R$ ${selectedProc?.price?.toFixed(2)}\n\n📍 Local: Tefé-AM - Av. Brasil, 63b\n\nPara reagendamentos em Manaus, entre em contato via WhatsApp.\n\nObrigado pela confiança! 🙏`;
+        
+        await supabase.functions.invoke('send-whatsapp', {
+          body: {
+            to: client.celular,
+            message: message
+          }
+        });
+      } catch (whatsappError) {
+        console.error('Erro ao enviar WhatsApp:', whatsappError);
+        // Não falha o agendamento se o WhatsApp não funcionar
+      }
+
       toast({
         title: "Agendamento realizado!",
-        description: "Seu agendamento foi criado com sucesso.",
+        description: "Seu agendamento foi criado com sucesso. Uma confirmação será enviada via WhatsApp.",
       });
 
       onAppointmentCreated();
@@ -189,7 +233,11 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack }: AgendamentoFo
               type="date"
               min={getMinDate()}
               value={formData.appointment_date}
-              onChange={(e) => setFormData(prev => ({ ...prev, appointment_date: e.target.value }))}
+              onChange={(e) => {
+                const newDate = e.target.value;
+                setFormData(prev => ({ ...prev, appointment_date: newDate, appointment_time: "" }));
+                loadAvailableTimes(newDate);
+              }}
               className="mt-1"
               required
             />
@@ -207,11 +255,17 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack }: AgendamentoFo
                 <SelectValue placeholder="Selecione um horário" />
               </SelectTrigger>
               <SelectContent>
-                {generateTimeOptions().map((time) => (
-                  <SelectItem key={time} value={time}>
-                    {time}
+                {availableTimes.length > 0 ? (
+                  availableTimes.map((time) => (
+                    <SelectItem key={time} value={time}>
+                      {time}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="" disabled>
+                    {formData.appointment_date ? "Nenhum horário disponível" : "Selecione uma data primeiro"}
                   </SelectItem>
-                ))}
+                )}
               </SelectContent>
             </Select>
           </div>

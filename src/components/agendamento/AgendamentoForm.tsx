@@ -262,7 +262,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack }: AgendamentoFo
                     </SelectItem>
                   ))
                 ) : (
-                  <SelectItem value="" disabled>
+                  <SelectItem value="no-times" disabled>
                     {formData.appointment_date ? "Nenhum horário disponível" : "Selecione uma data primeiro"}
                   </SelectItem>
                 )}

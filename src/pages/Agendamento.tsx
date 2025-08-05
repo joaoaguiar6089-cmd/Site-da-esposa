@@ -24,6 +24,7 @@ const Agendamento = () => {
   const navigate = useNavigate();
 
   const handleClientFound = (foundClient: Client) => {
+    console.log("Cliente encontrado:", foundClient);
     setClient(foundClient);
     setStep('agendamentos');
   };
@@ -38,6 +39,7 @@ const Agendamento = () => {
   };
 
   const handleNewAppointment = () => {
+    console.log("Criando novo agendamento para cliente:", client);
     setStep('novo-agendamento');
   };
 
@@ -90,6 +92,13 @@ const Agendamento = () => {
       <Header />
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-md mx-auto">
+          {/* Debug info */}
+          <div className="mb-4 p-2 bg-gray-100 text-sm">
+            <p>Step: {step}</p>
+            <p>Client: {client ? `${client.nome} ${client.sobrenome}` : 'null'}</p>
+            <p>EditingId: {editingId || 'null'}</p>
+          </div>
+          
           {step === 'login' && (
             <LoginCPF 
               onClientFound={handleClientFound}
@@ -120,6 +129,13 @@ const Agendamento = () => {
               onAppointmentCreated={handleAppointmentCreated}
               onBack={() => editingId ? navigate('/admin') : setStep('agendamentos')}
             />
+          )}
+          
+          {step === 'novo-agendamento' && !client && (
+            <div className="text-center text-red-500">
+              <p>Erro: Cliente não encontrado</p>
+              <button onClick={() => setStep('login')}>Voltar ao login</button>
+            </div>
           )}
         </div>
       </main>

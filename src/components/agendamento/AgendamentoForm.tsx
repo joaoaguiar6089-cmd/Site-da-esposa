@@ -31,6 +31,7 @@ interface AgendamentoFormProps {
 }
 
 const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: AgendamentoFormProps) => {
+  console.log("AgendamentoForm renderizado:", { client, editingId });
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [formData, setFormData] = useState({

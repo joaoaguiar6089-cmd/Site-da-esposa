@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Calendar, Users, LogOut, Home, UserPlus, Tag, Stethoscope } from "lucide-react";
+import { BarChart3, Calendar, Users, LogOut, Home, UserPlus, Tag, Stethoscope, MessageSquare } from "lucide-react";
 import AdminAuth from "@/components/admin/AdminAuth";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 import AppointmentsList from "@/components/admin/AppointmentsList";
 import ProfessionalsList from "@/components/admin/ProfessionalsList";
 import CategoriesList from "@/components/admin/CategoriesList";
 import ProceduresManagement from "@/components/admin/ProceduresManagement";
+import NotificationDebug from "@/components/admin/NotificationDebug";
 import { useToast } from "@/hooks/use-toast";
 
 
@@ -67,7 +68,7 @@ const Admin = () => {
 
         {/* Navegação por Tabs */}
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6 lg:grid-cols-6">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />
               Dashboard
@@ -87,6 +88,10 @@ const Admin = () => {
             <TabsTrigger value="procedures" className="flex items-center gap-2">
               <Stethoscope className="w-4 h-4" />
               Procedimentos
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4" />
+              Notificações
             </TabsTrigger>
           </TabsList>
 
@@ -108,6 +113,10 @@ const Admin = () => {
 
           <TabsContent value="procedures" className="space-y-6">
             <ProceduresManagement />
+          </TabsContent>
+
+          <TabsContent value="notifications" className="space-y-6">
+            <NotificationDebug />
           </TabsContent>
         </Tabs>
       </div>

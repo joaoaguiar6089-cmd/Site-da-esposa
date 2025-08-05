@@ -10,6 +10,12 @@ interface WhatsAppRequest {
   message: string;
 }
 
+interface WhatsAppResponse {
+  messaging_product: string;
+  contacts: { input: string; wa_id: string }[];
+  messages: { id: string }[];
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -25,9 +31,37 @@ const handler = async (req: Request): Promise<Response> => {
 
     const { to, message }: WhatsAppRequest = await req.json();
 
-    // Clean phone number (remove non-digits and add country code if needed)
+    console.log('Received WhatsApp request:', { originalNumber: to, message: message.substring(0, 50) + '...' });
+
+    // Enhanced phone number formatting
     const cleanPhone = to.replace(/\D/g, '');
-    const phoneNumber = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+    console.log('Cleaned phone number:', cleanPhone);
+    
+    // Format phone number for Brazil (+55)
+    let phoneNumber = cleanPhone;
+    if (!cleanPhone.startsWith('55')) {
+      phoneNumber = `55${cleanPhone}`;
+    }
+    
+    // Validate phone number format
+    if (phoneNumber.length < 12 || phoneNumber.length > 13) {
+      console.error('Invalid phone number format:', { original: to, cleaned: cleanPhone, formatted: phoneNumber });
+      throw new Error(`Formato de telefone inválido: ${to}. Use o formato (XX) XXXXX-XXXX`);
+    }
+    
+    console.log('Final formatted phone number:', phoneNumber);
+
+    const requestBody = {
+      messaging_product: 'whatsapp',
+      to: phoneNumber,
+      type: 'text',
+      text: { body: message }
+    };
+
+    console.log('Sending WhatsApp API request:', {
+      url: `https://graph.facebook.com/v17.0/${WHATSAPP_PHONE_ID}/messages`,
+      body: requestBody
+    });
 
     const response = await fetch(`https://graph.facebook.com/v17.0/${WHATSAPP_PHONE_ID}/messages`, {
       method: 'POST',
@@ -35,24 +69,49 @@ const handler = async (req: Request): Promise<Response> => {
         'Authorization': `Bearer ${WHATSAPP_API_TOKEN}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: phoneNumber,
-        type: 'text',
-        text: { body: message }
-      }),
+      body: JSON.stringify(requestBody),
     });
 
-    const data = await response.json();
+    const data: WhatsAppResponse = await response.json();
+    
+    console.log('WhatsApp API response:', {
+      status: response.status,
+      statusText: response.statusText,
+      data: data
+    });
     
     if (!response.ok) {
-      console.error('WhatsApp API error:', data);
-      throw new Error(`WhatsApp API error: ${data.error?.message || 'Unknown error'}`);
+      console.error('WhatsApp API error details:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: data,
+        requestBody: requestBody
+      });
+      throw new Error(`WhatsApp API error (${response.status}): ${data.error?.message || 'Unknown error'}`);
     }
 
-    console.log('WhatsApp message sent successfully:', data);
+    // Log successful delivery details
+    const messageId = data.messages?.[0]?.id;
+    const waId = data.contacts?.[0]?.wa_id;
+    
+    console.log('WhatsApp message sent successfully:', {
+      messageId,
+      waId,
+      originalNumber: to,
+      formattedNumber: phoneNumber,
+      deliveryStatus: 'sent'
+    });
 
-    return new Response(JSON.stringify({ success: true, data }), {
+    return new Response(JSON.stringify({ 
+      success: true, 
+      data,
+      debug: {
+        originalNumber: to,
+        formattedNumber: phoneNumber,
+        messageId: data.messages?.[0]?.id,
+        waId: data.contacts?.[0]?.wa_id
+      }
+    }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

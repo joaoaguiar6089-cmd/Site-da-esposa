@@ -9,8 +9,8 @@ const Header = () => {
     <header className="bg-white/95 backdrop-blur-sm shadow-soft sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          <div className="flex flex-col">
-            <h1 className="text-2xl font-bold text-primary">
+          <div className="flex flex-col cursor-pointer" onClick={() => window.location.href = "/"}>
+            <h1 className="text-2xl font-bold text-primary hover:text-primary/80 transition-colors">
               Dra. Karoline Ferreira
             </h1>
             <p className="text-sm text-muted-foreground">

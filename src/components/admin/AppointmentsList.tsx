@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +45,7 @@ const AppointmentsList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
+  const navigate = useNavigate();
   const { toast } = useToast();
 
   const loadAppointments = async () => {
@@ -336,7 +338,7 @@ const AppointmentsList = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => window.location.href = `/agendamento?edit=${appointment.id}`}
+                        onClick={() => navigate(`/agendamento?edit=${appointment.id}`)}
                         className="flex items-center gap-1 flex-1"
                       >
                         Editar

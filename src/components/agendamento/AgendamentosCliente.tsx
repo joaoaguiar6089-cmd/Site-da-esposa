@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,7 @@ interface AgendamentosClienteProps {
 const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosClienteProps) => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
   const { toast } = useToast();
 
   const loadAppointments = async () => {
@@ -162,7 +164,7 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => window.location.href = `/agendamento?edit=${appointment.id}`}
+                        onClick={() => navigate(`/agendamento?edit=${appointment.id}`)}
                       >
                         Alterar
                       </Button>

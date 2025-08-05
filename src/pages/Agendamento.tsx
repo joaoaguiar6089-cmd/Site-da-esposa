@@ -67,9 +67,15 @@ const Agendamento = () => {
           clients!appointments_client_id_fkey(*)
         `)
         .eq('id', appointmentId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      
+      if (!data) {
+        console.error('Agendamento não encontrado');
+        navigate('/agendamento');
+        return;
+      }
 
       setClient(data.clients);
       setStep('novo-agendamento');

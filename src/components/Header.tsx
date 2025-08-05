@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Instagram, MessageCircle } from "lucide-react";
+import { Calendar, Instagram, MessageCircle } from "lucide-react";
 
 const Header = () => {
   const whatsappLink = "https://wa.me/5597984387295";
@@ -19,6 +19,15 @@ const Header = () => {
           </div>
           
           <div className="flex gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.href = "/agendamento"}
+              className="flex items-center gap-2"
+            >
+              <Calendar size={16} />
+              Agendar
+            </Button>
             <Button
               variant="whatsapp"
               size="sm"

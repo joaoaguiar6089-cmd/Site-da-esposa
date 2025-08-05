@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
-import heroImage from "@/assets/hero-clinic.jpg";
+import heroImage from "/lovable-uploads/648c7c53-0d63-4091-b28f-2ded7b542feb.png";
 
 const Hero = () => {
   const whatsappLink = "https://wa.me/5597984387295";

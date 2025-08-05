@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Calendar, Clock, Plus, User } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ArrowLeft, Calendar, Clock, Plus, User, Phone, Edit } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import type { Client } from "@/pages/Agendamento";
@@ -31,6 +33,9 @@ interface AgendamentosClienteProps {
 const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosClienteProps) => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const [newPhone, setNewPhone] = useState(client.celular);
+  const [updatingPhone, setUpdatingPhone] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -112,6 +117,53 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
     }
   };
 
+  const formatPhone = (phone: string) => {
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length === 11) {
+      return cleaned.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    }
+    return phone;
+  };
+
+  const handlePhoneUpdate = async () => {
+    if (!newPhone.trim()) {
+      toast({
+        title: "Erro",
+        description: "O telefone não pode estar vazio.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUpdatingPhone(true);
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({ celular: newPhone.replace(/\D/g, '') })
+        .eq('id', client.id);
+
+      if (error) throw error;
+
+      // Atualizar o cliente localmente
+      client.celular = newPhone.replace(/\D/g, '');
+      
+      toast({
+        title: "Sucesso",
+        description: "Telefone atualizado com sucesso!",
+      });
+      setIsEditingPhone(false);
+    } catch (error) {
+      console.error('Erro ao atualizar telefone:', error);
+      toast({
+        title: "Erro", 
+        description: "Erro ao atualizar telefone.",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingPhone(false);
+    }
+  };
+
   if (loading) {
     return (
       <Card className="w-full">
@@ -129,13 +181,61 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
           <User className="w-6 h-6 text-primary" />
           <CardTitle className="text-xl">Meus Agendamentos</CardTitle>
         </div>
-        <div className="text-center">
+        <div className="text-center space-y-2">
           <p className="text-muted-foreground">
             {client.nome} {client.sobrenome}
           </p>
           <p className="text-sm text-muted-foreground">
             CPF: {client.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')}
           </p>
+          <div className="flex items-center justify-center gap-2">
+            <Phone className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">
+              {formatPhone(client.celular)}
+            </span>
+            <Dialog open={isEditingPhone} onOpenChange={setIsEditingPhone}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                  <Edit className="w-3 h-3" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Editar Telefone</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">Novo telefone</label>
+                    <Input
+                      value={newPhone}
+                      onChange={(e) => setNewPhone(e.target.value)}
+                      placeholder="(00) 00000-0000"
+                      maxLength={15}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={handlePhoneUpdate}
+                      disabled={updatingPhone}
+                      className="flex-1"
+                    >
+                      {updatingPhone ? "Salvando..." : "Salvar"}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setIsEditingPhone(false);
+                        setNewPhone(client.celular);
+                      }}
+                      className="flex-1"
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

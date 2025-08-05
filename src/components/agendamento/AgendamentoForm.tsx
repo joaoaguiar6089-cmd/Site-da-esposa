@@ -31,7 +31,6 @@ interface AgendamentoFormProps {
 }
 
 const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: AgendamentoFormProps) => {
-  console.log("AgendamentoForm renderizado:", { client, editingId });
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [formData, setFormData] = useState({
@@ -90,7 +89,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
 
       setFormData({
         procedure_id: data.procedure_id || "",
-        professional_id: data.professional_id || "",
+        professional_id: data.professional_id || "none",
         appointment_date: data.appointment_date,
         appointment_time: data.appointment_time,
         notes: data.notes || "",
@@ -174,7 +173,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
           .from('appointments')
           .update({
             procedure_id: formData.procedure_id,
-            professional_id: formData.professional_id || null,
+            professional_id: formData.professional_id === "none" ? null : formData.professional_id,
             appointment_date: formData.appointment_date,
             appointment_time: formData.appointment_time,
             notes: formData.notes.trim() || null,
@@ -186,7 +185,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
           .insert({
             client_id: client.id,
             procedure_id: formData.procedure_id,
-            professional_id: formData.professional_id || null,
+            professional_id: formData.professional_id === "none" ? null : formData.professional_id,
             appointment_date: formData.appointment_date,
             appointment_time: formData.appointment_time,
             notes: formData.notes.trim() || null,
@@ -199,7 +198,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
       // Enviar notificações
       try {
         const selectedProc = procedures.find(p => p.id === formData.procedure_id);
-        const selectedProfessional = professionals.find(p => p.id === formData.professional_id);
+        const selectedProfessional = professionals.find(p => p.id === formData.professional_id && formData.professional_id !== "none");
         
         // WhatsApp para cliente
         const clientMessage = `🩺 *Agendamento ${editingId ? 'Atualizado' : 'Confirmado'}*\n\nOlá ${client.nome}!\n\nSeu agendamento foi ${editingId ? 'atualizado' : 'confirmado'}:\n\n📅 Data: ${new Date(formData.appointment_date).toLocaleDateString('pt-BR')}\n⏰ Horário: ${formData.appointment_time}\n💉 Procedimento: ${selectedProc?.name}\n💰 Valor: R$ ${selectedProc?.price?.toFixed(2)}\n${selectedProfessional ? `👩‍⚕️ Profissional: ${selectedProfessional.name}\n` : ''}\n📍 Local: Tefé-AM - Av. Brasil, 63b\n\nPara reagendamentos em Manaus, entre em contato via WhatsApp.\n\nObrigado pela confiança! 🙏`;
@@ -315,7 +314,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
                 <SelectValue placeholder="Selecione um profissional" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhum profissional específico</SelectItem>
+                <SelectItem value="none">Nenhum profissional específico</SelectItem>
                 {professionals.map((professional) => (
                   <SelectItem key={professional.id} value={professional.id}>
                     {professional.name}

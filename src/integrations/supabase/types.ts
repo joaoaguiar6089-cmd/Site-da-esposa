@@ -97,13 +97,6 @@ export type Database = {
             referencedRelation: "professionals"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "appointments_professional_id_fkey"
-            columns: ["professional_id"]
-            isOneToOne: false
-            referencedRelation: "professionals_public"
-            referencedColumns: ["id"]
-          },
         ]
       }
       categories: {
@@ -287,24 +280,7 @@ export type Database = {
       }
     }
     Views: {
-      professionals_public: {
-        Row: {
-          created_at: string | null
-          id: string | null
-          name: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string | null
-          name?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string | null
-          name?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       get_current_user_cpf: {

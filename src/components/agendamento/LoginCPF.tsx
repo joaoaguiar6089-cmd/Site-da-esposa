@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/components/auth/AuthContext";
 import type { Client } from "@/pages/Agendamento";
 
 interface LoginCPFProps {
@@ -17,6 +18,7 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
   const [cpf, setCpf] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { signInWithCPF } = useAuth();
 
   const formatCPF = (value: string) => {
     const numbers = value.replace(/\D/g, '');
@@ -50,6 +52,20 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
     setLoading(true);
     
     try {
+      // First authenticate with CPF
+      const { error: authError } = await signInWithCPF(cleanCPF);
+      
+      if (authError) {
+        toast({
+          title: "Erro de autenticação",
+          description: "Erro ao fazer login. Tente novamente.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Then fetch client data
       const { data, error } = await supabase
         .from('clients')
         .select('*')

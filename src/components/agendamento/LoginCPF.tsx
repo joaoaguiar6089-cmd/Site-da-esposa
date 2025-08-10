@@ -52,29 +52,12 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
     setLoading(true);
     
     try {
-      // First authenticate with CPF
-      const { error: authError } = await signInWithCPF(cleanCPF);
-      
-      // Log security event for CPF login attempt
-      if (!authError) {
-        await supabase.rpc('log_security_event', {
-          event_type: 'cpf_login_success',
-          event_details: { cpf: cleanCPF }
-        });
-      } else {
-        await supabase.rpc('log_security_event', {
-          event_type: 'cpf_login_failed',
-          event_details: { cpf: cleanCPF, error: authError.message }
-        });
-        
-        toast({
-          title: "Erro de autenticação",
-          description: "Erro ao fazer login. Tente novamente.",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
+      // Skip authentication for CPF login and go directly to client lookup
+      // Since we're not using user accounts for clients, just verify CPF exists
+      await supabase.rpc('log_security_event', {
+        event_type: 'cpf_login_attempt',
+        event_details: { cpf: cleanCPF }
+      });
 
       // Then fetch client data
       const { data, error } = await supabase

@@ -52,16 +52,6 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
     setLoading(true);
     
     try {
-      // Create temporary auth session for client lookup
-      const tempEmail = `${cleanCPF}@temp.clinic.local`;
-      const tempPassword = cleanCPF;
-      
-      // Try to authenticate temporarily
-      await supabase.auth.signInWithPassword({
-        email: tempEmail,
-        password: tempPassword,
-      });
-
       // Log security event for CPF login attempt
       await supabase.rpc('log_security_event', {
         event_type: 'cpf_login_attempt',

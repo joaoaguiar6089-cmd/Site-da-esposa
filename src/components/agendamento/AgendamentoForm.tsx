@@ -195,10 +195,50 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
 
       if (result.error) throw result.error;
 
-      // Enviar notificações
+      // Enviar notificações e dados para webhook
       try {
         const selectedProc = procedures.find(p => p.id === formData.procedure_id);
         const selectedProfessional = professionals.find(p => p.id === formData.professional_id && formData.professional_id !== "none");
+        
+        // Enviar dados para webhook n8n
+        const webhookData = {
+          client: {
+            id: client.id,
+            nome: client.nome,
+            sobrenome: client.sobrenome,
+            cpf: client.cpf,
+            celular: client.celular
+          },
+          appointment: {
+            id: editingId || null,
+            procedure_id: formData.procedure_id,
+            procedure_name: selectedProc?.name,
+            procedure_price: selectedProc?.price,
+            procedure_duration: selectedProc?.duration,
+            professional_id: formData.professional_id === "none" ? null : formData.professional_id,
+            professional_name: selectedProfessional?.name || null,
+            professional_email: selectedProfessional?.email || null,
+            appointment_date: formData.appointment_date,
+            appointment_time: formData.appointment_time,
+            notes: formData.notes.trim() || null,
+            status: 'agendado',
+            action: editingId ? 'updated' : 'created',
+            created_at: new Date().toISOString()
+          }
+        };
+
+        // Enviar para webhook n8n
+        try {
+          await fetch('https://jk2025.app.n8n.cloud/webhook-test/WebhookN8N', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(webhookData)
+          });
+        } catch (webhookError) {
+          console.error('Erro ao enviar para webhook n8n:', webhookError);
+        }
         
         // WhatsApp para cliente
         const clientMessage = `🩺 *Agendamento ${editingId ? 'Atualizado' : 'Confirmado'}*\n\nOlá ${client.nome}!\n\nSeu agendamento foi ${editingId ? 'atualizado' : 'confirmado'}:\n\n📅 Data: ${new Date(formData.appointment_date).toLocaleDateString('pt-BR')}\n⏰ Horário: ${formData.appointment_time}\n💉 Procedimento: ${selectedProc?.name}\n💰 Valor: R$ ${selectedProc?.price?.toFixed(2)}\n${selectedProfessional ? `👩‍⚕️ Profissional: ${selectedProfessional.name}\n` : ''}\n📍 Local: Tefé-AM - Av. Brasil, 63b\n\nPara reagendamentos em Manaus, entre em contato via WhatsApp.\n\nObrigado pela confiança! 🙏`;

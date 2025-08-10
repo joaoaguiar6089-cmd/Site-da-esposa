@@ -79,8 +79,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithCPF = async (cpf: string) => {
     try {
       // For existing clients, create a temporary account using CPF
-      const tempEmail = `${cpf}@temp.local`;
-      const tempPassword = cpf; // In production, use a more secure method
+      const cleanCPF = cpf.replace(/\D/g, '');
+      const tempEmail = `${cleanCPF}@temp.clinic.local`;
+      const tempPassword = cleanCPF;
       
       // Try to sign in first
       let { error: signInError } = await supabase.auth.signInWithPassword({
@@ -107,7 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .from('profiles')
           .insert([{
             user_id: (await supabase.auth.getUser()).data.user?.id,
-            cpf: cpf.replace(/\D/g, ''),
+            cpf: cleanCPF,
             role: 'client'
           }]);
 

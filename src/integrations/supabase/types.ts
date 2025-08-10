@@ -283,6 +283,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      authenticate_for_cpf_lookup: {
+        Args: { cpf_param: string }
+        Returns: boolean
+      }
       get_current_user_cpf: {
         Args: Record<PropertyKey, never>
         Returns: string

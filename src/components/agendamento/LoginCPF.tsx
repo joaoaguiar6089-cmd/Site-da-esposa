@@ -55,7 +55,18 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
       // First authenticate with CPF
       const { error: authError } = await signInWithCPF(cleanCPF);
       
-      if (authError) {
+      // Log security event for CPF login attempt
+      if (!authError) {
+        await supabase.rpc('log_security_event', {
+          event_type: 'cpf_login_success',
+          event_details: { cpf: cleanCPF }
+        });
+      } else {
+        await supabase.rpc('log_security_event', {
+          event_type: 'cpf_login_failed',
+          event_details: { cpf: cleanCPF, error: authError.message }
+        });
+        
         toast({
           title: "Erro de autenticação",
           description: "Erro ao fazer login. Tente novamente.",

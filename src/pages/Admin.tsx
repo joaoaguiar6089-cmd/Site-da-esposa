@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Calendar, Users, LogOut, Home, UserPlus, Tag, Stethoscope, MessageSquare } from "lucide-react";
+import { BarChart3, Calendar, Users, LogOut, Home, UserPlus, Tag, Stethoscope, MessageSquare, Shield } from "lucide-react";
 import AdminAuth from "@/components/admin/AdminAuth";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 import AppointmentsList from "@/components/admin/AppointmentsList";
@@ -9,27 +9,43 @@ import ProfessionalsList from "@/components/admin/ProfessionalsList";
 import CategoriesList from "@/components/admin/CategoriesList";
 import ProceduresManagement from "@/components/admin/ProceduresManagement";
 import NotificationDebug from "@/components/admin/NotificationDebug";
+import AdminManagement from "@/components/admin/AdminManagement";
+import SecurityAuditLog from "@/components/admin/SecurityAuditLog";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/components/auth/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 
 const Admin = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { toast } = useToast();
+  const { user, isAdmin, signOut } = useAuth();
 
   useEffect(() => {
-    const authStatus = localStorage.getItem("admin_authenticated");
-    if (authStatus === "true") {
-      setIsAuthenticated(true);
-    }
-  }, []);
+    // Check if user is authenticated and is an admin
+    setIsAuthenticated(!!user && isAdmin);
+  }, [user, isAdmin]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("admin_authenticated");
-    setIsAuthenticated(false);
-    toast({
-      title: "Logout realizado",
-      description: "Você foi desconectado da área administrativa.",
-    });
+  const handleLogout = async () => {
+    try {
+      // Log security event
+      await supabase.rpc('log_security_event', {
+        event_type: 'admin_logout'
+      });
+      
+      await signOut();
+      setIsAuthenticated(false);
+      
+      toast({
+        title: "Logout realizado",
+        description: "Você foi desconectado da área administrativa.",
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force logout even if logging fails
+      await signOut();
+      setIsAuthenticated(false);
+    }
   };
 
   const goToHome = () => {
@@ -68,7 +84,7 @@ const Admin = () => {
 
         {/* Navegação por Tabs */}
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 lg:grid-cols-6">
+          <TabsList className="grid w-full grid-cols-8 lg:grid-cols-8">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />
               Dashboard
@@ -92,6 +108,14 @@ const Admin = () => {
             <TabsTrigger value="notifications" className="flex items-center gap-2">
               <MessageSquare className="w-4 h-4" />
               Notificações
+            </TabsTrigger>
+            <TabsTrigger value="admins" className="flex items-center gap-2">
+              <Shield className="w-4 h-4" />
+              Administradores
+            </TabsTrigger>
+            <TabsTrigger value="security" className="flex items-center gap-2">
+              <Shield className="w-4 h-4" />
+              Segurança
             </TabsTrigger>
           </TabsList>
 
@@ -117,6 +141,14 @@ const Admin = () => {
 
           <TabsContent value="notifications" className="space-y-6">
             <NotificationDebug />
+          </TabsContent>
+
+          <TabsContent value="admins" className="space-y-6">
+            <AdminManagement />
+          </TabsContent>
+
+          <TabsContent value="security" className="space-y-6">
+            <SecurityAuditLog />
           </TabsContent>
         </Tabs>
       </div>

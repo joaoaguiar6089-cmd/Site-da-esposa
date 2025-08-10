@@ -37,16 +37,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Check if user is admin
+          // Check if user is admin using the new secure method
           setTimeout(async () => {
             try {
+              const { data: adminUser } = await supabase
+                .from('admin_users')
+                .select('is_active')
+                .eq('user_id', session.user.id)
+                .single();
+              
               const { data: profile } = await supabase
                 .from('profiles')
                 .select('role')
                 .eq('user_id', session.user.id)
                 .single();
               
-              setIsAdmin(profile?.role === 'admin');
+              setIsAdmin(adminUser?.is_active === true && profile?.role === 'admin');
             } catch (error) {
               console.error('Error checking admin status:', error);
               setIsAdmin(false);

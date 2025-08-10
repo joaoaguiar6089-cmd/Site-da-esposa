@@ -5,31 +5,76 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/components/auth/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AdminAuthProps {
   onAuth: () => void;
 }
 
 const AdminAuth = ({ onAuth }: AdminAuthProps) => {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { signIn, isAdmin } = useAuth();
 
-  const handleAuth = () => {
+  const handleAuth = async () => {
     setLoading(true);
     
-    // Senha simples para demonstração - em produção usar hash seguro
-    if (password === "admin123") {
-      localStorage.setItem("admin_authenticated", "true");
-      onAuth();
+    try {
+      const { error } = await signIn(email, password);
+      
+      if (error) {
+        toast({
+          title: "Erro de autenticação",
+          description: error.message,
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Check if user has admin access after login
+      const { data: adminUser } = await supabase
+        .from('admin_users')
+        .select('is_active')
+        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+        .single();
+
+      if (!adminUser?.is_active) {
+        toast({
+          title: "Acesso negado",
+          description: "Você não tem permissões administrativas.",
+          variant: "destructive",
+        });
+        await supabase.auth.signOut();
+        setLoading(false);
+        return;
+      }
+
+      // Log security event
+      await supabase.rpc('log_security_event', {
+        event_type: 'admin_login',
+        event_details: { email }
+      });
+
+      // Update last login
+      await supabase
+        .from('admin_users')
+        .update({ last_login: new Date().toISOString() })
+        .eq('user_id', (await supabase.auth.getUser()).data.user?.id);
+
       toast({
         title: "Acesso autorizado",
         description: "Bem-vinda à área administrativa!",
       });
-    } else {
+      
+      onAuth();
+    } catch (error) {
       toast({
-        title: "Acesso negado",
-        description: "Senha incorreta.",
+        title: "Erro interno",
+        description: "Tente novamente em alguns instantes.",
         variant: "destructive",
       });
     }
@@ -57,6 +102,17 @@ const AdminAuth = ({ onAuth }: AdminAuthProps) => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Digite seu email administrativo"
+              disabled={loading}
+            />
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="password">Senha</Label>
             <Input
               id="password"
@@ -71,7 +127,7 @@ const AdminAuth = ({ onAuth }: AdminAuthProps) => {
           <Button 
             onClick={handleAuth} 
             className="w-full" 
-            disabled={loading || !password}
+            disabled={loading || !email || !password}
           >
             {loading ? "Verificando..." : "Entrar"}
           </Button>

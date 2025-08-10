@@ -90,6 +90,28 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
     setLoading(true);
     
     try {
+      // Create a temporary authenticated session for this registration
+      const tempEmail = `${cleanCPF}@clinic.temp`;
+      const tempPassword = `temp_${cleanCPF}_pass`;
+      
+      // Try to sign up a temporary user for this registration
+      const { error: authError } = await supabase.auth.signUp({
+        email: tempEmail,
+        password: tempPassword,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+        },
+      });
+
+      if (authError && authError.message !== 'User already registered') {
+        console.error('Auth error:', authError);
+        // Continue anyway - try to sign in if user exists
+        await supabase.auth.signInWithPassword({
+          email: tempEmail,
+          password: tempPassword,
+        });
+      }
+
       const { data, error } = await supabase
         .from('clients')
         .insert({

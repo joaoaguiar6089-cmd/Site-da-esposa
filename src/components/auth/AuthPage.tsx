@@ -102,11 +102,23 @@ const AuthPage = () => {
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <CardTitle className="text-2xl">Acesso Seguro</CardTitle>
+            <CardTitle className="text-2xl">Acesso Seguro - Clientes</CardTitle>
           </div>
           <p className="text-muted-foreground">
-            Faça login ou cadastre-se para acessar o sistema
+            Área exclusiva para clientes. Faça login ou cadastre-se para agendar consultas e acompanhar seus procedimentos.
           </p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+            <p className="text-sm text-blue-700">
+              <strong>Administradores:</strong> Use a área administrativa em{" "}
+              <Button
+                variant="link"
+                className="p-0 h-auto text-blue-700 underline"
+                onClick={() => navigate("/admin")}
+              >
+                /admin
+              </Button>
+            </p>
+          </div>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login" className="space-y-4">

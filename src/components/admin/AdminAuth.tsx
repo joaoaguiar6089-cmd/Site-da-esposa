@@ -23,16 +23,6 @@ const AdminAuth = ({ onAuth }: AdminAuthProps) => {
     setLoading(true);
     
     try {
-      // BYPASS TEMPORÁRIO PARA DEBUG - REMOVER DEPOIS
-      if (email === 'admin@clinica.com' && password === '123456') {
-        toast({
-          title: "Acesso autorizado (DEBUG)",
-          description: "Entrando na área administrativa...",
-        });
-        onAuth();
-        setLoading(false);
-        return;
-      }
 
       const { error } = await signIn(email, password);
       

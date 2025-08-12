@@ -20,7 +20,7 @@ interface Procedure {
 interface Professional {
   id: string;
   name: string;
-  email: string;
+  email?: string;
 }
 
 interface AgendamentoFormProps {
@@ -48,7 +48,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
     try {
       const [proceduresResponse, professionalsResponse] = await Promise.all([
         supabase.from('procedures').select('*').order('name'),
-        supabase.from('professionals').select('id, name, email').order('name')
+        supabase.from('professionals').select('id, name').order('name')
       ]);
 
       if (proceduresResponse.error) throw proceduresResponse.error;

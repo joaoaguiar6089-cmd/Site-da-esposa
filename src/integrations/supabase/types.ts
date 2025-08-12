@@ -291,6 +291,10 @@ export type Database = {
         Args: { cpf_param: string }
         Returns: boolean
       }
+      generate_secure_cpf_password: {
+        Args: { cpf_param: string }
+        Returns: string
+      }
       get_current_user_cpf: {
         Args: Record<PropertyKey, never>
         Returns: string

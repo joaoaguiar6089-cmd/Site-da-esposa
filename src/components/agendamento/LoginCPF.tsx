@@ -6,6 +6,7 @@ import { ArrowLeft, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/auth/AuthContext";
+import { isValidCPF, formatCPF } from "@/utils/cpfValidator";
 import type { Client } from "@/pages/Agendamento";
 
 interface LoginCPFProps {
@@ -20,15 +21,6 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
   const { toast } = useToast();
   const { signInWithCPF } = useAuth();
 
-  const formatCPF = (value: string) => {
-    const numbers = value.replace(/\D/g, '');
-    const match = numbers.match(/^(\d{3})(\d{3})(\d{3})(\d{2})$/);
-    if (match) {
-      return `${match[1]}.${match[2]}.${match[3]}-${match[4]}`;
-    }
-    return numbers;
-  };
-
   const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (value.replace(/\D/g, '').length <= 11) {
@@ -39,16 +31,16 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const cleanCPF = cpf.replace(/\D/g, '');
-    if (cleanCPF.length !== 11) {
+    if (!isValidCPF(cpf)) {
       toast({
         title: "CPF inválido",
-        description: "Por favor, digite um CPF válido com 11 dígitos.",
+        description: "Por favor, digite um CPF válido.",
         variant: "destructive",
       });
       return;
     }
 
+    const cleanCPF = cpf.replace(/\D/g, '');
     setLoading(true);
     
     try {
@@ -142,7 +134,7 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
             </Button>
             <Button
               type="submit"
-              disabled={loading || cpf.replace(/\D/g, '').length !== 11}
+              disabled={loading || !isValidCPF(cpf)}
               className="flex-1"
             >
               {loading ? "Buscando..." : "Continuar"}

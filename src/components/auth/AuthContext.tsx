@@ -78,22 +78,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithCPF = async (cpf: string) => {
     try {
-      // For existing clients, create a temporary account using CPF
+      // Clean CPF and validate format
       const cleanCPF = cpf.replace(/\D/g, '');
+      
+      if (cleanCPF.length !== 11) {
+        return { error: new Error('CPF deve ter 11 dígitos') };
+      }
+      
       const tempEmail = `${cleanCPF}@temp.clinic.local`;
-      const tempPassword = cleanCPF;
+      
+      // Generate secure password using the new database function
+      const { data: securePassword, error: passwordError } = await supabase
+        .rpc('generate_secure_cpf_password', { cpf_param: cleanCPF });
+      
+      if (passwordError || !securePassword) {
+        return { error: new Error('Erro ao gerar credenciais seguras') };
+      }
       
       // Try to sign in first
       let { error: signInError } = await supabase.auth.signInWithPassword({
         email: tempEmail,
-        password: tempPassword,
+        password: securePassword,
       });
 
       if (signInError) {
-        // If sign in fails, create the account
+        // If sign in fails, create the account with secure password
         const { error: signUpError } = await supabase.auth.signUp({
           email: tempEmail,
-          password: tempPassword,
+          password: securePassword,
           options: {
             emailRedirectTo: `${window.location.origin}/`,
           },

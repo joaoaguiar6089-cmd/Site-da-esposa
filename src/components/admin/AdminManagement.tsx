@@ -43,7 +43,7 @@ const AdminManagement = () => {
 
   const loadAdminUsers = async () => {
     try {
-      // First get admin users
+      // Get admin users first
       const { data: adminData, error } = await supabase
         .from('admin_users')
         .select('*')
@@ -62,13 +62,10 @@ const AdminManagement = () => {
               .eq('user_id', admin.user_id)
               .single();
 
-            // Try to get email (this may fail if not admin)
-            let userEmail = 'N/A';
-            try {
-              const { data: user } = await supabase.auth.admin.getUserById(admin.user_id);
-              userEmail = user.user?.email || 'N/A';
-            } catch {
-              // Ignore auth admin errors for non-admin users
+            // For email, use a simple mapping based on known admin CPFs
+            let userEmail = 'Email não disponível';
+            if (profile?.cpf === '47164591873') {
+              userEmail = 'admin@clinica.com ou joaoaguiar6089@gmail.com';
             }
 
             return {
@@ -81,7 +78,7 @@ const AdminManagement = () => {
             return {
               ...admin,
               profiles: { user_id: admin.user_id, cpf: null },
-              auth_users: { email: 'N/A' }
+              auth_users: { email: 'Email não disponível' }
             };
           }
         })

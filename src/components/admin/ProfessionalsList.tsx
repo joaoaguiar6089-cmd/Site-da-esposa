@@ -110,6 +110,24 @@ const ProfessionalsList = () => {
     if (!confirm("Tem certeza que deseja excluir este profissional?")) return;
 
     try {
+      // Verificar se o profissional tem agendamentos
+      const { data: appointments, error: checkError } = await supabase
+        .from('appointments')
+        .select('id')
+        .eq('professional_id', id)
+        .limit(1);
+
+      if (checkError) throw checkError;
+
+      if (appointments && appointments.length > 0) {
+        toast({
+          title: "Não é possível excluir",
+          description: "Este profissional possui agendamentos associados. Para excluí-lo, primeiro remova ou transfira os agendamentos.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { error } = await supabase
         .from('professionals')
         .delete()

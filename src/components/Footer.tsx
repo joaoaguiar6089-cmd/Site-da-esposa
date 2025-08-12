@@ -70,6 +70,16 @@ const Footer = () => {
               <Heart size={16} className="text-accent" /> 
               para sua beleza.
             </p>
+            {/* Link discreto para área administrativa */}
+            <div className="mt-2">
+              <a 
+                href="/admin" 
+                className="text-xs text-gray-500 hover:text-gray-400 transition-colors opacity-50"
+                title="Área Administrativa"
+              >
+                •
+              </a>
+            </div>
           </div>
         </div>
       </div>

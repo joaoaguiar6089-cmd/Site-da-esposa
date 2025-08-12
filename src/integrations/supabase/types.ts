@@ -287,6 +287,10 @@ export type Database = {
         Args: { cpf_param: string }
         Returns: boolean
       }
+      check_cpf_exists: {
+        Args: { cpf_param: string }
+        Returns: boolean
+      }
       get_current_user_cpf: {
         Args: Record<PropertyKey, never>
         Returns: string

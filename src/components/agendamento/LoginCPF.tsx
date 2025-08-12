@@ -58,22 +58,38 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
         event_details: { cpf: cleanCPF }
       });
 
-      // Then fetch client data
-      const { data, error } = await supabase
+      // Verificar se o CPF existe usando função segura
+      const { data: cpfExists, error: checkError } = await supabase
+        .rpc('check_cpf_exists', { cpf_param: cleanCPF });
+
+      if (checkError) {
+        throw checkError;
+      }
+
+      if (!cpfExists) {
+        onClientNotFound();
+        return;
+      }
+
+      // Se o CPF existe, fazer login seguro com CPF
+      const result = await signInWithCPF(cleanCPF);
+      
+      if (result.error) {
+        throw result.error;
+      }
+
+      // Buscar dados do cliente após autenticação bem-sucedida
+      const { data: clientData, error: clientError } = await supabase
         .from('clients')
         .select('*')
         .eq('cpf', cleanCPF)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
+      if (clientError) {
+        throw clientError;
       }
 
-      if (data) {
-        onClientFound(data);
-      } else {
-        onClientNotFound();
-      }
+      onClientFound(clientData);
     } catch (error) {
       console.error('Erro ao buscar cliente:', error);
       toast({

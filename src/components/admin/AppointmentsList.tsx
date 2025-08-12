@@ -17,12 +17,18 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 
+interface Professional {
+  id: string;
+  name: string;
+}
+
 interface Appointment {
   id: string;
   appointment_date: string;
   appointment_time: string;
   status: string;
   notes: string;
+  professional_id: string | null;
   client: {
     nome: string;
     sobrenome: string;
@@ -34,14 +40,20 @@ interface Appointment {
     price: number;
     duration: number;
   };
+  professional?: {
+    id: string;
+    name: string;
+  } | null;
 }
 
 const AppointmentsList = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [filteredAppointments, setFilteredAppointments] = useState<Appointment[]>([]);
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('todos');
   const [dateFilter, setDateFilter] = useState('todos');
+  const [professionalFilter, setProfessionalFilter] = useState('todos');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
@@ -55,7 +67,8 @@ const AppointmentsList = () => {
         .select(`
           *,
           clients!appointments_client_id_fkey(nome, sobrenome, cpf, celular),
-          procedures!appointments_procedure_id_fkey(name, price, duration)
+          procedures!appointments_procedure_id_fkey(name, price, duration),
+          professionals(id, name)
         `)
         .order('appointment_date', { ascending: true })
         .order('appointment_time', { ascending: true });
@@ -65,7 +78,8 @@ const AppointmentsList = () => {
       const formattedData = data?.map(apt => ({
         ...apt,
         client: apt.clients,
-        procedure: apt.procedures
+        procedure: apt.procedures,
+        professional: apt.professionals
       })) || [];
       
       setAppointments(formattedData);
@@ -82,13 +96,28 @@ const AppointmentsList = () => {
     }
   };
 
+  const loadProfessionals = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('professionals')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+      setProfessionals(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar profissionais:', error);
+    }
+  };
+
   useEffect(() => {
     loadAppointments();
+    loadProfessionals();
   }, []);
 
   useEffect(() => {
     filterAppointments();
-  }, [statusFilter, dateFilter, searchTerm, appointments]);
+  }, [statusFilter, dateFilter, professionalFilter, searchTerm, appointments]);
 
   const filterAppointments = () => {
     let filtered = [...appointments];
@@ -96,6 +125,15 @@ const AppointmentsList = () => {
     // Filtro por status
     if (statusFilter !== 'todos') {
       filtered = filtered.filter(apt => apt.status === statusFilter);
+    }
+
+    // Filtro por profissional
+    if (professionalFilter !== 'todos') {
+      if (professionalFilter === 'sem_profissional') {
+        filtered = filtered.filter(apt => !apt.professional_id);
+      } else {
+        filtered = filtered.filter(apt => apt.professional_id === professionalFilter);
+      }
     }
 
     // Filtro por data
@@ -118,7 +156,8 @@ const AppointmentsList = () => {
         apt.client.sobrenome.toLowerCase().includes(searchTerm.toLowerCase()) ||
         apt.client.cpf.includes(searchTerm) ||
         apt.client.celular.includes(searchTerm) ||
-        apt.procedure.name.toLowerCase().includes(searchTerm.toLowerCase())
+        apt.procedure.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (apt.professional?.name && apt.professional.name.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 
@@ -241,6 +280,21 @@ const AppointmentsList = () => {
             </SelectContent>
           </Select>
 
+          <Select value={professionalFilter} onValueChange={setProfessionalFilter}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Profissional" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos profissionais</SelectItem>
+              <SelectItem value="sem_profissional">Sem profissional</SelectItem>
+              {professionals.map((professional) => (
+                <SelectItem key={professional.id} value={professional.id}>
+                  {professional.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Select value={dateFilter} onValueChange={setDateFilter}>
             <SelectTrigger className="w-40">
               <SelectValue placeholder="Data" />
@@ -308,6 +362,9 @@ const AppointmentsList = () => {
                         </div>
                         <div className="mb-2">
                           <strong>Valor:</strong> R$ {appointment.procedure.price?.toFixed(2)}
+                        </div>
+                        <div className="mb-2">
+                          <strong>Profissional:</strong> {appointment.professional?.name || 'Não atribuído'}
                         </div>
                       </div>
                     </div>

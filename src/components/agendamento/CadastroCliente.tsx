@@ -69,6 +69,15 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
     const cleanCPF = formData.cpf.replace(/\D/g, '');
     const cleanPhone = formData.celular.replace(/\D/g, '');
     
+    console.log('Cadastro - Dados do formulário:', { 
+      cpf: formData.cpf, 
+      cleanCPF, 
+      nome: formData.nome, 
+      sobrenome: formData.sobrenome,
+      celular: formData.celular,
+      cleanPhone 
+    });
+    
     if (cleanCPF.length !== 11) {
       toast({
         title: "CPF inválido",
@@ -90,28 +99,9 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
     setLoading(true);
     
     try {
-      // Create a temporary authenticated session for this registration
-      const tempEmail = `${cleanCPF}@clinic.temp`;
-      const tempPassword = `temp_${cleanCPF}_pass`;
+      console.log('Cadastro - Inserindo cliente no banco...');
       
-      // Try to sign up a temporary user for this registration
-      const { error: authError } = await supabase.auth.signUp({
-        email: tempEmail,
-        password: tempPassword,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-        },
-      });
-
-      if (authError && authError.message !== 'User already registered') {
-        console.error('Auth error:', authError);
-        // Continue anyway - try to sign in if user exists
-        await supabase.auth.signInWithPassword({
-          email: tempEmail,
-          password: tempPassword,
-        });
-      }
-
+      // Inserir cliente diretamente sem autenticação
       const { data, error } = await supabase
         .from('clients')
         .insert({
@@ -123,7 +113,10 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
         .select()
         .single();
 
+      console.log('Cadastro - Resultado da inserção:', { data, error });
+
       if (error) {
+        console.error('Cadastro - Erro ao inserir:', error);
         if (error.code === '23505') {
           toast({
             title: "CPF já cadastrado",
@@ -135,6 +128,8 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
         throw error;
       }
 
+      console.log('Cadastro - Cliente cadastrado com sucesso:', data);
+      
       toast({
         title: "Cadastro realizado!",
         description: "Seus dados foram salvos com sucesso.",

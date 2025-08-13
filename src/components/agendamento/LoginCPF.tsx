@@ -35,6 +35,11 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    const cleanCPF = cpf.replace(/\D/g, '');
+    console.log('Login CPF - CPF digitado:', cpf);
+    console.log('Login CPF - CPF limpo:', cleanCPF);
+    console.log('Login CPF - CPF válido?', isValidCPF(cpf));
+    
     if (!isValidCPF(cpf)) {
       toast({
         title: "CPF inválido",
@@ -44,10 +49,11 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
       return;
     }
 
-    const cleanCPF = cpf.replace(/\D/g, '');
     setLoading(true);
     
     try {
+      console.log('Login CPF - Buscando cliente com CPF:', cleanCPF);
+      
       // Buscar diretamente na tabela de clientes (sem autenticação)
       const { data: clientData, error: clientError } = await supabase
         .from('clients')
@@ -55,17 +61,21 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
         .eq('cpf', cleanCPF)
         .maybeSingle();
 
+      console.log('Login CPF - Resultado da busca:', { clientData, clientError });
+
       if (clientError) {
         console.error('Erro na consulta:', clientError);
         throw new Error('Erro ao consultar dados do cliente');
       }
 
       if (!clientData) {
+        console.log('Login CPF - Cliente não encontrado, direcionando para cadastro');
         onClientNotFound();
         return;
       }
 
-      // Cliente encontrado, prosseguir sem autenticação
+      console.log('Login CPF - Cliente encontrado:', clientData);
+      // Cliente encontrado, prosseguir
       onClientFound(clientData);
     } catch (error) {
       console.error('Erro ao buscar cliente:', error);

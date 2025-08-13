@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Calendar, Instagram, MessageCircle } from "lucide-react";
+import CategorySelect from "./CategorySelect";
 
 const Header = () => {
   const whatsappLink = "https://wa.me/5597984387295";
@@ -19,6 +20,7 @@ const Header = () => {
           </div>
           
           <div className="flex gap-3">
+            <CategorySelect />
             <Button
               variant="outline"
               size="sm"

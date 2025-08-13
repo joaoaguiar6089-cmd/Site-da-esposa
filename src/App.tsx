@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Agendamento from "./pages/Agendamento";
 import Admin from "./pages/Admin";
 import AuthPage from "./components/auth/AuthPage";
+import CategoryProcedures from "./pages/CategoryProcedures";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/agendamento" element={<Agendamento />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/auth" element={<AuthPage />} />
+          <Route path="/categoria/:categoryId" element={<CategoryProcedures />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

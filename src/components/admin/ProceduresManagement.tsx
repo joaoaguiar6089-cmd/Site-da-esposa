@@ -6,7 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Edit, Trash2, Star, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -22,6 +24,9 @@ interface Procedure {
   duration: number;
   price: number | null;
   category_id: string | null;
+  image_url: string | null;
+  benefits: string[] | null;
+  is_featured: boolean;
   categories?: Category;
 }
 
@@ -36,8 +41,12 @@ const ProceduresManagement = () => {
     description: "",
     duration: "60",
     price: "",
-    category_id: ""
+    category_id: "",
+    image_url: "",
+    benefits: [] as string[],
+    is_featured: false
   });
+  const [newBenefit, setNewBenefit] = useState("");
   const { toast } = useToast();
 
   const loadProcedures = async () => {
@@ -98,7 +107,10 @@ const ProceduresManagement = () => {
         description: formData.description || null,
         duration: parseInt(formData.duration),
         price: formData.price ? parseFloat(formData.price) : null,
-        category_id: formData.category_id || null
+        category_id: formData.category_id || null,
+        image_url: formData.image_url || null,
+        benefits: formData.benefits.length > 0 ? formData.benefits : null,
+        is_featured: formData.is_featured
       };
 
       if (editingProcedure) {
@@ -126,7 +138,7 @@ const ProceduresManagement = () => {
         });
       }
 
-      setFormData({ name: "", description: "", duration: "60", price: "", category_id: "" });
+      setFormData({ name: "", description: "", duration: "60", price: "", category_id: "", image_url: "", benefits: [], is_featured: false });
       setEditingProcedure(null);
       setDialogOpen(false);
       loadProcedures();
@@ -146,7 +158,10 @@ const ProceduresManagement = () => {
       description: procedure.description || "",
       duration: procedure.duration.toString(),
       price: procedure.price?.toString() || "",
-      category_id: procedure.category_id || ""
+      category_id: procedure.category_id || "",
+      image_url: procedure.image_url || "",
+      benefits: procedure.benefits || [],
+      is_featured: procedure.is_featured
     });
     setDialogOpen(true);
   };
@@ -178,8 +193,63 @@ const ProceduresManagement = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: "", description: "", duration: "60", price: "", category_id: "" });
+    setFormData({ name: "", description: "", duration: "60", price: "", category_id: "", image_url: "", benefits: [], is_featured: false });
     setEditingProcedure(null);
+    setNewBenefit("");
+  };
+
+  const addBenefit = () => {
+    if (newBenefit.trim() && !formData.benefits.includes(newBenefit.trim())) {
+      setFormData({ ...formData, benefits: [...formData.benefits, newBenefit.trim()] });
+      setNewBenefit("");
+    }
+  };
+
+  const removeBenefit = (benefit: string) => {
+    setFormData({ ...formData, benefits: formData.benefits.filter(b => b !== benefit) });
+  };
+
+  const toggleFeatured = async (procedureId: string, currentStatus: boolean) => {
+    try {
+      // Check if we're trying to feature and already have 4 featured procedures
+      if (!currentStatus) {
+        const { count } = await supabase
+          .from('procedures')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_featured', true);
+
+        if (count && count >= 4) {
+          toast({
+            title: "Limite atingido",
+            description: "Você pode ter no máximo 4 procedimentos em destaque.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      const { error } = await supabase
+        .from('procedures')
+        .update({ is_featured: !currentStatus })
+        .eq('id', procedureId);
+
+      if (error) throw error;
+
+      toast({
+        title: currentStatus ? "Removido dos destaques" : "Adicionado aos destaques",
+        description: currentStatus 
+          ? "O procedimento foi removido da página inicial." 
+          : "O procedimento agora aparece na página inicial.",
+      });
+
+      loadProcedures();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) return <div>Carregando procedimentos...</div>;
@@ -198,37 +268,40 @@ const ProceduresManagement = () => {
               Adicionar Procedimento
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingProcedure ? "Editar Procedimento" : "Novo Procedimento"}
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="name">Nome</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="name">Nome</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="category">Categoria</Label>
+                  <Select value={formData.category_id} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="category">Categoria</Label>
-                <Select value={formData.category_id} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma categoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+
               <div>
                 <Label htmlFor="description">Descrição</Label>
                 <Textarea
@@ -236,29 +309,105 @@ const ProceduresManagement = () => {
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Descrição do procedimento"
+                  rows={3}
                 />
               </div>
+
               <div>
-                <Label htmlFor="duration">Duração (minutos)</Label>
+                <Label htmlFor="image_url">URL da Imagem</Label>
                 <Input
-                  id="duration"
-                  type="number"
-                  value={formData.duration}
-                  onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                  required
+                  id="image_url"
+                  value={formData.image_url}
+                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                  placeholder="https://exemplo.com/imagem.jpg"
                 />
+                {formData.image_url && (
+                  <div className="mt-2">
+                    <img 
+                      src={formData.image_url} 
+                      alt="Preview" 
+                      className="w-32 h-32 object-cover rounded border"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="duration">Duração (minutos)</Label>
+                  <Input
+                    id="duration"
+                    type="number"
+                    value={formData.duration}
+                    onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="price">Preço (R$)</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    step="0.01"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
               <div>
-                <Label htmlFor="price">Preço (R$)</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  step="0.01"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  placeholder="0.00"
-                />
+                <Label>Benefícios</Label>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      value={newBenefit}
+                      onChange={(e) => setNewBenefit(e.target.value)}
+                      placeholder="Adicionar benefício"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addBenefit();
+                        }
+                      }}
+                    />
+                    <Button type="button" onClick={addBenefit} variant="outline">
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {formData.benefits.map((benefit, index) => (
+                      <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                        {benefit}
+                        <button
+                          type="button"
+                          onClick={() => removeBenefit(benefit)}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
               </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="is_featured"
+                  checked={formData.is_featured}
+                  onCheckedChange={(checked) => 
+                    setFormData({ ...formData, is_featured: checked as boolean })
+                  }
+                />
+                <Label htmlFor="is_featured" className="text-sm font-medium">
+                  Destacar na página inicial (máximo 4)
+                </Label>
+              </div>
+
               <Button type="submit" className="w-full">
                 {editingProcedure ? "Atualizar" : "Criar"}
               </Button>
@@ -270,37 +419,89 @@ const ProceduresManagement = () => {
       <div className="grid gap-4">
         {procedures.map((procedure) => (
           <Card key={procedure.id} className="p-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-semibold text-foreground">{procedure.name}</h3>
-                {procedure.categories && (
-                  <p className="text-sm text-primary font-medium">{procedure.categories.name}</p>
-                )}
-                {procedure.description && (
-                  <p className="text-sm text-muted-foreground mt-1">{procedure.description}</p>
-                )}
-                <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
-                  <span>Duração: {procedure.duration} min</span>
-                  {procedure.price && (
-                    <span>Preço: R$ {procedure.price.toFixed(2)}</span>
-                  )}
+            <div className="flex gap-4">
+              {procedure.image_url && (
+                <div className="flex-shrink-0">
+                  <img 
+                    src={procedure.image_url} 
+                    alt={procedure.name}
+                    className="w-24 h-24 object-cover rounded"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
                 </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleEdit(procedure)}
-                >
-                  <Edit className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDelete(procedure.id)}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+              )}
+              
+              <div className="flex-grow">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-foreground">{procedure.name}</h3>
+                      {procedure.is_featured && (
+                        <Badge variant="default" className="bg-amber-100 text-amber-800">
+                          <Star className="w-3 h-3 mr-1" />
+                          Destaque
+                        </Badge>
+                      )}
+                    </div>
+                    {procedure.categories && (
+                      <p className="text-sm text-primary font-medium">{procedure.categories.name}</p>
+                    )}
+                    {procedure.description && (
+                      <p className="text-sm text-muted-foreground mt-1">{procedure.description}</p>
+                    )}
+                    
+                    {procedure.benefits && procedure.benefits.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Benefícios:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {procedure.benefits.slice(0, 3).map((benefit, index) => (
+                            <Badge key={index} variant="outline" className="text-xs">
+                              {benefit}
+                            </Badge>
+                          ))}
+                          {procedure.benefits.length > 3 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{procedure.benefits.length - 3} mais
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
+                      <span>Duração: {procedure.duration} min</span>
+                      {procedure.price && (
+                        <span>Preço: R$ {procedure.price.toFixed(2)}</span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      variant={procedure.is_featured ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => toggleFeatured(procedure.id, procedure.is_featured)}
+                    >
+                      <Star className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEdit(procedure)}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(procedure.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </Card>

@@ -155,31 +155,43 @@ export type Database = {
       }
       procedures: {
         Row: {
+          benefits: string[] | null
           category_id: string | null
           created_at: string
           description: string | null
           duration: number
           id: string
+          image_url: string | null
+          is_featured: boolean | null
           name: string
           price: number | null
+          updated_at: string | null
         }
         Insert: {
+          benefits?: string[] | null
           category_id?: string | null
           created_at?: string
           description?: string | null
           duration?: number
           id?: string
+          image_url?: string | null
+          is_featured?: boolean | null
           name: string
           price?: number | null
+          updated_at?: string | null
         }
         Update: {
+          benefits?: string[] | null
           category_id?: string | null
           created_at?: string
           description?: string | null
           duration?: number
           id?: string
+          image_url?: string | null
+          is_featured?: boolean | null
           name?: string
           price?: number | null
+          updated_at?: string | null
         }
         Relationships: [
           {

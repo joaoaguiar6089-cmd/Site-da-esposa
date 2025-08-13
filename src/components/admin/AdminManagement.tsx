@@ -66,11 +66,11 @@ const AdminManagement = () => {
     setSubmitting(true);
 
     try {
-      // Sempre tentar criar um novo usuário primeiro
       if (!formData.password) {
         throw new Error('Senha é obrigatória para criar um novo administrador');
       }
 
+      // Criar o usuário - o trigger automaticamente criará o perfil e admin_users
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -87,71 +87,9 @@ const AdminManagement = () => {
         throw new Error('Falha ao criar conta de usuário');
       }
 
-      const userId = authData.user.id;
-
-      // Aguardar um pouco para garantir que o trigger rode e crie o profile
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Verificar se já é admin
-      const { data: existingAdmin } = await supabase
-        .from('admin_users')
-        .select('id')
-        .eq('user_id', userId)
-        .single();
-        
-      if (existingAdmin) {
-        throw new Error('Este usuário já é um administrador');
-      }
-
-      // Atualizar o profile para ser admin (o profile já foi criado pelo trigger)
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ role: 'admin' })
-        .eq('user_id', userId);
-
-      if (profileError) {
-        console.error('Erro ao atualizar profile:', profileError);
-        // Se não conseguir atualizar, tentar inserir
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            user_id: userId,
-            role: 'admin'
-          });
-        
-        if (insertError) {
-          console.error('Erro ao inserir profile:', insertError);
-          throw new Error('Erro ao configurar perfil do administrador: ' + insertError.message);
-        }
-      }
-
-      // Criar registro admin
-      const { error: adminError } = await supabase
-        .from('admin_users')
-        .insert({
-          user_id: userId,
-          is_active: true,
-          email: formData.email,
-          email_notifications: formData.emailNotifications
-        });
-
-      if (adminError) {
-        console.error('Erro ao criar admin_users:', adminError);
-        throw new Error('Erro ao criar registro de administrador: ' + adminError.message);
-      }
-
-      // Log do evento de segurança
-      await supabase.rpc('log_security_event', {
-        event_type: 'admin_user_created',
-        event_details: { 
-          email: formData.email,
-          target_user_id: userId
-        }
-      });
-
       toast({
         title: "Administrador criado",
-        description: `Administrador ${formData.email} criado com sucesso.`,
+        description: `Administrador ${formData.email} criado com sucesso. O trigger automaticamente configurou as permissões.`,
       });
 
       setFormData({ email: "", password: "", emailNotifications: true });

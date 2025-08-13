@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, Star, X } from "lucide-react";
+import { Plus, Edit, Trash2, Star, X, Upload, Image } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -47,6 +47,7 @@ const ProceduresManagement = () => {
     is_featured: false
   });
   const [newBenefit, setNewBenefit] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
   const { toast } = useToast();
 
   const loadProcedures = async () => {
@@ -209,6 +210,63 @@ const ProceduresManagement = () => {
     setFormData({ ...formData, benefits: formData.benefits.filter(b => b !== benefit) });
   };
 
+  const handleImageUpload = async (file: File) => {
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Erro",
+        description: "Por favor, selecione apenas arquivos de imagem.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "Erro",
+        description: "A imagem deve ter no máximo 5MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadingImage(true);
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `procedures/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('procedure-images')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from('procedure-images')
+        .getPublicUrl(filePath);
+
+      setFormData({ ...formData, image_url: data.publicUrl });
+
+      toast({
+        title: "Sucesso",
+        description: "Imagem enviada com sucesso!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao enviar imagem",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const toggleFeatured = async (procedureId: string, currentStatus: boolean) => {
     try {
       // Check if we're trying to feature and already have 4 featured procedures
@@ -314,25 +372,64 @@ const ProceduresManagement = () => {
               </div>
 
               <div>
-                <Label htmlFor="image_url">URL da Imagem</Label>
-                <Input
-                  id="image_url"
-                  value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                  placeholder="https://exemplo.com/imagem.jpg"
-                />
-                {formData.image_url && (
-                  <div className="mt-2">
-                    <img 
-                      src={formData.image_url} 
-                      alt="Preview" 
-                      className="w-32 h-32 object-cover rounded border"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
+                <Label>Imagem do Procedimento</Label>
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <Label htmlFor="image_url" className="text-sm text-muted-foreground">URL da Imagem</Label>
+                      <Input
+                        id="image_url"
+                        value={formData.image_url}
+                        onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                        placeholder="https://exemplo.com/imagem.jpg"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <Label className="text-sm text-muted-foreground">ou</Label>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleImageUpload(file);
+                          }}
+                          className="hidden"
+                          id="image-upload"
+                        />
+                        <label
+                          htmlFor="image-upload"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-md cursor-pointer hover:bg-secondary/80 transition-colors"
+                        >
+                          {uploadingImage ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                              Enviando...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4" />
+                              Upload
+                            </>
+                          )}
+                        </label>
+                      </div>
+                    </div>
                   </div>
-                )}
+                  
+                  {formData.image_url && (
+                    <div className="mt-2">
+                      <img 
+                        src={formData.image_url} 
+                        alt="Preview" 
+                        className="w-32 h-32 object-cover rounded border"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

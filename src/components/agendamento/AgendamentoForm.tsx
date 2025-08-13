@@ -276,9 +276,9 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
           });
         }
 
-        // Notificar proprietária da clínica
+        // Notificar proprietária da clínica via WhatsApp e Email
         try {
-          await supabase.functions.invoke('notify-owner', {
+          const ownerNotifyPromise = supabase.functions.invoke('notify-owner', {
             body: {
               type: editingId ? 'alteracao' : 'agendamento',
               clientName: `${client.nome} ${client.sobrenome}`,
@@ -289,6 +289,22 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
               professionalName: selectedProfessional?.name
             }
           });
+
+          const emailNotifyPromise = supabase.functions.invoke('send-email', {
+            body: {
+              to: 'enfesteta.karoline@gmail.com',
+              subject: `${editingId ? 'Agendamento Alterado' : 'Novo Agendamento'} - ${selectedProc?.name || ''}`,
+              clientName: `${client.nome} ${client.sobrenome}`,
+              clientPhone: client.celular,
+              appointmentDate: formData.appointment_date,
+              appointmentTime: formData.appointment_time,
+              procedureName: selectedProc?.name || '',
+              professionalName: selectedProfessional?.name,
+              action: editingId ? 'alteracao' : 'agendamento'
+            }
+          });
+
+          await Promise.allSettled([ownerNotifyPromise, emailNotifyPromise]);
         } catch (ownerNotificationError) {
           console.error('Erro ao notificar proprietária:', ownerNotificationError);
         }

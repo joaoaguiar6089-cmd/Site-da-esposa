@@ -174,9 +174,9 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
 
       if (error) throw error;
 
-      // Notificar proprietária sobre o cancelamento
+      // Notificar proprietária sobre o cancelamento via WhatsApp e Email
       try {
-        await supabase.functions.invoke('notify-owner', {
+        const ownerNotifyPromise = supabase.functions.invoke('notify-owner', {
           body: {
             type: 'cancelamento',
             clientName: `${client.nome} ${client.sobrenome}`,
@@ -186,6 +186,22 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
             procedureName: appointmentData.procedures.name
           }
         });
+
+        const emailNotifyPromise = supabase.functions.invoke('send-email', {
+          body: {
+            to: 'enfesteta.karoline@gmail.com',
+            subject: `Agendamento Cancelado - ${appointmentData.procedures.name}`,
+            clientName: `${client.nome} ${client.sobrenome}`,
+            clientPhone: client.celular,
+            appointmentDate: appointmentData.appointment_date,
+            appointmentTime: appointmentData.appointment_time,
+            procedureName: appointmentData.procedures.name,
+            professionalName: 'Dra. Karoline Ferreira',
+            action: 'cancelamento'
+          }
+        });
+
+        await Promise.allSettled([ownerNotifyPromise, emailNotifyPromise]);
       } catch (notificationError) {
         console.error('Erro ao notificar proprietária:', notificationError);
       }

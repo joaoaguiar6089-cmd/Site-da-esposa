@@ -67,7 +67,9 @@ const handler = async (req: Request): Promise<Response> => {
         const cleanPhone = client.celular.replace(/\D/g, '');
         const phoneNumber = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
 
-        const message = `🔔 *Lembrete de Consulta*\n\nOlá ${client.nome}!\n\nEste é um lembrete de que você tem um agendamento AMANHÃ:\n\n📅 Data: ${new Date(appointment.appointment_date).toLocaleDateString('pt-BR')}\n⏰ Horário: ${appointment.appointment_time}\n💉 Procedimento: ${procedure.name}\n\n📍 Local: Tefé-AM - Av. Brasil, 63b\n\nCaso precise remarcar, entre em contato conosco.\n\nObrigado! 🙏`;
+        const appointmentUrl = `https://ejqsaloqrczyfiqljcym.supabase.co/agendamento?cpf=${encodeURIComponent(client.cpf)}`;
+        
+        const message = `🔔 *Lembrete de Consulta*\n\nOlá ${client.nome}!\n\nEste é um lembrete de que você tem um agendamento AMANHÃ:\n\n📅 Data: ${new Date(appointment.appointment_date).toLocaleDateString('pt-BR')}\n⏰ Horário: ${appointment.appointment_time}\n💉 Procedimento: ${procedure.name}\n\n📍 Local: Tefé-AM - Av. Brasil, 63b\n\n🔗 *Gerencie seu agendamento:*\n${appointmentUrl}\n\n✅ Confirmar agendamento\n📝 Solicitar alteração\n❌ Cancelar agendamento\n\nObrigado! 🙏`;
 
         const response = await fetch(`https://graph.facebook.com/v17.0/${WHATSAPP_PHONE_ID}/messages`, {
           method: 'POST',

@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowLeft, Calendar, Clock, Plus, User, Phone, Edit } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Plus, User, Phone, Edit, X } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import type { Client } from "@/pages/Agendamento";
@@ -164,6 +165,48 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
     }
   };
 
+  const handleCancelAppointment = async (appointmentId: string, appointmentData: Appointment) => {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'cancelado' })
+        .eq('id', appointmentId);
+
+      if (error) throw error;
+
+      // Notificar proprietária sobre o cancelamento
+      try {
+        await supabase.functions.invoke('notify-owner', {
+          body: {
+            type: 'cancelamento',
+            clientName: `${client.nome} ${client.sobrenome}`,
+            clientPhone: client.celular,
+            appointmentDate: appointmentData.appointment_date,
+            appointmentTime: appointmentData.appointment_time,
+            procedureName: appointmentData.procedures.name
+          }
+        });
+      } catch (notificationError) {
+        console.error('Erro ao notificar proprietária:', notificationError);
+      }
+
+      toast({
+        title: "Agendamento cancelado",
+        description: "Seu agendamento foi cancelado com sucesso.",
+      });
+
+      // Recarregar a lista de agendamentos
+      loadAppointments();
+    } catch (error) {
+      console.error('Erro ao cancelar agendamento:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao cancelar agendamento. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <Card className="w-full">
@@ -257,18 +300,46 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
                 <div key={appointment.id} className="border rounded-lg p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <h3 className="font-medium">{appointment.procedures.name}</h3>
-                    <div className="flex items-center gap-2">
-                      <Badge className={getStatusColor(appointment.status)}>
-                        {getStatusText(appointment.status)}
-                      </Badge>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => navigate(`/agendamento?edit=${appointment.id}`)}
-                      >
-                        Alterar
-                      </Button>
-                    </div>
+                     <div className="flex items-center gap-2">
+                       <Badge className={getStatusColor(appointment.status)}>
+                         {getStatusText(appointment.status)}
+                       </Badge>
+                       {appointment.status === 'agendado' && (
+                         <>
+                           <Button 
+                             variant="outline" 
+                             size="sm"
+                             onClick={() => navigate(`/agendamento?edit=${appointment.id}`)}
+                           >
+                             Alterar
+                           </Button>
+                           <AlertDialog>
+                             <AlertDialogTrigger asChild>
+                               <Button variant="outline" size="sm">
+                                 <X className="w-4 h-4" />
+                               </Button>
+                             </AlertDialogTrigger>
+                             <AlertDialogContent>
+                               <AlertDialogHeader>
+                                 <AlertDialogTitle>Cancelar Agendamento</AlertDialogTitle>
+                                 <AlertDialogDescription>
+                                   Tem certeza que deseja cancelar este agendamento? Esta ação não pode ser desfeita.
+                                 </AlertDialogDescription>
+                               </AlertDialogHeader>
+                               <AlertDialogFooter>
+                                 <AlertDialogCancel>Não cancelar</AlertDialogCancel>
+                                 <AlertDialogAction
+                                   onClick={() => handleCancelAppointment(appointment.id, appointment)}
+                                   className="bg-red-600 hover:bg-red-700"
+                                 >
+                                   Sim, cancelar
+                                 </AlertDialogAction>
+                               </AlertDialogFooter>
+                             </AlertDialogContent>
+                           </AlertDialog>
+                         </>
+                       )}
+                     </div>
                   </div>
                   
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">

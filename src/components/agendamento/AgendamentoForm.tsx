@@ -275,6 +275,23 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
             }
           });
         }
+
+        // Notificar proprietária da clínica
+        try {
+          await supabase.functions.invoke('notify-owner', {
+            body: {
+              type: editingId ? 'alteracao' : 'agendamento',
+              clientName: `${client.nome} ${client.sobrenome}`,
+              clientPhone: client.celular,
+              appointmentDate: formData.appointment_date,
+              appointmentTime: formData.appointment_time,
+              procedureName: selectedProc?.name || '',
+              professionalName: selectedProfessional?.name
+            }
+          });
+        } catch (ownerNotificationError) {
+          console.error('Erro ao notificar proprietária:', ownerNotificationError);
+        }
       } catch (notificationError) {
         console.error('Erro ao enviar notificações:', notificationError);
         // Não falha o agendamento se as notificações não funcionarem

@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.simple-test]
 verify_jwt = false
+
+[functions.send-reminder]
+verify_jwt = false
+
+[functions.notify-owner]
+verify_jwt = false

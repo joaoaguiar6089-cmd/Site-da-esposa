@@ -95,7 +95,8 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('Z-API response:', {
       status: response.status,
       statusText: response.statusText,
-      data: data
+      data: data,
+      headers: Object.fromEntries(response.headers.entries())
     });
     
     if (!response.ok) {
@@ -103,9 +104,10 @@ const handler = async (req: Request): Promise<Response> => {
         status: response.status,
         statusText: response.statusText,
         error: data,
-        requestBody: requestBody
+        requestBody: requestBody,
+        apiUrl: apiUrl
       });
-      throw new Error(`Z-API error (${response.status}): ${data.error?.message || data.message || 'Unknown error'}`);
+      throw new Error(`Z-API error (${response.status}): ${data.error?.message || data.message || JSON.stringify(data)}`);
     }
 
     // Log successful delivery details

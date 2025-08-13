@@ -11,7 +11,7 @@ const Hero = () => {
       <div 
         className="absolute inset-0 bg-cover bg-no-repeat
                    bg-[center_80%] 
-                   sm:bg-[center_60%] 
+                   sm:bg-[center_20%] 
                    md:bg-[center_40%] 
                    lg:bg-right-center
                    xl:bg-right-center

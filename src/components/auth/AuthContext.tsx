@@ -85,7 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { error: new Error('CPF deve ter 11 dígitos') };
       }
       
-      const tempEmail = `${cleanCPF}@temp.clinic.local`;
+      const tempEmail = `${cleanCPF}@cliente.agendamento.com`;
       
       // Generate a simple secure password based on CPF
       const securePassword = `cpf_${cleanCPF}_${btoa(cleanCPF).slice(0, 8)}`;

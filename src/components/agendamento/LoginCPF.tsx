@@ -44,43 +44,24 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
     setLoading(true);
     
     try {
-      // Log security event for CPF login attempt
-      await supabase.rpc('log_security_event', {
-        event_type: 'cpf_login_attempt',
-        event_details: { cpf: cleanCPF }
-      });
-
-      // Verificar se o CPF existe usando função segura
-      const { data: cpfExists, error: checkError } = await supabase
-        .rpc('check_cpf_exists', { cpf_param: cleanCPF });
-
-      if (checkError) {
-        throw checkError;
-      }
-
-      if (!cpfExists) {
-        onClientNotFound();
-        return;
-      }
-
-      // Se o CPF existe, fazer login seguro com CPF
-      const result = await signInWithCPF(cleanCPF);
-      
-      if (result.error) {
-        throw result.error;
-      }
-
-      // Buscar dados do cliente após autenticação bem-sucedida
+      // Buscar diretamente na tabela de clientes (sem autenticação)
       const { data: clientData, error: clientError } = await supabase
         .from('clients')
         .select('*')
         .eq('cpf', cleanCPF)
-        .single();
+        .maybeSingle();
 
       if (clientError) {
-        throw clientError;
+        console.error('Erro na consulta:', clientError);
+        throw new Error('Erro ao consultar dados do cliente');
       }
 
+      if (!clientData) {
+        onClientNotFound();
+        return;
+      }
+
+      // Cliente encontrado, prosseguir sem autenticação
       onClientFound(clientData);
     } catch (error) {
       console.error('Erro ao buscar cliente:', error);

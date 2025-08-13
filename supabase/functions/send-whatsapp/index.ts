@@ -22,18 +22,18 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const WHATSAPP_API_TOKEN = Deno.env.get('WHATSAPP_API_TOKEN');
-    const WHATSAPP_PHONE_ID = Deno.env.get('WHATSAPP_PHONE_ID');
+    const ZAPI_INSTANCE_ID = Deno.env.get('ZAPI_INSTANCE_ID');
+    const ZAPI_TOKEN = Deno.env.get('ZAPI_TOKEN');
 
-    if (!WHATSAPP_API_TOKEN || !WHATSAPP_PHONE_ID) {
-      throw new Error('WhatsApp API credentials not configured');
+    if (!ZAPI_INSTANCE_ID || !ZAPI_TOKEN) {
+      throw new Error('Z-API credentials not configured');
     }
 
     const { to, message }: WhatsAppRequest = await req.json();
 
     console.log('Received WhatsApp request:', { originalNumber: to, message: message.substring(0, 50) + '...' });
 
-    // Enhanced phone number formatting
+    // Enhanced phone number formatting for Z-API
     const cleanPhone = to.replace(/\D/g, '');
     console.log('Cleaned phone number:', cleanPhone);
     
@@ -52,51 +52,48 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('Final formatted phone number:', phoneNumber);
 
     const requestBody = {
-      messaging_product: 'whatsapp',
-      to: phoneNumber,
-      type: 'text',
-      text: { body: message }
+      phone: phoneNumber,
+      message: message
     };
 
-    console.log('Sending WhatsApp API request:', {
-      url: `https://graph.facebook.com/v17.0/${WHATSAPP_PHONE_ID}/messages`,
+    const apiUrl = `https://api.z-api.io/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_TOKEN}/send-text`;
+
+    console.log('Sending Z-API request:', {
+      url: apiUrl,
       body: requestBody
     });
 
-    const response = await fetch(`https://graph.facebook.com/v17.0/${WHATSAPP_PHONE_ID}/messages`, {
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${WHATSAPP_API_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(requestBody),
     });
 
-    const data: WhatsAppResponse = await response.json();
+    const data = await response.json();
     
-    console.log('WhatsApp API response:', {
+    console.log('Z-API response:', {
       status: response.status,
       statusText: response.statusText,
       data: data
     });
     
     if (!response.ok) {
-      console.error('WhatsApp API error details:', {
+      console.error('Z-API error details:', {
         status: response.status,
         statusText: response.statusText,
         error: data,
         requestBody: requestBody
       });
-      throw new Error(`WhatsApp API error (${response.status}): ${data.error?.message || 'Unknown error'}`);
+      throw new Error(`Z-API error (${response.status}): ${data.error?.message || data.message || 'Unknown error'}`);
     }
 
     // Log successful delivery details
-    const messageId = data.messages?.[0]?.id;
-    const waId = data.contacts?.[0]?.wa_id;
+    const messageId = data.messageId;
     
-    console.log('WhatsApp message sent successfully:', {
+    console.log('WhatsApp message sent successfully via Z-API:', {
       messageId,
-      waId,
       originalNumber: to,
       formattedNumber: phoneNumber,
       deliveryStatus: 'sent'
@@ -108,8 +105,8 @@ const handler = async (req: Request): Promise<Response> => {
       debug: {
         originalNumber: to,
         formattedNumber: phoneNumber,
-        messageId: data.messages?.[0]?.id,
-        waId: data.contacts?.[0]?.wa_id
+        messageId: data.messageId,
+        provider: 'Z-API'
       }
     }), {
       status: 200,

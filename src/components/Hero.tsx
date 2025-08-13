@@ -12,7 +12,7 @@ const Hero = () => {
         className="absolute inset-0 bg-cover bg-no-repeat
                    bg-[center_80%] 
                    sm:bg-[center_20%] 
-                   md:bg-[center_40%] 
+                   md:bg-[center_10%] 
                    lg:bg-right-center
                    xl:bg-right-center
                    scale-110 sm:scale-105 md:scale-100"

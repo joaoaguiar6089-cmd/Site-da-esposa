@@ -10,12 +10,12 @@ const Hero = () => {
       {/* Background Image - Mobile optimized */}
       <div 
         className="absolute inset-0 bg-cover bg-no-repeat
-                   bg-[center_20%] 
-                   sm:bg-[center_20%] 
-                   md:bg-[center_10%] 
-                   lg:bg-left-center
-                   xl:bg-left-center
-                   scale-110 sm:scale-50 md:scale-50"
+                   bg-[center_80%] 
+                   sm:bg-[center_60%] 
+                   md:bg-[center_40%] 
+                   lg:bg-right-center
+                   xl:bg-right-center
+                   scale-110 sm:scale-105 md:scale-100"
         style={{ backgroundImage: `url(${heroImage})` }}
       />
       

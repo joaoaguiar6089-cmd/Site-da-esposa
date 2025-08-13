@@ -51,6 +51,10 @@ const handler = async (req: Request): Promise<Response> => {
       .eq('email_notifications', true)
       .not('email', 'is', null);
 
+    console.log('=== Administradores encontrados ===');
+    console.log('Admins data:', admins);
+    console.log('Admin error:', adminError);
+
     if (adminError) {
       console.error('Erro ao buscar administradores:', adminError);
     }

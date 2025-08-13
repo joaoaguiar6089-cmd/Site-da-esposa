@@ -241,7 +241,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
         }
         
         // WhatsApp para cliente
-        const clientMessage = `🩺 *Agendamento ${editingId ? 'Atualizado' : 'Confirmado'}*\n\nOlá ${client.nome}!\n\nSeu agendamento foi ${editingId ? 'atualizado' : 'confirmado'}:\n\n📅 Data: ${new Date(formData.appointment_date).toLocaleDateString('pt-BR')}\n⏰ Horário: ${formData.appointment_time}\n💉 Procedimento: ${selectedProc?.name}\n💰 Valor: R$ ${selectedProc?.price?.toFixed(2)}\n${selectedProfessional ? `👩‍⚕️ Profissional: ${selectedProfessional.name}\n` : ''}\n📍 Local: Tefé-AM - Av. Brasil, 63b\n\nPara reagendamentos em Manaus, entre em contato via WhatsApp.\n\nObrigado pela confiança! 🙏`;
+        const clientMessage = `🩺 *Agendamento ${editingId ? 'Atualizado' : 'Confirmado'}*\n\nOlá ${client.nome}!\n\nSeu agendamento foi ${editingId ? 'atualizado' : 'confirmado'}:\n\n📅 Data: ${new Date(formData.appointment_date).toLocaleDateString('pt-BR')}\n⏰ Horário: ${formData.appointment_time}\n💉 Procedimento: ${selectedProc?.name}\n${selectedProfessional ? `👩‍⚕️ Profissional: ${selectedProfessional.name}\n` : ''}\n📍 Local: Tefé-AM - Av. Brasil, 63b\n\nPara reagendamentos em Manaus, entre em contato via WhatsApp.\n\nObrigado pela confiança! 🙏`;
         
         console.log('Enviando WhatsApp para:', client.celular, 'Mensagem:', clientMessage.substring(0, 100) + '...');
         

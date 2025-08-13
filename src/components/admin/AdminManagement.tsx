@@ -66,64 +66,28 @@ const AdminManagement = () => {
     setSubmitting(true);
 
     try {
-      // Primeiro, tentar criar um novo usuário (se não existir)
-      let userId: string | null = null;
-      let userExists = false;
-
-      if (formData.password) {
-        // Se tem senha, tentar criar novo usuário
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
-        });
-
-        if (authError) {
-          // Se o erro for "user already registered", procurar o usuário existente
-          if (authError.message.includes('already registered') || authError.message.includes('already exists')) {
-            userExists = true;
-            toast({
-              title: "Usuário já existe",
-              description: "Tentando adicionar privilégios admin ao usuário existente...",
-            });
-          } else {
-            throw authError;
-          }
-        } else if (authData.user) {
-          userId = authData.user.id;
-        }
-      } else {
-        // Se não tem senha, assumir que o usuário já existe
-        userExists = true;
+      // Sempre tentar criar um novo usuário primeiro
+      if (!formData.password) {
+        throw new Error('Senha é obrigatória para criar um novo administrador');
       }
 
-      // Se o usuário já existe, buscar pelo email
-      if (userExists && !userId) {
-        // Buscar o user_id baseado no email através de uma consulta no profiles
-        // Vamos fazer uma abordagem diferente - buscar por email diretamente
-        
-        // Primeiro, verificar se já existe um admin com esse email
-        const { data: existingAdminData } = await supabase
-          .from('admin_users')
-          .select('id, user_id')
-          .eq('email', formData.email)
-          .single();
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+      });
 
-        if (existingAdminData) {
-          throw new Error('Este email já é um administrador');
+      if (authError) {
+        if (authError.message.includes('already registered') || authError.message.includes('already exists')) {
+          throw new Error('Email já cadastrado. Use um email diferente ou entre em contato com o administrador.');
         }
-
-        // Buscar user_id através do email na tabela profiles que pode ter referência
-        // Vamos tentar uma abordagem mais direta
-        if (formData.email === 'enfesteta.karoline@gmail.com') {
-          userId = '2f910934-4c61-46bd-b4a5-5ee5a8dc5553'; // ID conhecido do banco
-        } else {
-          throw new Error('Usuário não encontrado. Por favor, forneça uma senha para criar nova conta.');
-        }
+        throw authError;
       }
 
-      if (!userId) {
-        throw new Error('Falha ao obter ID do usuário');
+      if (!authData.user) {
+        throw new Error('Falha ao criar conta de usuário');
       }
+
+      const userId = authData.user.id;
 
       // Verificar se já é admin
       const { data: existingAdmin } = await supabase
@@ -136,15 +100,21 @@ const AdminManagement = () => {
         throw new Error('Este usuário já é um administrador');
       }
 
-      // Criar ou atualizar perfil com role admin
+      // Aguardar um pouco para garantir que o usuário foi criado no auth
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Criar perfil com role admin
       const { error: profileError } = await supabase
         .from('profiles')
-        .upsert({
+        .insert({
           user_id: userId,
           role: 'admin'
         });
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error('Erro ao criar profile:', profileError);
+        throw new Error('Erro ao criar perfil do administrador: ' + profileError.message);
+      }
 
       // Criar registro admin
       const { error: adminError } = await supabase
@@ -156,21 +126,23 @@ const AdminManagement = () => {
           email_notifications: formData.emailNotifications
         });
 
-      if (adminError) throw adminError;
+      if (adminError) {
+        console.error('Erro ao criar admin_users:', adminError);
+        throw new Error('Erro ao criar registro de administrador: ' + adminError.message);
+      }
 
       // Log do evento de segurança
       await supabase.rpc('log_security_event', {
         event_type: 'admin_user_created',
         event_details: { 
           email: formData.email,
-          target_user_id: userId,
-          existing_user: userExists
+          target_user_id: userId
         }
       });
 
       toast({
         title: "Administrador criado",
-        description: `Privilégios de administrador adicionados para ${formData.email}.`,
+        description: `Administrador ${formData.email} criado com sucesso.`,
       });
 
       setFormData({ email: "", password: "", emailNotifications: true });
@@ -336,14 +308,14 @@ const AdminManagement = () => {
                 />
               </div>
               <div>
-                <Label htmlFor="password">Senha (apenas para novos usuários)</Label>
+                <Label htmlFor="password">Senha</Label>
                 <div className="relative">
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     value={formData.password}
                     onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                    placeholder="Necessário apenas se o usuário não existir"
+                    required
                     minLength={6}
                   />
                   <Button

@@ -40,7 +40,7 @@ const handler = async (req: Request): Promise<Response> => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Client-Token': TOKEN,
+        // Testando SEM Client-Token primeiro
       },
       body: JSON.stringify(requestBody),
     });

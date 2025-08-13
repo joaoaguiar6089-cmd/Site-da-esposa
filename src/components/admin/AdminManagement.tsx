@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Shield, UserPlus, Eye, EyeOff } from "lucide-react";
+import { Shield, UserPlus, Eye, EyeOff, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -198,6 +198,41 @@ const AdminManagement = () => {
       toast({
         title: "Erro",
         description: "Erro ao alterar status do administrador.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteAdmin = async (adminId: string, adminEmail: string) => {
+    if (!confirm(`Tem certeza que deseja deletar o administrador ${adminEmail}?`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('admin_users')
+        .delete()
+        .eq('id', adminId);
+
+      if (error) throw error;
+
+      // Log security event
+      await supabase.rpc('log_security_event', {
+        event_type: 'admin_deleted',
+        event_details: { admin_id: adminId, email: adminEmail }
+      });
+
+      toast({
+        title: "Administrador deletado",
+        description: "Administrador removido com sucesso.",
+      });
+
+      loadAdminUsers();
+    } catch (error: any) {
+      console.error('Error deleting admin:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao deletar administrador.",
         variant: "destructive",
       });
     }
@@ -406,22 +441,29 @@ const AdminManagement = () => {
                        </p>
                      )}
                    </div>
-                   <div className="flex items-center gap-2">
-                     <div className="flex items-center space-x-2">
-                       <Switch
-                         checked={admin.email_notifications}
-                         onCheckedChange={() => toggleEmailNotifications(admin.id, admin.email_notifications)}
-                         disabled={!admin.email}
-                       />
-                       <Label className="text-sm">Emails</Label>
-                     </div>
-                     <Button
-                       variant={admin.is_active ? "destructive" : "default"}
-                       onClick={() => toggleAdminStatus(admin.id, admin.is_active)}
-                     >
-                       {admin.is_active ? "Desativar" : "Ativar"}
-                     </Button>
-                   </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={admin.email_notifications}
+                          onCheckedChange={() => toggleEmailNotifications(admin.id, admin.email_notifications)}
+                          disabled={!admin.email}
+                        />
+                        <Label className="text-sm">Emails</Label>
+                      </div>
+                      <Button
+                        variant={admin.is_active ? "destructive" : "default"}
+                        onClick={() => toggleAdminStatus(admin.id, admin.is_active)}
+                      >
+                        {admin.is_active ? "Desativar" : "Ativar"}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteAdmin(admin.id, admin.auth_users?.email || '')}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                 </div>
               </CardContent>
             </Card>

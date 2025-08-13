@@ -167,10 +167,12 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
 
   const handleCancelAppointment = async (appointmentId: string, appointmentData: Appointment) => {
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('appointments')
         .update({ status: 'cancelado' })
-        .eq('id', appointmentId);
+        .eq('id', appointmentId)
+        .select()
+        .single();
 
       if (error) throw error;
 
@@ -209,8 +211,19 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
         description: "Seu agendamento foi cancelado com sucesso.",
       });
 
-      // Recarregar a lista de agendamentos
-      loadAppointments();
+      // Atualizar a lista localmente primeiro para feedback imediato
+      setAppointments(prevAppointments => 
+        prevAppointments.map(app => 
+          app.id === appointmentId 
+            ? { ...app, status: 'cancelado' }
+            : app
+        )
+      );
+
+      // Depois recarregar do banco para garantir consistência
+      setTimeout(() => {
+        loadAppointments();
+      }, 500);
     } catch (error) {
       console.error('Erro ao cancelar agendamento:', error);
       toast({

@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, BarChart3, Calendar, Users, UserPlus, Tag, Stethoscope, MessageSquare, Shield, Image } from "lucide-react";
+import { Menu, BarChart3, Calendar, Users, UserPlus, Tag, Stethoscope, MessageSquare, Shield, Image, Clock } from "lucide-react";
 import { useState } from "react";
 
 interface AdminSidebarProps {
@@ -18,6 +18,7 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
     { id: "categories", label: "Categorias", icon: Tag },
     { id: "procedures", label: "Procedimentos", icon: Stethoscope },
     { id: "hero-image", label: "Imagem Hero", icon: Image },
+    { id: "schedule", label: "Horários", icon: Clock },
     { id: "notifications", label: "Notificações", icon: MessageSquare },
     { id: "admins", label: "Administradores", icon: Shield },
     { id: "security", label: "Segurança", icon: Shield },

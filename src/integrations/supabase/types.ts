@@ -273,6 +273,39 @@ export type Database = {
         }
         Relationships: []
       }
+      schedule_settings: {
+        Row: {
+          available_days: number[]
+          created_at: string
+          end_time: string
+          id: string
+          interval_minutes: number
+          is_active: boolean
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          available_days?: number[]
+          created_at?: string
+          end_time?: string
+          id?: string
+          interval_minutes?: number
+          is_active?: boolean
+          start_time?: string
+          updated_at?: string
+        }
+        Update: {
+          available_days?: number[]
+          created_at?: string
+          end_time?: string
+          id?: string
+          interval_minutes?: number
+          is_active?: boolean
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       security_audit_log: {
         Row: {
           created_at: string
@@ -327,6 +360,16 @@ export type Database = {
     Functions: {
       authenticate_for_cpf_lookup: {
         Args: { cpf_param: string }
+        Returns: boolean
+      }
+      check_appointment_conflict: {
+        Args: {
+          p_appointment_date: string
+          p_appointment_time: string
+          p_professional_id: string
+          p_procedure_id: string
+          p_appointment_id?: string
+        }
         Returns: boolean
       }
       check_cpf_exists: {

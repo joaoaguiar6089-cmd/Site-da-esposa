@@ -109,15 +109,66 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
 
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
 
-  const generateTimeOptions = () => {
-    const times = [];
-    for (let hour = 8; hour <= 18; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
+  const generateTimeOptions = async () => {
+    try {
+      // Buscar configurações de horários
+      const { data: settings, error } = await supabase
+        .from('schedule_settings')
+        .select('start_time, end_time, interval_minutes, available_days')
+        .eq('is_active', true)
+        .single();
+
+      if (error || !settings) {
+        console.error('Erro ao buscar configurações de horários:', error);
+        // Usar valores padrão se não conseguir buscar
+        const times = [];
+        for (let hour = 8; hour <= 18; hour++) {
+          for (let minute = 0; minute < 60; minute += 30) {
+            const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+            times.push(timeString);
+          }
+        }
+        return times;
+      }
+
+      // Verificar se o dia selecionado está disponível
+      if (formData.appointment_date) {
+        const selectedDate = new Date(formData.appointment_date + 'T00:00:00');
+        const dayOfWeek = selectedDate.getDay();
+        
+        if (!settings.available_days.includes(dayOfWeek)) {
+          return [];
+        }
+      }
+
+      // Gerar horários baseados nas configurações
+      const times = [];
+      const [startHour, startMinute] = settings.start_time.split(':').map(Number);
+      const [endHour, endMinute] = settings.end_time.split(':').map(Number);
+      
+      const startTotalMinutes = startHour * 60 + startMinute;
+      const endTotalMinutes = endHour * 60 + endMinute;
+      
+      for (let minutes = startTotalMinutes; minutes < endTotalMinutes; minutes += settings.interval_minutes) {
+        const hour = Math.floor(minutes / 60);
+        const minute = minutes % 60;
         const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
         times.push(timeString);
       }
+      
+      return times;
+    } catch (error) {
+      console.error('Erro ao gerar horários:', error);
+      // Fallback para horários padrão
+      const times = [];
+      for (let hour = 8; hour <= 18; hour++) {
+        for (let minute = 0; minute < 60; minute += 30) {
+          const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+          times.push(timeString);
+        }
+      }
+      return times;
     }
-    return times;
   };
 
   const loadAvailableTimes = async (date: string) => {
@@ -127,22 +178,36 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
     }
 
     try {
+      const allTimes = await generateTimeOptions();
+      
+      if (allTimes.length === 0) {
+        setAvailableTimes([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('appointments')
         .select('appointment_time')
         .eq('appointment_date', date)
-        .eq('status', 'agendado');
+        .eq('professional_id', formData.professional_id)
+        .neq('status', 'cancelado');
 
       if (error) throw error;
 
       const bookedTimes = data?.map(apt => apt.appointment_time) || [];
-      const allTimes = generateTimeOptions();
       const available = allTimes.filter(time => !bookedTimes.includes(time));
       
       setAvailableTimes(available);
     } catch (error) {
       console.error('Erro ao carregar horários:', error);
-      setAvailableTimes(generateTimeOptions());
+      const fallbackTimes = [];
+      for (let hour = 8; hour <= 18; hour++) {
+        for (let minute = 0; minute < 60; minute += 30) {
+          const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+          fallbackTimes.push(timeString);
+        }
+      }
+      setAvailableTimes(fallbackTimes);
     }
   };
 
@@ -167,6 +232,28 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
     setLoading(true);
     
     try {
+      // Verificar conflitos de agendamento primeiro
+      const { data: conflictData, error: conflictError } = await supabase
+        .rpc('check_appointment_conflict', {
+          p_appointment_date: formData.appointment_date,
+          p_appointment_time: formData.appointment_time,
+          p_professional_id: formData.professional_id === "none" ? null : formData.professional_id,
+          p_procedure_id: formData.procedure_id,
+          p_appointment_id: editingId || null
+        });
+
+      if (conflictError) {
+        console.error('Erro ao verificar conflitos:', conflictError);
+      } else if (conflictData) {
+        toast({
+          title: "Conflito de horário",
+          description: "Já existe um agendamento neste horário com este profissional. Escolha outro horário.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
       let result;
       if (editingId) {
         result = await supabase

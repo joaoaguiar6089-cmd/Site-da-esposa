@@ -15,7 +15,7 @@ const Hero = () => {
                    md:bg-[center_10%] 
                    lg:bg-right-center
                    xl:bg-right-center
-                   scale-110 sm:scale-105 md:scale-100"
+                   scale-110 sm:scale-50 md:scale-50"
         style={{ backgroundImage: `url(${heroImage})` }}
       />
       

@@ -29,7 +29,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const ZAPI_INSTANCE_ID = Deno.env.get('ZAPI_INSTANCE_ID');
     const ZAPI_TOKEN = Deno.env.get('ZAPI_TOKEN');
-    const OWNER_PHONE = '5592996149271'; // Número da proprietária
+    const OWNER_PHONE = '5592986149271'; // Número da proprietária
 
     if (!ZAPI_INSTANCE_ID || !ZAPI_TOKEN) {
       console.error('Z-API credentials not configured');

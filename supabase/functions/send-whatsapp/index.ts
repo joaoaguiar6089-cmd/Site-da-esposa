@@ -46,17 +46,17 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Received WhatsApp request:', { originalNumber: to, message: message.substring(0, 50) + '...' });
 
-    // Enhanced phone number formatting for Z-API
+    // Format phone number for Z-API (Brazilian format with country code)
     const cleanPhone = to.replace(/\D/g, '');
     console.log('Cleaned phone number:', cleanPhone);
     
-    // Format phone number for Brazil (+55)
+    // Ensure phone number has Brazilian country code (55)
     let phoneNumber = cleanPhone;
     if (!cleanPhone.startsWith('55')) {
       phoneNumber = `55${cleanPhone}`;
     }
     
-    // Validate phone number format
+    // Validate phone number format (must be 12 or 13 digits for Brazilian numbers)
     if (phoneNumber.length < 12 || phoneNumber.length > 13) {
       console.error('Invalid phone number format:', { original: to, cleaned: cleanPhone, formatted: phoneNumber });
       throw new Error(`Formato de telefone inválido: ${to}. Use o formato (XX) XXXXX-XXXX`);
@@ -64,26 +64,30 @@ const handler = async (req: Request): Promise<Response> => {
     
     console.log('Final formatted phone number:', phoneNumber);
 
+    // Request body as per Z-API documentation
     const requestBody = {
       phone: phoneNumber,
       message: message
     };
 
-    // Correct Z-API endpoint format
+    // Z-API endpoint as per official documentation
     const apiUrl = `https://api.z-api.io/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_TOKEN}/send-text`;
 
     console.log('Sending Z-API request:', {
       url: apiUrl,
       body: requestBody,
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Client-Token': '[REDACTED]'
       }
     });
 
+    // Make request with Client-Token header as required by Z-API
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Client-Token': ZAPI_TOKEN, // This is required by Z-API
       },
       body: JSON.stringify(requestBody),
     });
@@ -93,8 +97,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('Z-API response:', {
       status: response.status,
       statusText: response.statusText,
-      data: data,
-      headers: Object.fromEntries(response.headers.entries())
+      data: data
     });
     
     if (!response.ok) {
@@ -105,14 +108,16 @@ const handler = async (req: Request): Promise<Response> => {
         requestBody: requestBody,
         apiUrl: apiUrl
       });
-      throw new Error(`Z-API error (${response.status}): ${data.error?.message || data.message || JSON.stringify(data)}`);
+      throw new Error(`Z-API error (${response.status}): ${data.error || data.message || JSON.stringify(data)}`);
     }
 
     // Log successful delivery details
     const messageId = data.messageId;
+    const zaapId = data.zaapId;
     
     console.log('WhatsApp message sent successfully via Z-API:', {
       messageId,
+      zaapId,
       originalNumber: to,
       formattedNumber: phoneNumber,
       deliveryStatus: 'sent'
@@ -120,11 +125,16 @@ const handler = async (req: Request): Promise<Response> => {
 
     return new Response(JSON.stringify({ 
       success: true, 
-      data,
+      data: {
+        messageId,
+        zaapId,
+        ...data
+      },
       debug: {
         originalNumber: to,
         formattedNumber: phoneNumber,
         messageId: data.messageId,
+        zaapId: data.zaapId,
         provider: 'Z-API'
       }
     }), {

@@ -290,17 +290,15 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
             }
           });
 
-          const emailNotifyPromise = supabase.functions.invoke('send-email', {
+          const emailNotifyPromise = supabase.functions.invoke('notify-admins', {
             body: {
-              to: 'enfesteta.karoline@gmail.com',
-              subject: `${editingId ? 'Agendamento Alterado' : 'Novo Agendamento'} - ${selectedProc?.name || ''}`,
+              type: editingId ? 'alteracao' : 'agendamento',
               clientName: `${client.nome} ${client.sobrenome}`,
               clientPhone: client.celular,
               appointmentDate: formData.appointment_date,
               appointmentTime: formData.appointment_time,
               procedureName: selectedProc?.name || '',
-              professionalName: selectedProfessional?.name,
-              action: editingId ? 'alteracao' : 'agendamento'
+              professionalName: selectedProfessional?.name
             }
           });
 

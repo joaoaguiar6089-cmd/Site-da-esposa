@@ -17,6 +17,8 @@ export type Database = {
       admin_users: {
         Row: {
           created_at: string
+          email: string | null
+          email_notifications: boolean
           id: string
           is_active: boolean
           last_login: string | null
@@ -24,6 +26,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          email?: string | null
+          email_notifications?: boolean
           id?: string
           is_active?: boolean
           last_login?: string | null
@@ -31,6 +35,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          email?: string | null
+          email_notifications?: boolean
           id?: string
           is_active?: boolean
           last_login?: string | null

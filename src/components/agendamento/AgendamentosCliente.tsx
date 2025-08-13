@@ -187,17 +187,15 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
           }
         });
 
-        const emailNotifyPromise = supabase.functions.invoke('send-email', {
+        const emailNotifyPromise = supabase.functions.invoke('notify-admins', {
           body: {
-            to: 'enfesteta.karoline@gmail.com',
-            subject: `Agendamento Cancelado - ${appointmentData.procedures.name}`,
+            type: 'cancelamento',
             clientName: `${client.nome} ${client.sobrenome}`,
             clientPhone: client.celular,
             appointmentDate: appointmentData.appointment_date,
             appointmentTime: appointmentData.appointment_time,
             procedureName: appointmentData.procedures.name,
-            professionalName: 'Dra. Karoline Ferreira',
-            action: 'cancelamento'
+            professionalName: 'Dra. Karoline Ferreira'
           }
         });
 

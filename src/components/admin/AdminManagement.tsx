@@ -9,12 +9,16 @@ import { Shield, UserPlus, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+import { Switch } from "@/components/ui/switch";
+
 interface AdminUser {
   id: string;
   user_id: string;
   created_at: string;
   last_login: string | null;
   is_active: boolean;
+  email: string | null;
+  email_notifications: boolean;
   profiles: {
     user_id: string;
     cpf: string | null;
@@ -32,6 +36,8 @@ const AdminManagement = () => {
     email: "",
     password: "",
     cpf: "",
+    adminEmail: "",
+    emailNotifications: true,
   });
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -43,10 +49,10 @@ const AdminManagement = () => {
 
   const loadAdminUsers = async () => {
     try {
-      // Get admin users first
+      // Get admin users with email and notification settings
       const { data: adminData, error } = await supabase
         .from('admin_users')
-        .select('*')
+        .select('*, email, email_notifications')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -125,12 +131,14 @@ const AdminManagement = () => {
 
       if (profileError) throw profileError;
 
-      // Create admin user record
+      // Create admin user record with email settings
       const { error: adminError } = await supabase
         .from('admin_users')
         .insert({
           user_id: authData.user.id,
-          is_active: true
+          is_active: true,
+          email: formData.adminEmail || formData.email,
+          email_notifications: formData.emailNotifications
         });
 
       if (adminError) throw adminError;
@@ -149,7 +157,7 @@ const AdminManagement = () => {
         description: "Usuário administrativo criado com sucesso.",
       });
 
-      setFormData({ email: "", password: "", cpf: "" });
+      setFormData({ email: "", password: "", cpf: "", adminEmail: "", emailNotifications: true });
       setDialogOpen(false);
       loadAdminUsers();
     } catch (error: any) {
@@ -190,6 +198,56 @@ const AdminManagement = () => {
       toast({
         title: "Erro",
         description: "Erro ao alterar status do administrador.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleEmailNotifications = async (adminId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('admin_users')
+        .update({ email_notifications: !currentStatus })
+        .eq('id', adminId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Configuração atualizada",
+        description: `Notificações por email ${!currentStatus ? 'ativadas' : 'desativadas'}.`,
+      });
+
+      loadAdminUsers();
+    } catch (error: any) {
+      console.error('Error toggling email notifications:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao alterar configuração de notificações.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateAdminEmail = async (adminId: string, newEmail: string) => {
+    try {
+      const { error } = await supabase
+        .from('admin_users')
+        .update({ email: newEmail })
+        .eq('id', adminId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Email atualizado",
+        description: "Email de notificação atualizado com sucesso.",
+      });
+
+      loadAdminUsers();
+    } catch (error: any) {
+      console.error('Error updating admin email:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar email.",
         variant: "destructive",
       });
     }
@@ -274,6 +332,26 @@ const AdminManagement = () => {
                   required
                 />
               </div>
+              <div>
+                <Label htmlFor="adminEmail">Email para Notificações (opcional)</Label>
+                <Input
+                  id="adminEmail"
+                  type="email"
+                  placeholder="Se diferente do email de login"
+                  value={formData.adminEmail}
+                  onChange={(e) => setFormData(prev => ({ ...prev, adminEmail: e.target.value }))}
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="emailNotifications"
+                  checked={formData.emailNotifications}
+                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, emailNotifications: checked }))}
+                />
+                <Label htmlFor="emailNotifications">
+                  Receber notificações por email sobre agendamentos
+                </Label>
+              </div>
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   Cancelar
@@ -317,18 +395,33 @@ const AdminManagement = () => {
                     <p className="text-sm text-muted-foreground">
                       Criado em: {new Date(admin.created_at).toLocaleDateString('pt-BR')}
                     </p>
-                    {admin.last_login && (
-                      <p className="text-sm text-muted-foreground">
-                        Último login: {new Date(admin.last_login).toLocaleDateString('pt-BR')}
-                      </p>
-                    )}
-                  </div>
-                  <Button
-                    variant={admin.is_active ? "destructive" : "default"}
-                    onClick={() => toggleAdminStatus(admin.id, admin.is_active)}
-                  >
-                    {admin.is_active ? "Desativar" : "Ativar"}
-                  </Button>
+                     {admin.last_login && (
+                       <p className="text-sm text-muted-foreground">
+                         Último login: {new Date(admin.last_login).toLocaleDateString('pt-BR')}
+                       </p>
+                     )}
+                     {admin.email && (
+                       <p className="text-sm text-muted-foreground">
+                         Email notificações: {admin.email}
+                       </p>
+                     )}
+                   </div>
+                   <div className="flex items-center gap-2">
+                     <div className="flex items-center space-x-2">
+                       <Switch
+                         checked={admin.email_notifications}
+                         onCheckedChange={() => toggleEmailNotifications(admin.id, admin.email_notifications)}
+                         disabled={!admin.email}
+                       />
+                       <Label className="text-sm">Emails</Label>
+                     </div>
+                     <Button
+                       variant={admin.is_active ? "destructive" : "default"}
+                       onClick={() => toggleAdminStatus(admin.id, admin.is_active)}
+                     >
+                       {admin.is_active ? "Desativar" : "Ativar"}
+                     </Button>
+                   </div>
                 </div>
               </CardContent>
             </Card>

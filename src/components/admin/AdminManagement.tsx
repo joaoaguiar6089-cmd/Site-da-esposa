@@ -66,33 +66,67 @@ const AdminManagement = () => {
     setSubmitting(true);
 
     try {
-      // Create user account
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-      });
-
-      if (authError) throw authError;
-
-      if (!authData.user) {
-        throw new Error('Failed to create user account');
+      // Primeiro, verificar se o email já existe como usuário
+      const { data: existingUsers, error: searchError } = await supabase.auth.admin.listUsers();
+      
+      if (searchError) {
+        console.error('Erro ao buscar usuários:', searchError);
       }
 
-      // Create profile with admin role
+      const existingUser = existingUsers?.users?.find((user: any) => user.email === formData.email);
+      
+      let userId: string;
+      
+      if (existingUser) {
+        // Se o usuário já existe, usar o ID existente
+        userId = existingUser.id;
+        
+        // Verificar se já é admin
+        const { data: existingAdmin } = await supabase
+          .from('admin_users')
+          .select('id')
+          .eq('user_id', userId)
+          .single();
+          
+        if (existingAdmin) {
+          throw new Error('Este email já é um administrador');
+        }
+        
+        toast({
+          title: "Usuário encontrado",
+          description: "Adicionando privilégios de administrador ao usuário existente.",
+        });
+      } else {
+        // Se não existe, criar nova conta
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+        });
+
+        if (authError) throw authError;
+
+        if (!authData.user) {
+          throw new Error('Falha ao criar conta de usuário');
+        }
+        
+        userId = authData.user.id;
+      }
+
+      // Criar ou atualizar perfil com role admin
       const { error: profileError } = await supabase
         .from('profiles')
-        .insert({
-          user_id: authData.user.id,
+        .upsert({
+          user_id: userId,
           role: 'admin'
         });
 
       if (profileError) throw profileError;
 
-      // Create admin user record with email settings
+      // Criar registro admin
       const { error: adminError } = await supabase
         .from('admin_users')
         .insert({
-          user_id: authData.user.id,
+          user_id: userId,
           is_active: true,
           email: formData.email,
           email_notifications: formData.emailNotifications
@@ -100,25 +134,26 @@ const AdminManagement = () => {
 
       if (adminError) throw adminError;
 
-      // Log security event
+      // Log do evento de segurança
       await supabase.rpc('log_security_event', {
         event_type: 'admin_user_created',
         event_details: { 
           email: formData.email,
-          target_user_id: authData.user.id 
+          target_user_id: userId,
+          existing_user: !!existingUser
         }
       });
 
       toast({
         title: "Administrador criado",
-        description: "Usuário administrativo criado com sucesso.",
+        description: `Privilégios de administrador adicionados para ${formData.email}.`,
       });
 
       setFormData({ email: "", password: "", emailNotifications: true });
       setDialogOpen(false);
       loadAdminUsers();
     } catch (error: any) {
-      console.error('Error creating admin:', error);
+      console.error('Erro ao criar admin:', error);
       toast({
         title: "Erro",
         description: error.message || "Erro ao criar usuário administrativo.",
@@ -277,14 +312,14 @@ const AdminManagement = () => {
                 />
               </div>
               <div>
-                <Label htmlFor="password">Senha</Label>
+                <Label htmlFor="password">Senha (apenas para novos usuários)</Label>
                 <div className="relative">
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     value={formData.password}
                     onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                    required
+                    placeholder="Necessário apenas se o usuário não existir"
                     minLength={6}
                   />
                   <Button

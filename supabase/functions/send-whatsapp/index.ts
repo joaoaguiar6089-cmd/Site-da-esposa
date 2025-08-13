@@ -22,10 +22,20 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    console.log('=== Z-API WhatsApp Function Called ===');
+    
     const ZAPI_INSTANCE_ID = Deno.env.get('ZAPI_INSTANCE_ID');
     const ZAPI_TOKEN = Deno.env.get('ZAPI_TOKEN');
 
+    console.log('Environment check:', {
+      hasInstanceId: !!ZAPI_INSTANCE_ID,
+      hasToken: !!ZAPI_TOKEN,
+      instanceIdLength: ZAPI_INSTANCE_ID?.length || 0,
+      tokenLength: ZAPI_TOKEN?.length || 0
+    });
+
     if (!ZAPI_INSTANCE_ID || !ZAPI_TOKEN) {
+      console.error('Missing Z-API credentials');
       throw new Error('Z-API credentials not configured');
     }
 

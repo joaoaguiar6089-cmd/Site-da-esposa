@@ -86,6 +86,7 @@ const handler = async (req: Request): Promise<Response> => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Client-Token': ZAPI_TOKEN,
       },
       body: JSON.stringify(requestBody),
     });

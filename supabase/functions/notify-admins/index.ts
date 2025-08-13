@@ -130,7 +130,7 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    // Sempre enviar para o email padrão da proprietária
+    // Sempre enviar para o email padrão da proprietária (temporário - apenas para teste)
     const defaultEmailPromise = resend.emails.send({
       from: "Clínica Dra. Karoline <onboarding@resend.dev>",
       to: ["enfesteta.karoline@gmail.com"],

@@ -8,8 +8,8 @@ const Header = () => {
 
   return (
     <header className="bg-white/95 backdrop-blur-sm shadow-soft sticky top-0 z-50">
-      <div className="container mx-auto px-4 py-4">
-        <div className="flex items-center justify-between">
+      <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
           <div className="flex flex-col cursor-pointer" onClick={() => window.location.href = "/"}>
             <h1 className="text-2xl font-bold text-primary hover:text-primary/80 transition-colors">
               Dra. Karoline Ferreira
@@ -19,35 +19,42 @@ const Header = () => {
             </p>
           </div>
           
-          <div className="flex gap-3">
-            <CategorySelect />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.location.href = "/agendamento"}
-              className="flex items-center gap-2"
-            >
-              <Calendar size={16} />
-              Agendar
-            </Button>
-            <Button
-              variant="whatsapp"
-              size="sm"
-              onClick={() => window.open(whatsappLink, "_blank")}
-              className="flex items-center gap-2"
-            >
-              <MessageCircle size={16} />
-              WhatsApp
-            </Button>
-            <Button
-              variant="instagram"
-              size="sm"
-              onClick={() => window.open(instagramLink, "_blank")}
-              className="flex items-center gap-2"
-            >
-              <Instagram size={16} />
-              Instagram
-            </Button>
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+            <div className="order-1 sm:order-1">
+              <CategorySelect />
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 order-2 sm:order-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.location.href = "/agendamento"}
+                className="flex items-center justify-center gap-2 text-xs sm:text-sm min-w-0"
+              >
+                <Calendar size={14} />
+                <span className="hidden sm:inline">Agendar</span>
+                <span className="sm:hidden">Agendar</span>
+              </Button>
+              <Button
+                variant="whatsapp"
+                size="sm"
+                onClick={() => window.open(whatsappLink, "_blank")}
+                className="flex items-center justify-center gap-2 text-xs sm:text-sm min-w-0"
+              >
+                <MessageCircle size={14} />
+                <span className="hidden sm:inline">WhatsApp</span>
+                <span className="sm:hidden">WA</span>
+              </Button>
+              <Button
+                variant="instagram"
+                size="sm"
+                onClick={() => window.open(instagramLink, "_blank")}
+                className="flex items-center justify-center gap-2 text-xs sm:text-sm min-w-0"
+              >
+                <Instagram size={14} />
+                <span className="hidden sm:inline">Instagram</span>
+                <span className="sm:hidden">IG</span>
+              </Button>
+            </div>
           </div>
         </div>
       </div>

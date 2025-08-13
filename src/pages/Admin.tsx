@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Calendar, Users, LogOut, Home, UserPlus, Tag, Stethoscope, MessageSquare, Shield } from "lucide-react";
+import { LogOut, Home } from "lucide-react";
 import AdminAuth from "@/components/admin/AdminAuth";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 import AppointmentsList from "@/components/admin/AppointmentsList";
@@ -11,6 +10,8 @@ import ProceduresManagement from "@/components/admin/ProceduresManagement";
 import NotificationDebug from "@/components/admin/NotificationDebug";
 import AdminManagement from "@/components/admin/AdminManagement";
 import SecurityAuditLog from "@/components/admin/SecurityAuditLog";
+import HeroImageManager from "@/components/admin/HeroImageManager";
+import AdminSidebar from "@/components/admin/AdminSidebar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/auth/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const Admin = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [activeTab, setActiveTab] = useState("dashboard");
   const { toast } = useToast();
   const { user, isAdmin, signOut } = useAuth();
 
@@ -56,101 +58,68 @@ const Admin = () => {
     return <AdminAuth onAuth={() => setIsAuthenticated(true)} />;
   }
 
+  const renderContent = () => {
+    switch (activeTab) {
+      case "dashboard":
+        return <AdminDashboard />;
+      case "appointments":
+        return <AppointmentsList />;
+      case "professionals":
+        return <ProfessionalsList />;
+      case "categories":
+        return <CategoriesList />;
+      case "procedures":
+        return <ProceduresManagement />;
+      case "hero-image":
+        return <HeroImageManager />;
+      case "notifications":
+        return <NotificationDebug />;
+      case "admins":
+        return <AdminManagement />;
+      case "security":
+        return <SecurityAuditLog />;
+      default:
+        return <AdminDashboard />;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-elegant">
-      <div className="container mx-auto p-6">
-        {/* Header da Admin */}
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">
-              Área Administrativa
-            </h1>
-            <p className="text-muted-foreground">
-              Dra. Karoline Ferreira - Estética e Saúde
-            </p>
+      <div className="flex">
+        <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        
+        <div className="flex-1">
+          {/* Header da Admin */}
+          <div className="border-b bg-card p-4 lg:p-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-2xl lg:text-3xl font-bold text-foreground">
+                  Área Administrativa
+                </h1>
+                <p className="text-muted-foreground text-sm lg:text-base">
+                  Dra. Karoline Ferreira - Estética e Saúde
+                </p>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={goToHome} className="flex items-center gap-2">
+                  <Home className="w-4 h-4" />
+                  <span className="hidden sm:inline">Ir para o Site</span>
+                  <span className="sm:hidden">Site</span>
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleLogout} className="flex items-center gap-2">
+                  <LogOut className="w-4 h-4" />
+                  <span className="hidden sm:inline">Sair</span>
+                </Button>
+              </div>
+            </div>
           </div>
-          
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={goToHome} className="flex items-center gap-2">
-              <Home className="w-4 h-4" />
-              Ir para o Site
-            </Button>
-            <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2">
-              <LogOut className="w-4 h-4" />
-              Sair
-            </Button>
+
+          {/* Content */}
+          <div className="p-4 lg:p-6">
+            {renderContent()}
           </div>
         </div>
-
-        {/* Navegação por Tabs */}
-        <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-8 lg:grid-cols-8">
-            <TabsTrigger value="dashboard" className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4" />
-              Dashboard
-            </TabsTrigger>
-            <TabsTrigger value="appointments" className="flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              Agendamentos
-            </TabsTrigger>
-            <TabsTrigger value="professionals" className="flex items-center gap-2">
-              <UserPlus className="w-4 h-4" />
-              Profissionais
-            </TabsTrigger>
-            <TabsTrigger value="categories" className="flex items-center gap-2">
-              <Tag className="w-4 h-4" />
-              Categorias
-            </TabsTrigger>
-            <TabsTrigger value="procedures" className="flex items-center gap-2">
-              <Stethoscope className="w-4 h-4" />
-              Procedimentos
-            </TabsTrigger>
-            <TabsTrigger value="notifications" className="flex items-center gap-2">
-              <MessageSquare className="w-4 h-4" />
-              Notificações
-            </TabsTrigger>
-            <TabsTrigger value="admins" className="flex items-center gap-2">
-              <Shield className="w-4 h-4" />
-              Administradores
-            </TabsTrigger>
-            <TabsTrigger value="security" className="flex items-center gap-2">
-              <Shield className="w-4 h-4" />
-              Segurança
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="dashboard" className="space-y-6">
-            <AdminDashboard />
-          </TabsContent>
-
-          <TabsContent value="appointments" className="space-y-6">
-            <AppointmentsList />
-          </TabsContent>
-
-          <TabsContent value="professionals" className="space-y-6">
-            <ProfessionalsList />
-          </TabsContent>
-
-          <TabsContent value="categories" className="space-y-6">
-            <CategoriesList />
-          </TabsContent>
-
-          <TabsContent value="procedures" className="space-y-6">
-            <ProceduresManagement />
-          </TabsContent>
-
-          <TabsContent value="notifications" className="space-y-6">
-            <NotificationDebug />
-          </TabsContent>
-
-          <TabsContent value="admins" className="space-y-6">
-            <AdminManagement />
-          </TabsContent>
-
-          <TabsContent value="security" className="space-y-6">
-            <SecurityAuditLog />
-          </TabsContent>
-        </Tabs>
       </div>
     </div>
   );

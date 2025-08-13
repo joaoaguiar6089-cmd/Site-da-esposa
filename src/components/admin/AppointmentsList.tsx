@@ -8,6 +8,8 @@ import { Calendar, Clock, User, Phone, Trash2, Search, MessageCircle, Filter } f
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Pagination,
   PaginationContent,
@@ -56,6 +58,8 @@ const AppointmentsList = () => {
   const [professionalFilter, setProfessionalFilter] = useState('todos');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [sendReminder, setSendReminder] = useState(false);
+  const [pendingStatusUpdate, setPendingStatusUpdate] = useState<{appointmentId: string, newStatus: string, appointment: Appointment} | null>(null);
   const itemsPerPage = 6;
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -165,14 +169,30 @@ const AppointmentsList = () => {
     setCurrentPage(1);
   };
 
-  const updateStatus = async (appointmentId: string, newStatus: string) => {
+  const handleStatusChange = (appointmentId: string, newStatus: string) => {
+    const appointment = appointments.find(apt => apt.id === appointmentId);
+    if (appointment) {
+      setPendingStatusUpdate({ appointmentId, newStatus, appointment });
+    }
+  };
+
+  const confirmStatusUpdate = async () => {
+    if (!pendingStatusUpdate) return;
+
     try {
       const { error } = await supabase
         .from('appointments')
-        .update({ status: newStatus })
-        .eq('id', appointmentId);
+        .update({ status: pendingStatusUpdate.newStatus })
+        .eq('id', pendingStatusUpdate.appointmentId);
 
       if (error) throw error;
+
+      // Enviar lembrete se solicitado
+      if (sendReminder) {
+        const appointment = pendingStatusUpdate.appointment;
+        const appointmentDetails = `📅 Data: ${new Date(appointment.appointment_date).toLocaleDateString('pt-BR')}\n⏰ Horário: ${appointment.appointment_time}\n💉 Procedimento: ${appointment.procedure.name}\n${appointment.professional ? `👩‍⚕️ Profissional: ${appointment.professional.name}` : ''}`;
+        sendWhatsApp(appointment.client.celular, appointment.client.nome, appointmentDetails);
+      }
 
       toast({
         title: "Status atualizado",
@@ -187,6 +207,9 @@ const AppointmentsList = () => {
         description: "Erro ao atualizar status.",
         variant: "destructive",
       });
+    } finally {
+      setPendingStatusUpdate(null);
+      setSendReminder(false);
     }
   };
 
@@ -217,8 +240,8 @@ const AppointmentsList = () => {
     }
   };
 
-  const sendWhatsApp = (phoneNumber: string, clientName: string) => {
-    const message = `Olá ${clientName}! Este é um lembrete do seu agendamento na clínica da Dra. Karoline Ferreira. Em caso de dúvidas, entre em contato conosco.`;
+  const sendWhatsApp = (phoneNumber: string, clientName: string, appointmentDetails?: string) => {
+    const message = `Olá ${clientName}! Este é um lembrete do seu agendamento na clínica da Dra. Karoline Ferreira.\n\n${appointmentDetails || ''}\n📍 Local: Av. Brasil, 63b, São Francisco - Tefé-AM\n🗺️ Ver localização: https://share.google/GBkRNRdCejpJYVANt\n\nEm caso de dúvidas, entre em contato conosco.`;
     const whatsappUrl = `https://wa.me/55${phoneNumber.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
@@ -375,10 +398,10 @@ const AppointmentsList = () => {
                     )}
                   </div>
                   
-                  <div className="flex flex-col gap-2">
+                   <div className="flex flex-col gap-2">
                     <Select
                       value={appointment.status}
-                      onValueChange={(value) => updateStatus(appointment.id, value)}
+                      onValueChange={(value) => handleStatusChange(appointment.id, value)}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -462,6 +485,34 @@ const AppointmentsList = () => {
           </Pagination>
         </div>
       )}
+
+      {/* Modal de Confirmação de Status */}
+      <AlertDialog open={!!pendingStatusUpdate} onOpenChange={() => setPendingStatusUpdate(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Alterar Status do Agendamento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Confirma a alteração de status para "{pendingStatusUpdate?.newStatus}"?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex items-center space-x-2 py-4">
+            <Checkbox 
+              id="send-reminder" 
+              checked={sendReminder}
+              onCheckedChange={(checked) => setSendReminder(checked === true)}
+            />
+            <label htmlFor="send-reminder" className="text-sm font-medium">
+              Enviar lembrete por WhatsApp
+            </label>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmStatusUpdate}>
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

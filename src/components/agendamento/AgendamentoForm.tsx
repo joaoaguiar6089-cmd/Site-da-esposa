@@ -243,12 +243,24 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
         // WhatsApp para cliente
         const clientMessage = `🩺 *Agendamento ${editingId ? 'Atualizado' : 'Confirmado'}*\n\nOlá ${client.nome}!\n\nSeu agendamento foi ${editingId ? 'atualizado' : 'confirmado'}:\n\n📅 Data: ${new Date(formData.appointment_date).toLocaleDateString('pt-BR')}\n⏰ Horário: ${formData.appointment_time}\n💉 Procedimento: ${selectedProc?.name}\n💰 Valor: R$ ${selectedProc?.price?.toFixed(2)}\n${selectedProfessional ? `👩‍⚕️ Profissional: ${selectedProfessional.name}\n` : ''}\n📍 Local: Tefé-AM - Av. Brasil, 63b\n\nPara reagendamentos em Manaus, entre em contato via WhatsApp.\n\nObrigado pela confiança! 🙏`;
         
-        await supabase.functions.invoke('send-whatsapp', {
-          body: {
-            to: client.celular,
-            message: clientMessage
+        console.log('Enviando WhatsApp para:', client.celular, 'Mensagem:', clientMessage.substring(0, 100) + '...');
+        
+        try {
+          const { data: whatsappData, error: whatsappError } = await supabase.functions.invoke('send-whatsapp', {
+            body: {
+              to: client.celular,
+              message: clientMessage
+            }
+          });
+          
+          if (whatsappError) {
+            console.error('Erro específico WhatsApp:', whatsappError);
+          } else {
+            console.log('WhatsApp enviado com sucesso:', whatsappData);
           }
-        });
+        } catch (whatsappException) {
+          console.error('Exceção ao enviar WhatsApp:', whatsappException);
+        }
 
         // Email para profissional
         if (selectedProfessional && selectedProfessional.email) {

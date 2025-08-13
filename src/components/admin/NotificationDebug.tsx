@@ -115,6 +115,44 @@ const NotificationDebug = () => {
     }
   };
 
+  const testZApiConfig = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('test-zapi');
+      
+      if (error) {
+        console.error('Z-API config test error:', error);
+        toast({
+          title: "Erro no teste detalhado",
+          description: `Erro: ${error.message}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('Z-API config test result:', data);
+      toast({
+        title: "Teste Z-API concluído",
+        description: "Verifique o console para detalhes completos",
+        variant: "default",
+      });
+      
+      setLastResult({
+        success: data.success || false,
+        timestamp: new Date().toISOString(),
+        phone: 'config-test',
+        data: data
+      });
+      
+    } catch (error) {
+      console.error('Z-API config test error:', error);
+      toast({
+        title: "Erro no teste detalhado",
+        description: `Erro: ${error}`,
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -136,6 +174,14 @@ const NotificationDebug = () => {
             >
               <AlertCircle className="h-4 w-4" />
               Verificar Configuração
+            </Button>
+            <Button 
+              onClick={testZApiConfig}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <AlertCircle className="h-4 w-4" />
+              Teste Detalhado Z-API
             </Button>
           </div>
 

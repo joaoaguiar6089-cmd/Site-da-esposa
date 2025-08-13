@@ -41,11 +41,6 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
   const { toast } = useToast();
 
   const loadAppointments = async () => {
-    console.log('=== DEBUG AGENDAMENTOS ===');
-    console.log('Client recebido:', client);
-    console.log('Client ID:', client.id);
-    console.log('Client CPF:', client.cpf);
-    
     try {
       const { data, error } = await supabase
         .from('appointments')
@@ -64,10 +59,6 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
         `)
         .eq('client_id', client.id)
         .order('appointment_date', { ascending: true });
-
-      console.log('Consulta de agendamentos - dados:', data);
-      console.log('Consulta de agendamentos - erro:', error);
-      console.log('Número de agendamentos encontrados:', data?.length || 0);
 
       if (error) throw error;
 

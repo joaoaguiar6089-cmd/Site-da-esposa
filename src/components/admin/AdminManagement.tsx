@@ -89,6 +89,9 @@ const AdminManagement = () => {
 
       const userId = authData.user.id;
 
+      // Aguardar um pouco para garantir que o trigger rode e crie o profile
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
       // Verificar se já é admin
       const { data: existingAdmin } = await supabase
         .from('admin_users')
@@ -100,20 +103,26 @@ const AdminManagement = () => {
         throw new Error('Este usuário já é um administrador');
       }
 
-      // Aguardar um pouco para garantir que o usuário foi criado no auth
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Criar perfil com role admin
+      // Atualizar o profile para ser admin (o profile já foi criado pelo trigger)
       const { error: profileError } = await supabase
         .from('profiles')
-        .insert({
-          user_id: userId,
-          role: 'admin'
-        });
+        .update({ role: 'admin' })
+        .eq('user_id', userId);
 
       if (profileError) {
-        console.error('Erro ao criar profile:', profileError);
-        throw new Error('Erro ao criar perfil do administrador: ' + profileError.message);
+        console.error('Erro ao atualizar profile:', profileError);
+        // Se não conseguir atualizar, tentar inserir
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            user_id: userId,
+            role: 'admin'
+          });
+        
+        if (insertError) {
+          console.error('Erro ao inserir profile:', insertError);
+          throw new Error('Erro ao configurar perfil do administrador: ' + insertError.message);
+        }
       }
 
       // Criar registro admin

@@ -10,7 +10,7 @@ const Hero = () => {
       {/* Background Image - Mobile optimized */}
       <div 
         className="absolute inset-0 bg-cover bg-no-repeat
-                   bg-[center_80%] 
+                   bg-[center_20%] 
                    sm:bg-[center_20%] 
                    md:bg-[center_10%] 
                    lg:bg-right-center

@@ -10,12 +10,6 @@ interface WhatsAppRequest {
   message: string;
 }
 
-interface WhatsAppResponse {
-  messaging_product: string;
-  contacts: { input: string; wa_id: string }[];
-  messages: { id: string }[];
-}
-
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -27,6 +21,13 @@ const handler = async (req: Request): Promise<Response> => {
     let ZAPI_INSTANCE_ID = Deno.env.get('ZAPI_INSTANCE_ID');
     const ZAPI_TOKEN = Deno.env.get('ZAPI_TOKEN');
 
+    console.log('Environment check:', {
+      hasInstanceId: !!ZAPI_INSTANCE_ID,
+      hasToken: !!ZAPI_TOKEN,
+      instanceIdLength: ZAPI_INSTANCE_ID?.length || 0,
+      tokenLength: ZAPI_TOKEN?.length || 0
+    });
+
     // Extract instance ID if full URL was provided
     if (ZAPI_INSTANCE_ID?.includes('instances/')) {
       const match = ZAPI_INSTANCE_ID.match(/instances\/([^\/]+)/);
@@ -35,13 +36,6 @@ const handler = async (req: Request): Promise<Response> => {
         console.log('Extracted instance ID from URL:', ZAPI_INSTANCE_ID);
       }
     }
-
-    console.log('Environment check:', {
-      hasInstanceId: !!ZAPI_INSTANCE_ID,
-      hasToken: !!ZAPI_TOKEN,
-      instanceIdLength: ZAPI_INSTANCE_ID?.length || 0,
-      tokenLength: ZAPI_TOKEN?.length || 0
-    });
 
     if (!ZAPI_INSTANCE_ID || !ZAPI_TOKEN) {
       console.error('Missing Z-API credentials');
@@ -75,18 +69,21 @@ const handler = async (req: Request): Promise<Response> => {
       message: message
     };
 
+    // Correct Z-API endpoint format
     const apiUrl = `https://api.z-api.io/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_TOKEN}/send-text`;
 
     console.log('Sending Z-API request:', {
       url: apiUrl,
-      body: requestBody
+      body: requestBody,
+      headers: {
+        'Content-Type': 'application/json'
+      }
     });
 
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Client-Token': ZAPI_TOKEN,
       },
       body: JSON.stringify(requestBody),
     });

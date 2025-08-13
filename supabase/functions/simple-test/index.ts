@@ -16,6 +16,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Fixed values for testing
     const INSTANCE_ID = '3E5A81BACD2BF05A4EA8FEB4B7E03144';
     const TOKEN = '858B2CDA86812E5804947A22';
+    const CLIENT_TOKEN = 'Fa3cbd2c46f99489eb361d6ccd87960efS'; // Security token
     const TEST_PHONE = '5551997080499';
     const TEST_MESSAGE = 'Teste simples Z-API';
 
@@ -40,7 +41,7 @@ const handler = async (req: Request): Promise<Response> => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Testando SEM Client-Token primeiro
+        'Client-Token': CLIENT_TOKEN, // Token de segurança correto
       },
       body: JSON.stringify(requestBody),
     });

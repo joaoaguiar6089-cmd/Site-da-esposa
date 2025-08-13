@@ -87,7 +87,7 @@ const handler = async (req: Request): Promise<Response> => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Client-Token': ZAPI_TOKEN, // This is required by Z-API
+        'Client-Token': 'Fa3cbd2c46f99489eb361d6ccd87960efS', // Token de segurança Z-API
       },
       body: JSON.stringify(requestBody),
     });

@@ -23,8 +23,12 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
 
   const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (value.replace(/\D/g, '').length <= 11) {
-      setCpf(formatCPF(value));
+    const cleanValue = value.replace(/\D/g, '');
+    
+    // Limitar a 11 dígitos e sempre aplicar formatação
+    if (cleanValue.length <= 11) {
+      const formatted = formatCPF(cleanValue);
+      setCpf(formatted);
     }
   };
 

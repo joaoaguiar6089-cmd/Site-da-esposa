@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.test-zapi]
 verify_jwt = false
+
+[functions.check-secrets]
+verify_jwt = false

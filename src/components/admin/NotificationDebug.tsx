@@ -153,6 +153,44 @@ const NotificationDebug = () => {
     }
   };
 
+  const checkSecrets = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('check-secrets');
+      
+      if (error) {
+        console.error('Secret check error:', error);
+        toast({
+          title: "Erro ao verificar secrets",
+          description: `Erro: ${error.message}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('Secret check result:', data);
+      toast({
+        title: "Verificação de secrets concluída",
+        description: "Verifique o console para ver os valores dos secrets",
+        variant: "default",
+      });
+      
+      setLastResult({
+        success: true,
+        timestamp: new Date().toISOString(),
+        phone: 'secret-check',
+        data: data
+      });
+      
+    } catch (error) {
+      console.error('Secret check error:', error);
+      toast({
+        title: "Erro ao verificar secrets",
+        description: `Erro: ${error}`,
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -166,7 +204,7 @@ const NotificationDebug = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button 
               onClick={checkWhatsAppConfig}
               variant="outline"
@@ -182,6 +220,14 @@ const NotificationDebug = () => {
             >
               <AlertCircle className="h-4 w-4" />
               Teste Detalhado Z-API
+            </Button>
+            <Button 
+              onClick={checkSecrets}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <AlertCircle className="h-4 w-4" />
+              Verificar Secrets
             </Button>
           </div>
 

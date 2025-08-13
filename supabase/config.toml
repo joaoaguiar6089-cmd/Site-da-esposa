@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.check-secrets]
 verify_jwt = false
+
+[functions.simple-test]
+verify_jwt = false

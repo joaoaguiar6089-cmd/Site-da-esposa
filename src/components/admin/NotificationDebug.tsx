@@ -191,6 +191,44 @@ const NotificationDebug = () => {
     }
   };
 
+  const runSimpleTest = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('simple-test');
+      
+      if (error) {
+        console.error('Simple test error:', error);
+        toast({
+          title: "Erro no teste simples",
+          description: `Erro: ${error.message}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('Simple test result:', data);
+      toast({
+        title: "Teste simples concluído",
+        description: `Status: ${data.status}. Verifique o console para detalhes`,
+        variant: data.success ? "default" : "destructive",
+      });
+      
+      setLastResult({
+        success: data.success,
+        timestamp: new Date().toISOString(),
+        phone: 'simple-test',
+        data: data
+      });
+      
+    } catch (error) {
+      console.error('Simple test error:', error);
+      toast({
+        title: "Erro no teste simples",
+        description: `Erro: ${error}`,
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -228,6 +266,14 @@ const NotificationDebug = () => {
             >
               <AlertCircle className="h-4 w-4" />
               Verificar Secrets
+            </Button>
+            <Button 
+              onClick={runSimpleTest}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <AlertCircle className="h-4 w-4" />
+              Teste Simples
             </Button>
           </div>
 

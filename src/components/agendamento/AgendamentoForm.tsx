@@ -17,11 +17,6 @@ interface Procedure {
   price: number;
 }
 
-interface Professional {
-  id: string;
-  name: string;
-  email?: string;
-}
 
 interface AgendamentoFormProps {
   client: Client;
@@ -32,10 +27,8 @@ interface AgendamentoFormProps {
 
 const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: AgendamentoFormProps) => {
   const [procedures, setProcedures] = useState<Procedure[]>([]);
-  const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [formData, setFormData] = useState({
     procedure_id: "",
-    professional_id: "",
     appointment_date: "",
     appointment_time: "",
     notes: "",
@@ -46,21 +39,16 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
 
   const loadProcedures = async () => {
     try {
-      const [proceduresResponse, professionalsResponse] = await Promise.all([
-        supabase.from('procedures').select('*').order('name'),
-        supabase.from('professionals').select('id, name').order('name')
-      ]);
+      const { data, error } = await supabase.from('procedures').select('*').order('name');
 
-      if (proceduresResponse.error) throw proceduresResponse.error;
-      if (professionalsResponse.error) throw professionalsResponse.error;
+      if (error) throw error;
 
-      setProcedures(proceduresResponse.data || []);
-      setProfessionals(professionalsResponse.data || []);
+      setProcedures(data || []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast({
         title: "Erro",
-        description: "Erro ao carregar procedimentos e profissionais.",
+        description: "Erro ao carregar procedimentos.",
         variant: "destructive",
       });
     } finally {
@@ -89,7 +77,6 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
 
       setFormData({
         procedure_id: data.procedure_id || "",
-        professional_id: data.professional_id || "none",
         appointment_date: data.appointment_date,
         appointment_time: data.appointment_time,
         notes: data.notes || "",
@@ -189,7 +176,6 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
         .from('appointments')
         .select('appointment_time')
         .eq('appointment_date', date)
-        .eq('professional_id', formData.professional_id)
         .neq('status', 'cancelado');
 
       if (error) throw error;
@@ -237,7 +223,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
         .rpc('check_appointment_conflict', {
           p_appointment_date: formData.appointment_date,
           p_appointment_time: formData.appointment_time,
-          p_professional_id: formData.professional_id === "none" ? null : formData.professional_id,
+          p_professional_id: null,
           p_procedure_id: formData.procedure_id,
           p_appointment_id: editingId || null
         });
@@ -247,7 +233,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
       } else if (conflictData) {
         toast({
           title: "Conflito de horário",
-          description: "Já existe um agendamento neste horário com este profissional. Escolha outro horário.",
+          description: "Já existe um agendamento neste horário. Escolha outro horário.",
           variant: "destructive",
         });
         setLoading(false);
@@ -260,7 +246,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
           .from('appointments')
           .update({
             procedure_id: formData.procedure_id,
-            professional_id: formData.professional_id === "none" ? null : formData.professional_id,
+            professional_id: null,
             appointment_date: formData.appointment_date,
             appointment_time: formData.appointment_time,
             notes: formData.notes.trim() || null,
@@ -272,7 +258,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
           .insert({
             client_id: client.id,
             procedure_id: formData.procedure_id,
-            professional_id: formData.professional_id === "none" ? null : formData.professional_id,
+            professional_id: null,
             appointment_date: formData.appointment_date,
             appointment_time: formData.appointment_time,
             notes: formData.notes.trim() || null,
@@ -285,7 +271,6 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
       // Enviar notificações e dados para webhook
       try {
         const selectedProc = procedures.find(p => p.id === formData.procedure_id);
-        const selectedProfessional = professionals.find(p => p.id === formData.professional_id && formData.professional_id !== "none");
         
         // Enviar dados para webhook n8n
         const webhookData = {
@@ -302,9 +287,9 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
             procedure_name: selectedProc?.name,
             procedure_price: selectedProc?.price,
             procedure_duration: selectedProc?.duration,
-            professional_id: formData.professional_id === "none" ? null : formData.professional_id,
-            professional_name: selectedProfessional?.name || null,
-            professional_email: selectedProfessional?.email || null,
+            professional_id: null,
+            professional_name: null,
+            professional_email: null,
             appointment_date: formData.appointment_date,
             appointment_time: formData.appointment_time,
             notes: formData.notes.trim() || null,
@@ -328,7 +313,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
         }
         
         // WhatsApp para cliente
-        const clientMessage = `🩺 *Agendamento ${editingId ? 'Atualizado' : 'Confirmado'}*\n\nOlá ${client.nome}!\n\nSeu agendamento foi ${editingId ? 'atualizado' : 'confirmado'}:\n\n📅 Data: ${new Date(formData.appointment_date).toLocaleDateString('pt-BR')}\n⏰ Horário: ${formData.appointment_time}\n💉 Procedimento: ${selectedProc?.name}\n${selectedProfessional ? `👩‍⚕️ Profissional: ${selectedProfessional.name}\n` : ''}\n📍 Local: Av. Brasil, 63b, São Francisco - Tefé-AM\n🗺️ Ver localização: https://share.google/GBkRNRdCejpJYVANt\n\nObrigado pela confiança! 🙏`;
+        const clientMessage = `🩺 *Agendamento ${editingId ? 'Atualizado' : 'Confirmado'}*\n\nOlá ${client.nome}!\n\nSeu agendamento foi ${editingId ? 'atualizado' : 'confirmado'}:\n\n📅 Data: ${new Date(formData.appointment_date).toLocaleDateString('pt-BR')}\n⏰ Horário: ${formData.appointment_time}\n💉 Procedimento: ${selectedProc?.name}\n📍 Local: Av. Brasil, 63b, São Francisco - Tefé-AM\n🗺️ Ver localização: https://share.google/GBkRNRdCejpJYVANt\n\nObrigado pela confiança! 🙏`;
         
         console.log('Enviando WhatsApp para:', client.celular, 'Mensagem:', clientMessage.substring(0, 100) + '...');
         
@@ -349,19 +334,6 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
           console.error('Exceção ao enviar WhatsApp:', whatsappException);
         }
 
-        // Email para profissional
-        if (selectedProfessional && selectedProfessional.email) {
-          await supabase.functions.invoke('send-email', {
-            body: {
-              to: selectedProfessional.email,
-              professionalName: selectedProfessional.name,
-              clientName: `${client.nome} ${client.sobrenome}`,
-              procedureName: selectedProc?.name || '',
-              appointmentDate: new Date(formData.appointment_date).toLocaleDateString('pt-BR'),
-              appointmentTime: formData.appointment_time,
-            }
-          });
-        }
 
         // Notificar proprietária da clínica via WhatsApp e Email
         try {
@@ -373,7 +345,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
               appointmentDate: formData.appointment_date,
               appointmentTime: formData.appointment_time,
               procedureName: selectedProc?.name || '',
-              professionalName: selectedProfessional?.name
+              professionalName: null
             }
           });
 
@@ -385,7 +357,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
               appointmentDate: formData.appointment_date,
               appointmentTime: formData.appointment_time,
               procedureName: selectedProc?.name || '',
-              professionalName: selectedProfessional?.name
+              professionalName: null
             }
           });
 
@@ -472,27 +444,6 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
             )}
           </div>
 
-          <div>
-            <label htmlFor="professional" className="text-sm font-medium">
-              Profissional (Opcional)
-            </label>
-            <Select
-              value={formData.professional_id}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, professional_id: value }))}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Selecione um profissional" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Nenhum profissional específico</SelectItem>
-                {professionals.map((professional) => (
-                  <SelectItem key={professional.id} value={professional.id}>
-                    {professional.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
 
           <div>
             <label htmlFor="date" className="text-sm font-medium">

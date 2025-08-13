@@ -6,15 +6,23 @@ const Hero = () => {
   const whatsappLink = "https://wa.me/5597984387295";
 
   return (
-    <section className="relative min-h-screen flex items-center">
-      {/* Background Image */}
+    <section className="relative min-h-screen flex items-center overflow-hidden">
+      {/* Background Image - Mobile optimized */}
       <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat sm:bg-[center_20%] md:bg-center lg:bg-right-center"
+        className="absolute inset-0 bg-cover bg-no-repeat
+                   bg-[center_80%] 
+                   sm:bg-[center_60%] 
+                   md:bg-[center_40%] 
+                   lg:bg-right-center
+                   xl:bg-right-center
+                   scale-110 sm:scale-105 md:scale-100"
         style={{ backgroundImage: `url(${heroImage})` }}
       />
       
-      {/* Gradient Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
+      {/* Gradient Overlay - Mobile optimized */}
+      <div className="absolute inset-0 
+                      bg-gradient-to-t from-black/80 via-black/60 to-black/30
+                      sm:bg-gradient-to-r sm:from-black/70 sm:via-black/50 sm:to-transparent" />
       
       {/* Content */}
       <div className="relative container mx-auto px-4 py-20">

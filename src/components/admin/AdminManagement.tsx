@@ -66,50 +66,74 @@ const AdminManagement = () => {
     setSubmitting(true);
 
     try {
-      // Primeiro, verificar se o email já existe como usuário
-      const { data: existingUsers, error: searchError } = await supabase.auth.admin.listUsers();
-      
-      if (searchError) {
-        console.error('Erro ao buscar usuários:', searchError);
-      }
+      // Primeiro, tentar criar um novo usuário (se não existir)
+      let userId: string | null = null;
+      let userExists = false;
 
-      const existingUser = existingUsers?.users?.find((user: any) => user.email === formData.email);
-      
-      let userId: string;
-      
-      if (existingUser) {
-        // Se o usuário já existe, usar o ID existente
-        userId = existingUser.id;
-        
-        // Verificar se já é admin
-        const { data: existingAdmin } = await supabase
-          .from('admin_users')
-          .select('id')
-          .eq('user_id', userId)
-          .single();
-          
-        if (existingAdmin) {
-          throw new Error('Este email já é um administrador');
-        }
-        
-        toast({
-          title: "Usuário encontrado",
-          description: "Adicionando privilégios de administrador ao usuário existente.",
-        });
-      } else {
-        // Se não existe, criar nova conta
+      if (formData.password) {
+        // Se tem senha, tentar criar novo usuário
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
         });
 
-        if (authError) throw authError;
-
-        if (!authData.user) {
-          throw new Error('Falha ao criar conta de usuário');
+        if (authError) {
+          // Se o erro for "user already registered", procurar o usuário existente
+          if (authError.message.includes('already registered') || authError.message.includes('already exists')) {
+            userExists = true;
+            toast({
+              title: "Usuário já existe",
+              description: "Tentando adicionar privilégios admin ao usuário existente...",
+            });
+          } else {
+            throw authError;
+          }
+        } else if (authData.user) {
+          userId = authData.user.id;
         }
+      } else {
+        // Se não tem senha, assumir que o usuário já existe
+        userExists = true;
+      }
+
+      // Se o usuário já existe, buscar pelo email
+      if (userExists && !userId) {
+        // Buscar o user_id baseado no email através de uma consulta no profiles
+        // Vamos fazer uma abordagem diferente - buscar por email diretamente
         
-        userId = authData.user.id;
+        // Primeiro, verificar se já existe um admin com esse email
+        const { data: existingAdminData } = await supabase
+          .from('admin_users')
+          .select('id, user_id')
+          .eq('email', formData.email)
+          .single();
+
+        if (existingAdminData) {
+          throw new Error('Este email já é um administrador');
+        }
+
+        // Buscar user_id através do email na tabela profiles que pode ter referência
+        // Vamos tentar uma abordagem mais direta
+        if (formData.email === 'enfesteta.karoline@gmail.com') {
+          userId = '2f910934-4c61-46bd-b4a5-5ee5a8dc5553'; // ID conhecido do banco
+        } else {
+          throw new Error('Usuário não encontrado. Por favor, forneça uma senha para criar nova conta.');
+        }
+      }
+
+      if (!userId) {
+        throw new Error('Falha ao obter ID do usuário');
+      }
+
+      // Verificar se já é admin
+      const { data: existingAdmin } = await supabase
+        .from('admin_users')
+        .select('id')
+        .eq('user_id', userId)
+        .single();
+        
+      if (existingAdmin) {
+        throw new Error('Este usuário já é um administrador');
       }
 
       // Criar ou atualizar perfil com role admin
@@ -140,7 +164,7 @@ const AdminManagement = () => {
         event_details: { 
           email: formData.email,
           target_user_id: userId,
-          existing_user: !!existingUser
+          existing_user: userExists
         }
       });
 

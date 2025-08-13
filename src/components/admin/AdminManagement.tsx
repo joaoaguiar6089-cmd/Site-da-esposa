@@ -19,13 +19,6 @@ interface AdminUser {
   is_active: boolean;
   email: string | null;
   email_notifications: boolean;
-  profiles: {
-    user_id: string;
-    cpf: string | null;
-  };
-  auth_users: {
-    email: string;
-  } | null;
 }
 
 const AdminManagement = () => {
@@ -35,8 +28,6 @@ const AdminManagement = () => {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    cpf: "",
-    adminEmail: "",
     emailNotifications: true,
   });
   const [submitting, setSubmitting] = useState(false);
@@ -49,48 +40,15 @@ const AdminManagement = () => {
 
   const loadAdminUsers = async () => {
     try {
-      // Get admin users with email and notification settings
+      // Get admin users with their emails
       const { data: adminData, error } = await supabase
         .from('admin_users')
-        .select('*, email, email_notifications')
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Then get profiles for each admin user
-      const usersWithProfiles = await Promise.all(
-        (adminData || []).map(async (admin) => {
-          try {
-            // Get profile data
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('user_id, cpf')
-              .eq('user_id', admin.user_id)
-              .single();
-
-            // For email, use a simple mapping based on known admin CPFs
-            let userEmail = 'Email não disponível';
-            if (profile?.cpf === '47164591873') {
-              userEmail = 'admin@clinica.com ou joaoaguiar6089@gmail.com';
-            }
-
-            return {
-              ...admin,
-              profiles: profile || { user_id: admin.user_id, cpf: null },
-              auth_users: { email: userEmail }
-            };
-          } catch (error) {
-            console.error('Error loading admin profile:', error);
-            return {
-              ...admin,
-              profiles: { user_id: admin.user_id, cpf: null },
-              auth_users: { email: 'Email não disponível' }
-            };
-          }
-        })
-      );
-
-      setAdminUsers(usersWithProfiles);
+      setAdminUsers(adminData || []);
     } catch (error) {
       console.error('Error loading admin users:', error);
       toast({
@@ -125,7 +83,6 @@ const AdminManagement = () => {
         .from('profiles')
         .insert({
           user_id: authData.user.id,
-          cpf: formData.cpf.replace(/\D/g, ''),
           role: 'admin'
         });
 
@@ -137,7 +94,7 @@ const AdminManagement = () => {
         .insert({
           user_id: authData.user.id,
           is_active: true,
-          email: formData.adminEmail || formData.email,
+          email: formData.email,
           email_notifications: formData.emailNotifications
         });
 
@@ -157,7 +114,7 @@ const AdminManagement = () => {
         description: "Usuário administrativo criado com sucesso.",
       });
 
-      setFormData({ email: "", password: "", cpf: "", adminEmail: "", emailNotifications: true });
+      setFormData({ email: "", password: "", emailNotifications: true });
       setDialogOpen(false);
       loadAdminUsers();
     } catch (error: any) {
@@ -288,21 +245,6 @@ const AdminManagement = () => {
     }
   };
 
-  const formatCPF = (value: string) => {
-    const numbers = value.replace(/\D/g, '');
-    const match = numbers.match(/^(\d{3})(\d{3})(\d{3})(\d{2})$/);
-    if (match) {
-      return `${match[1]}.${match[2]}.${match[3]}-${match[4]}`;
-    }
-    return numbers;
-  };
-
-  const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (value.replace(/\D/g, '').length <= 11) {
-      setFormData(prev => ({ ...prev, cpf: formatCPF(value) }));
-    }
-  };
 
   if (loading) {
     return <div className="text-center py-8">Carregando usuários administrativos...</div>;
@@ -356,27 +298,6 @@ const AdminManagement = () => {
                   </Button>
                 </div>
               </div>
-              <div>
-                <Label htmlFor="cpf">CPF</Label>
-                <Input
-                  id="cpf"
-                  type="text"
-                  placeholder="000.000.000-00"
-                  value={formData.cpf}
-                  onChange={handleCPFChange}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="adminEmail">Email para Notificações (opcional)</Label>
-                <Input
-                  id="adminEmail"
-                  type="email"
-                  placeholder="Se diferente do email de login"
-                  value={formData.adminEmail}
-                  onChange={(e) => setFormData(prev => ({ ...prev, adminEmail: e.target.value }))}
-                />
-              </div>
               <div className="flex items-center space-x-2">
                 <Switch
                   id="emailNotifications"
@@ -416,28 +337,18 @@ const AdminManagement = () => {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold">
-                        {admin.auth_users?.email || 'Email não disponível'}
+                        {admin.email || 'Email não disponível'}
                       </h3>
                       <Badge variant={admin.is_active ? "default" : "secondary"}>
                         {admin.is_active ? "Ativo" : "Inativo"}
                       </Badge>
                     </div>
-                    {admin.profiles?.cpf && (
-                      <p className="text-sm text-muted-foreground">
-                        CPF: {formatCPF(admin.profiles.cpf)}
-                      </p>
-                    )}
                     <p className="text-sm text-muted-foreground">
                       Criado em: {new Date(admin.created_at).toLocaleDateString('pt-BR')}
                     </p>
                      {admin.last_login && (
                        <p className="text-sm text-muted-foreground">
                          Último login: {new Date(admin.last_login).toLocaleDateString('pt-BR')}
-                       </p>
-                     )}
-                     {admin.email && (
-                       <p className="text-sm text-muted-foreground">
-                         Email notificações: {admin.email}
                        </p>
                      )}
                    </div>
@@ -459,7 +370,7 @@ const AdminManagement = () => {
                       <Button
                         variant="destructive"
                         size="sm"
-                        onClick={() => deleteAdmin(admin.id, admin.auth_users?.email || '')}
+                        onClick={() => deleteAdmin(admin.id, admin.email || '')}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>

@@ -24,8 +24,17 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     console.log('=== Z-API WhatsApp Function Called ===');
     
-    const ZAPI_INSTANCE_ID = Deno.env.get('ZAPI_INSTANCE_ID');
+    let ZAPI_INSTANCE_ID = Deno.env.get('ZAPI_INSTANCE_ID');
     const ZAPI_TOKEN = Deno.env.get('ZAPI_TOKEN');
+
+    // Extract instance ID if full URL was provided
+    if (ZAPI_INSTANCE_ID?.includes('instances/')) {
+      const match = ZAPI_INSTANCE_ID.match(/instances\/([^\/]+)/);
+      if (match) {
+        ZAPI_INSTANCE_ID = match[1];
+        console.log('Extracted instance ID from URL:', ZAPI_INSTANCE_ID);
+      }
+    }
 
     console.log('Environment check:', {
       hasInstanceId: !!ZAPI_INSTANCE_ID,

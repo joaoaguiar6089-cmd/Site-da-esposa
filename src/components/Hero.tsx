@@ -1,11 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
 const Hero = () => {
   const [heroImage, setHeroImage] = useState('/lovable-uploads/648c7c53-0d63-4091-b28f-2ded7b542feb.png');
-  const whatsappLink = "https://wa.me/5597984387295";
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchHeroImage();
@@ -73,7 +74,7 @@ const Hero = () => {
             <Button 
               variant="hero" 
               size="lg"
-              onClick={() => window.open(whatsappLink, "_blank")}
+              onClick={() => navigate('/agendamento')}
             >
               Agendar Consulta
             </Button>

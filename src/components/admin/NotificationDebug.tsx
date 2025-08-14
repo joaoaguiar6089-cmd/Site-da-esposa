@@ -1,19 +1,41 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Phone, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { Send, Phone, CheckCircle, XCircle, MessageSquare, Edit } from "lucide-react";
 
 const NotificationDebug = () => {
   const [testPhone, setTestPhone] = useState("");
   const [testMessage, setTestMessage] = useState("Teste de notificação WhatsApp");
   const [isLoading, setIsLoading] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [editingTemplate, setEditingTemplate] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
   const { toast } = useToast();
+
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
+  const loadTemplates = async () => {
+    const { data, error } = await supabase
+      .from('whatsapp_templates')
+      .select('*')
+      .order('template_type');
+    
+    if (error) {
+      console.error('Erro ao carregar templates:', error);
+    } else {
+      setTemplates(data || []);
+    }
+  };
 
   const formatPhone = (phone: string) => {
     const digits = phone.replace(/\D/g, '');
@@ -82,232 +104,168 @@ const NotificationDebug = () => {
     }
   };
 
-  const checkWhatsAppConfig = async () => {
+  const saveTemplate = async (templateType: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('send-whatsapp', {
-        body: {
-          to: "test",
-          message: "config-check"
-        }
+      const { error } = await supabase
+        .from('whatsapp_templates')
+        .update({ template_content: editContent })
+        .eq('template_type', templateType);
+
+      if (error) throw error;
+
+      toast({
+        title: "✅ Template salvo!",
+        description: "Modelo de mensagem atualizado com sucesso",
       });
 
-      console.log('Config check result:', { data, error });
-      
-      if (error?.message?.includes('credentials not configured')) {
-        toast({
-          title: "⚠️ Configuração incompleta",
-          description: "Credenciais do WhatsApp não configuradas",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "✅ Configuração OK",
-          description: "Credenciais do WhatsApp estão configuradas",
-        });
-      }
+      setEditingTemplate(null);
+      setEditContent("");
+      loadTemplates();
     } catch (error: any) {
-      console.error('Config check error:', error);
       toast({
-        title: "❌ Erro na verificação",
+        title: "❌ Erro ao salvar",
         description: error.message,
         variant: "destructive",
       });
     }
   };
 
-  const testZApiConfig = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('test-zapi');
-      
-      if (error) {
-        console.error('Z-API config test error:', error);
-        toast({
-          title: "Erro no teste detalhado",
-          description: `Erro: ${error.message}`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      console.log('Z-API config test result:', data);
-      toast({
-        title: "Teste Z-API concluído",
-        description: "Verifique o console para detalhes completos",
-        variant: "default",
-      });
-      
-      setLastResult({
-        success: data.success || false,
-        timestamp: new Date().toISOString(),
-        phone: 'config-test',
-        data: data
-      });
-      
-    } catch (error) {
-      console.error('Z-API config test error:', error);
-      toast({
-        title: "Erro no teste detalhado",
-        description: `Erro: ${error}`,
-        variant: "destructive",
-      });
-    }
+  const startEditing = (template: any) => {
+    setEditingTemplate(template.template_type);
+    setEditContent(template.template_content);
   };
 
-  const checkSecrets = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('check-secrets');
-      
-      if (error) {
-        console.error('Secret check error:', error);
-        toast({
-          title: "Erro ao verificar secrets",
-          description: `Erro: ${error.message}`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      console.log('Secret check result:', data);
-      toast({
-        title: "Verificação de secrets concluída",
-        description: "Verifique o console para ver os valores dos secrets",
-        variant: "default",
-      });
-      
-      setLastResult({
-        success: true,
-        timestamp: new Date().toISOString(),
-        phone: 'secret-check',
-        data: data
-      });
-      
-    } catch (error) {
-      console.error('Secret check error:', error);
-      toast({
-        title: "Erro ao verificar secrets",
-        description: `Erro: ${error}`,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const runSimpleTest = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('simple-test');
-      
-      if (error) {
-        console.error('Simple test error:', error);
-        toast({
-          title: "Erro no teste simples",
-          description: `Erro: ${error.message}`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      console.log('Simple test result:', data);
-      toast({
-        title: "Teste simples concluído",
-        description: `Status: ${data.status}. Verifique o console para detalhes`,
-        variant: data.success ? "default" : "destructive",
-      });
-      
-      setLastResult({
-        success: data.success,
-        timestamp: new Date().toISOString(),
-        phone: 'simple-test',
-        data: data
-      });
-      
-    } catch (error) {
-      console.error('Simple test error:', error);
-      toast({
-        title: "Erro no teste simples",
-        description: `Erro: ${error}`,
-        variant: "destructive",
-      });
-    }
+  const getTemplateDisplayName = (type: string) => {
+    const names: Record<string, string> = {
+      'agendamento_cliente': 'Confirmação para Cliente',
+      'agendamento_atualizado_cliente': 'Atualização para Cliente',
+      'agendamento_proprietaria': 'Novo Agendamento (Proprietária)',
+      'alteracao_proprietaria': 'Alteração (Proprietária)',
+      'cancelamento_proprietaria': 'Cancelamento (Proprietária)'
+    };
+    return names[type] || type;
   };
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Phone className="h-5 w-5" />
-            Debug de Notificações WhatsApp
-          </CardTitle>
-          <CardDescription>
-            Teste e monitore o envio de notificações WhatsApp
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2 flex-wrap">
-            <Button 
-              onClick={checkWhatsAppConfig}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <AlertCircle className="h-4 w-4" />
-              Verificar Configuração
-            </Button>
-            <Button 
-              onClick={testZApiConfig}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <AlertCircle className="h-4 w-4" />
-              Teste Detalhado Z-API
-            </Button>
-            <Button 
-              onClick={checkSecrets}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <AlertCircle className="h-4 w-4" />
-              Verificar Secrets
-            </Button>
-            <Button 
-              onClick={runSimpleTest}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <AlertCircle className="h-4 w-4" />
-              Teste Simples
-            </Button>
-          </div>
+      <Tabs defaultValue="test" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="test">Teste de Mensagens</TabsTrigger>
+          <TabsTrigger value="templates">Editar Templates</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="test">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Phone className="h-5 w-5" />
+                Teste de Notificações WhatsApp
+              </CardTitle>
+              <CardDescription>
+                Teste o envio de notificações WhatsApp
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4">
+                <div>
+                  <Label htmlFor="testPhone">Número de Teste</Label>
+                  <Input
+                    id="testPhone"
+                    placeholder="(51) 99999-9999"
+                    value={testPhone}
+                    onChange={(e) => setTestPhone(e.target.value)}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="testMessage">Mensagem de Teste</Label>
+                  <Textarea
+                    id="testMessage"
+                    placeholder="Digite a mensagem de teste..."
+                    value={testMessage}
+                    onChange={(e) => setTestMessage(e.target.value)}
+                    rows={3}
+                  />
+                </div>
 
-          <div className="grid gap-4">
-            <div>
-              <label className="text-sm font-medium">Número de Teste</label>
-              <Input
-                placeholder="(51) 99999-9999"
-                value={testPhone}
-                onChange={(e) => setTestPhone(e.target.value)}
-              />
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium">Mensagem de Teste</label>
-              <Textarea
-                placeholder="Digite a mensagem de teste..."
-                value={testMessage}
-                onChange={(e) => setTestMessage(e.target.value)}
-                rows={3}
-              />
-            </div>
+                <Button 
+                  onClick={testWhatsAppSend}
+                  disabled={isLoading}
+                  className="flex items-center gap-2"
+                >
+                  <Send className="h-4 w-4" />
+                  {isLoading ? "Enviando..." : "Enviar Teste"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            <Button 
-              onClick={testWhatsAppSend}
-              disabled={isLoading}
-              className="flex items-center gap-2"
-            >
-              <Send className="h-4 w-4" />
-              {isLoading ? "Enviando..." : "Enviar Teste"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        <TabsContent value="templates">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                Templates de Mensagens WhatsApp
+              </CardTitle>
+              <CardDescription>
+                Personalize as mensagens enviadas automaticamente
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {templates.map((template) => (
+                <div key={template.id} className="border rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">{getTemplateDisplayName(template.template_type)}</h4>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => startEditing(template)}
+                      className="flex items-center gap-2"
+                    >
+                      <Edit className="h-4 w-4" />
+                      Editar
+                    </Button>
+                  </div>
+                  
+                  {editingTemplate === template.template_type ? (
+                    <div className="space-y-3">
+                      <Textarea
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        rows={8}
+                        className="font-mono text-sm"
+                      />
+                      <div className="text-xs text-muted-foreground">
+                        Variáveis disponíveis: {"{clientName}"}, {"{appointmentDate}"}, {"{appointmentTime}"}, {"{procedureName}"}, {"{notes}"}, {"{clientPhone}"}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => saveTemplate(template.template_type)}
+                          size="sm"
+                        >
+                          Salvar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => setEditingTemplate(null)}
+                          size="sm"
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-muted p-3 rounded text-sm font-mono whitespace-pre-wrap">
+                      {template.template_content}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {lastResult && (
         <Card>

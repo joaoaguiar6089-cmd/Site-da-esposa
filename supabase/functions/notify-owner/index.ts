@@ -13,6 +13,7 @@ interface NotificationRequest {
   appointmentTime: string;
   procedureName: string;
   professionalName?: string;
+  notes?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -21,7 +22,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { type, clientName, clientPhone, appointmentDate, appointmentTime, procedureName, professionalName }: NotificationRequest = await req.json();
+    const { type, clientName, clientPhone, appointmentDate, appointmentTime, procedureName, professionalName, notes }: NotificationRequest = await req.json();
 
     console.log('=== Owner Notification Function Called ===');
     console.log('Notification type:', type);
@@ -44,28 +45,45 @@ const handler = async (req: Request): Promise<Response> => {
       ownerPhone: OWNER_PHONE
     });
 
-    let messageIcon = '';
-    let actionText = '';
+    let templateType = '';
     
     switch (type) {
       case 'agendamento':
-        messageIcon = '📅';
-        actionText = 'NOVO AGENDAMENTO';
+        templateType = 'agendamento_proprietaria';
         break;
       case 'alteracao':
-        messageIcon = '📝';
-        actionText = 'AGENDAMENTO ALTERADO';
+        templateType = 'alteracao_proprietaria';
         break;
       case 'cancelamento':
-        messageIcon = '❌';
-        actionText = 'AGENDAMENTO CANCELADO';
+        templateType = 'cancelamento_proprietaria';
         break;
     }
 
     const formattedDate = new Date(appointmentDate).toLocaleDateString('pt-BR');
-    const professionalInfo = professionalName ? `\n👩‍⚕️ Profissional: ${professionalName}` : '';
+    const notesText = notes ? `\n📝 Observações: ${notes}` : '';
 
-    const message = `${messageIcon} *${actionText}*\n\n👤 Cliente: ${clientName}\n📱 Telefone: ${clientPhone}\n📅 Data: ${formattedDate}\n⏰ Horário: ${appointmentTime}\n💉 Procedimento: ${procedureName}${professionalInfo}\n\n📍 Clínica Dra. Karoline Ferreira\nTefé-AM`;
+    // Get template and format message
+    const getTemplateResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/get-whatsapp-template`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+      },
+      body: JSON.stringify({
+        templateType,
+        variables: {
+          clientName,
+          clientPhone,
+          appointmentDate: formattedDate,
+          appointmentTime,
+          procedureName,
+          notes: notesText
+        }
+      }),
+    });
+
+    const templateResult = await getTemplateResponse.json();
+    const message = templateResult.message || `Notificação de ${type}: ${clientName} - ${procedureName}`;
 
     const requestBody = {
       phone: OWNER_PHONE,

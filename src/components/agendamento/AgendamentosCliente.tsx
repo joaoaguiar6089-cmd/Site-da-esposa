@@ -185,7 +185,8 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
             clientPhone: client.celular,
             appointmentDate: appointmentData.appointment_date,
             appointmentTime: appointmentData.appointment_time,
-            procedureName: appointmentData.procedures.name
+            procedureName: appointmentData.procedures.name,
+            notes: appointmentData.notes
           }
         });
 

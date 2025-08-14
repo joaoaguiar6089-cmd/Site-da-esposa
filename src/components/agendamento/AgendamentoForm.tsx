@@ -312,8 +312,24 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
           console.error('Erro ao enviar para webhook n8n:', webhookError);
         }
         
-        // WhatsApp para cliente
-        const clientMessage = `🩺 *Agendamento ${editingId ? 'Atualizado' : 'Confirmado'}*\n\nOlá ${client.nome}!\n\nSeu agendamento foi ${editingId ? 'atualizado' : 'confirmado'}:\n\n📅 Data: ${new Date(formData.appointment_date).toLocaleDateString('pt-BR')}\n⏰ Horário: ${formData.appointment_time}\n💉 Procedimento: ${selectedProc?.name}\n📍 Local: Av. Brasil, 63b, São Francisco - Tefé-AM\n🗺️ Ver localização: https://share.google/GBkRNRdCejpJYVANt\n\nObrigado pela confiança! 🙏`;
+        // WhatsApp para cliente usando template
+        const templateType = editingId ? 'agendamento_atualizado_cliente' : 'agendamento_cliente';
+        const notesText = formData.notes ? `\n📝 Observações: ${formData.notes}` : '';
+        
+        const { data: templateData } = await supabase.functions.invoke('get-whatsapp-template', {
+          body: {
+            templateType,
+            variables: {
+              clientName: client.nome,
+              appointmentDate: new Date(formData.appointment_date).toLocaleDateString('pt-BR'),
+              appointmentTime: formData.appointment_time,
+              procedureName: selectedProc?.name || '',
+              notes: notesText
+            }
+          }
+        });
+        
+        const clientMessage = templateData?.message || `🩺 *Agendamento ${editingId ? 'Atualizado' : 'Confirmado'}*\n\nOlá ${client.nome}!\n\nSeu agendamento foi ${editingId ? 'atualizado' : 'confirmado'}:\n\n📅 Data: ${new Date(formData.appointment_date).toLocaleDateString('pt-BR')}\n⏰ Horário: ${formData.appointment_time}\n💉 Procedimento: ${selectedProc?.name}${notesText}\n📍 Local: Av. Brasil, 63b, São Francisco - Tefé-AM\n🗺️ Ver localização: https://share.google/GBkRNRdCejpJYVANt\n\nObrigado pela confiança! 🙏`;
         
         console.log('Enviando WhatsApp para:', client.celular, 'Mensagem:', clientMessage.substring(0, 100) + '...');
         
@@ -345,7 +361,8 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
               appointmentDate: formData.appointment_date,
               appointmentTime: formData.appointment_time,
               procedureName: selectedProc?.name || '',
-              professionalName: null
+              professionalName: null,
+              notes: formData.notes
             }
           });
 

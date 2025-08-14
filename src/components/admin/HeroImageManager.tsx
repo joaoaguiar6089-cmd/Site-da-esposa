@@ -1,15 +1,40 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, Image, Monitor, Smartphone, Tablet } from "lucide-react";
+import { Upload, Image, Monitor, Smartphone, Tablet, Check } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 const HeroImageManager = () => {
   const [uploading, setUploading] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [previewMode, setPreviewMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [currentImage, setCurrentImage] = useState('/lovable-uploads/648c7c53-0d63-4091-b28f-2ded7b542feb.png');
+  const [appliedImage, setAppliedImage] = useState('/lovable-uploads/648c7c53-0d63-4091-b28f-2ded7b542feb.png');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetchCurrentHeroImage();
+  }, []);
+
+  const fetchCurrentHeroImage = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('site_settings')
+        .select('setting_value')
+        .eq('setting_key', 'hero_image_url')
+        .single();
+
+      if (error) throw error;
+      
+      if (data?.setting_value) {
+        setAppliedImage(data.setting_value);
+        setCurrentImage(data.setting_value);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar imagem hero:', error);
+    }
+  };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -44,12 +69,33 @@ const HeroImageManager = () => {
         .getPublicUrl(filePath);
 
       setCurrentImage(data.publicUrl);
-      toast.success('Imagem enviada com sucesso!');
+      toast.success('Imagem enviada com sucesso! Clique em "Aplicar" para usar na página principal.');
     } catch (error) {
       console.error('Erro ao fazer upload:', error);
       toast.error('Erro ao fazer upload da imagem');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const applyHeroImage = async () => {
+    setApplying(true);
+    
+    try {
+      const { error } = await supabase
+        .from('site_settings')
+        .update({ setting_value: currentImage })
+        .eq('setting_key', 'hero_image_url');
+
+      if (error) throw error;
+      
+      setAppliedImage(currentImage);
+      toast.success('Imagem aplicada com sucesso na página principal!');
+    } catch (error) {
+      console.error('Erro ao aplicar imagem:', error);
+      toast.error('Erro ao aplicar a imagem');
+    } finally {
+      setApplying(false);
     }
   };
 
@@ -105,14 +151,28 @@ const HeroImageManager = () => {
               className="hidden"
             />
             
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="w-full"
-            >
-              <Image className="mr-2 h-4 w-4" />
-              {uploading ? 'Enviando...' : 'Selecionar Imagem'}
-            </Button>
+            <div className="space-y-3">
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="w-full"
+              >
+                <Image className="mr-2 h-4 w-4" />
+                {uploading ? 'Enviando...' : 'Selecionar Imagem'}
+              </Button>
+
+              {currentImage !== appliedImage && (
+                <Button
+                  onClick={applyHeroImage}
+                  disabled={applying}
+                  variant="default"
+                  className="w-full"
+                >
+                  <Check className="mr-2 h-4 w-4" />
+                  {applying ? 'Aplicando...' : 'Aplicar na Página Principal'}
+                </Button>
+              )}
+            </div>
 
             <div className="text-sm text-muted-foreground">
               <p>Recomendações:</p>

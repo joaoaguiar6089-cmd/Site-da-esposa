@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.12 (cd3cf9e)"
@@ -336,6 +336,30 @@ export type Database = {
         }
         Relationships: []
       }
+      site_settings: {
+        Row: {
+          created_at: string
+          id: string
+          setting_key: string
+          setting_value: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          setting_key: string
+          setting_value: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          setting_key?: string
+          setting_value?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       professionals_public: {
@@ -365,10 +389,10 @@ export type Database = {
       check_appointment_conflict: {
         Args: {
           p_appointment_date: string
-          p_appointment_time: string
-          p_professional_id: string
-          p_procedure_id: string
           p_appointment_id?: string
+          p_appointment_time: string
+          p_procedure_id: string
+          p_professional_id: string
         }
         Returns: boolean
       }
@@ -398,8 +422,8 @@ export type Database = {
       }
       log_security_event: {
         Args: {
-          event_type: string
           event_details?: Json
+          event_type: string
           target_user_id?: string
         }
         Returns: undefined

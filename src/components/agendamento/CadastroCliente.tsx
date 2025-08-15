@@ -114,7 +114,30 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
         throw new Error('Sobrenome é obrigatório');
       }
       
-      // Inserir cliente diretamente
+      // Verificar se CPF já existe
+      console.log('🔍 DEBUG: Verificando se CPF já existe...');
+      const { data: existingClient, error: checkError } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('cpf', cpfLimpo)
+        .maybeSingle();
+        
+      if (checkError) {
+        console.log('❌ DEBUG: Erro ao verificar CPF existente:', checkError);
+        throw new Error('Erro ao verificar CPF. Tente novamente.');
+      }
+      
+      if (existingClient) {
+        console.log('❌ DEBUG: CPF já existe no banco');
+        toast({
+          title: "CPF já cadastrado",
+          description: "Este CPF já está cadastrado no sistema.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Preparar dados para inserção
       const insertData = {
         cpf: cpfLimpo,
         nome: formData.nome.trim(),
@@ -124,25 +147,23 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
       
       console.log('🔍 DEBUG: Dados para inserção:', insertData);
       
+      // Inserir cliente
       const { data, error } = await supabase
         .from('clients')
         .insert(insertData)
         .select()
-        .single();
+        .maybeSingle();
 
       console.log('🔍 DEBUG: Resposta do Supabase:', { data, error });
 
       if (error) {
         console.log('❌ DEBUG: Erro do Supabase:', error);
-        if (error.code === '23505') {
-          toast({
-            title: "CPF já cadastrado",
-            description: "Este CPF já está cadastrado no sistema.",
-            variant: "destructive",
-          });
-          return;
-        }
-        throw error;
+        throw new Error(`Erro do banco de dados: ${error.message}`);
+      }
+      
+      if (!data) {
+        console.log('❌ DEBUG: Dados não retornados após inserção');
+        throw new Error('Dados não foram salvos corretamente. Tente novamente.');
       }
       
       console.log('✅ DEBUG: Cadastro realizado com sucesso!');

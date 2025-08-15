@@ -37,13 +37,15 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
     let formattedValue = value;
     
     if (field === 'cpf') {
-      if (cleanCPF(value).length <= 11) {
+      const cleanValue = cleanCPF(value);
+      if (cleanValue.length <= 11) {
         formattedValue = formatCPF(value);
       } else {
         return;
       }
     } else if (field === 'celular') {
-      if (value.replace(/\D/g, '').length <= 11) {
+      const cleanValue = value.replace(/\D/g, '');
+      if (cleanValue.length <= 11) {
         formattedValue = formatPhone(value);
       } else {
         return;
@@ -94,15 +96,37 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
     
     try {
       console.log('🔍 DEBUG: Tentando inserir no Supabase...');
+      
+      // Verificações adicionais para iOS
+      if (!cpfLimpo || cpfLimpo.length !== 11) {
+        throw new Error('CPF inválido após limpeza');
+      }
+      
+      if (!cleanPhone || cleanPhone.length < 10) {
+        throw new Error('Telefone inválido após limpeza');
+      }
+      
+      if (!formData.nome.trim()) {
+        throw new Error('Nome é obrigatório');
+      }
+      
+      if (!formData.sobrenome.trim()) {
+        throw new Error('Sobrenome é obrigatório');
+      }
+      
       // Inserir cliente diretamente
+      const insertData = {
+        cpf: cpfLimpo,
+        nome: formData.nome.trim(),
+        sobrenome: formData.sobrenome.trim(),
+        celular: cleanPhone,
+      };
+      
+      console.log('🔍 DEBUG: Dados para inserção:', insertData);
+      
       const { data, error } = await supabase
         .from('clients')
-        .insert({
-          cpf: cpfLimpo,
-          nome: formData.nome.trim(),
-          sobrenome: formData.sobrenome.trim(),
-          celular: cleanPhone,
-        })
+        .insert(insertData)
         .select()
         .single();
 
@@ -128,13 +152,29 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
       });
 
       onClientRegistered(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ DEBUG: Erro ao cadastrar cliente:', error);
       console.error('❌ DEBUG: Tipo do erro:', typeof error);
-      console.error('❌ DEBUG: Detalhes do erro:', JSON.stringify(error, null, 2));
+      console.error('❌ DEBUG: Message:', error?.message);
+      console.error('❌ DEBUG: Stack:', error?.stack);
+      
+      let errorMessage = "Erro ao realizar cadastro. Tente novamente.";
+      
+      if (error?.message) {
+        if (error.message.includes('CPF inválido')) {
+          errorMessage = "CPF inválido. Verifique o número digitado.";
+        } else if (error.message.includes('Telefone inválido')) {
+          errorMessage = "Telefone inválido. Verifique o número digitado.";
+        } else if (error.message.includes('Nome é obrigatório')) {
+          errorMessage = "Nome é obrigatório.";
+        } else if (error.message.includes('Sobrenome é obrigatório')) {
+          errorMessage = "Sobrenome é obrigatório.";
+        }
+      }
+      
       toast({
         title: "Erro",
-        description: "Erro ao realizar cadastro. Tente novamente.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

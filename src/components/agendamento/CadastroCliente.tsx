@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { isValidCPF, formatCPF, cleanCPF } from "@/utils/cpfValidator";
 import type { Client } from "@/pages/Agendamento";
 
 interface CadastroClienteProps {
@@ -22,14 +23,6 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const formatCPF = (value: string) => {
-    const numbers = value.replace(/\D/g, '');
-    const match = numbers.match(/^(\d{3})(\d{3})(\d{3})(\d{2})$/);
-    if (match) {
-      return `${match[1]}.${match[2]}.${match[3]}-${match[4]}`;
-    }
-    return numbers;
-  };
 
   const formatPhone = (value: string) => {
     const numbers = value.replace(/\D/g, '');
@@ -44,7 +37,7 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
     let formattedValue = value;
     
     if (field === 'cpf') {
-      if (value.replace(/\D/g, '').length <= 11) {
+      if (cleanCPF(value).length <= 11) {
         formattedValue = formatCPF(value);
       } else {
         return;
@@ -66,13 +59,13 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const cleanCPF = formData.cpf.replace(/\D/g, '');
+    const cpfLimpo = cleanCPF(formData.cpf);
     const cleanPhone = formData.celular.replace(/\D/g, '');
     
-    if (cleanCPF.length !== 11) {
+    if (!isValidCPF(formData.cpf)) {
       toast({
         title: "CPF inválido",
-        description: "Por favor, digite um CPF válido com 11 dígitos.",
+        description: "Por favor, digite um CPF válido.",
         variant: "destructive",
       });
       return;
@@ -94,7 +87,7 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
       const { data, error } = await supabase
         .from('clients')
         .insert({
-          cpf: cleanCPF,
+          cpf: cpfLimpo,
           nome: formData.nome.trim(),
           sobrenome: formData.sobrenome.trim(),
           celular: cleanPhone,

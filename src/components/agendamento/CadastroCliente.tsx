@@ -59,10 +59,18 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('🔍 DEBUG: Iniciando cadastro...');
+    console.log('🔍 DEBUG: Dados do formulário:', formData);
+    
     const cpfLimpo = cleanCPF(formData.cpf);
     const cleanPhone = formData.celular.replace(/\D/g, '');
     
+    console.log('🔍 DEBUG: CPF limpo:', cpfLimpo);
+    console.log('🔍 DEBUG: Telefone limpo:', cleanPhone);
+    console.log('🔍 DEBUG: CPF válido?', isValidCPF(formData.cpf));
+    
     if (!isValidCPF(formData.cpf)) {
+      console.log('❌ DEBUG: Falha na validação do CPF');
       toast({
         title: "CPF inválido",
         description: "Por favor, digite um CPF válido.",
@@ -72,6 +80,7 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
     }
 
     if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+      console.log('❌ DEBUG: Falha na validação do telefone');
       toast({
         title: "Celular inválido",
         description: "Por favor, digite um número de celular válido.",
@@ -80,9 +89,11 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
       return;
     }
 
+    console.log('✅ DEBUG: Validações passaram, iniciando inserção no banco...');
     setLoading(true);
     
     try {
+      console.log('🔍 DEBUG: Tentando inserir no Supabase...');
       // Inserir cliente diretamente
       const { data, error } = await supabase
         .from('clients')
@@ -95,7 +106,10 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
         .select()
         .single();
 
+      console.log('🔍 DEBUG: Resposta do Supabase:', { data, error });
+
       if (error) {
+        console.log('❌ DEBUG: Erro do Supabase:', error);
         if (error.code === '23505') {
           toast({
             title: "CPF já cadastrado",
@@ -107,6 +121,7 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
         throw error;
       }
       
+      console.log('✅ DEBUG: Cadastro realizado com sucesso!');
       toast({
         title: "Cadastro realizado!",
         description: "Seus dados foram salvos com sucesso.",
@@ -114,7 +129,9 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
 
       onClientRegistered(data);
     } catch (error) {
-      console.error('Erro ao cadastrar cliente:', error);
+      console.error('❌ DEBUG: Erro ao cadastrar cliente:', error);
+      console.error('❌ DEBUG: Tipo do erro:', typeof error);
+      console.error('❌ DEBUG: Detalhes do erro:', JSON.stringify(error, null, 2));
       toast({
         title: "Erro",
         description: "Erro ao realizar cadastro. Tente novamente.",

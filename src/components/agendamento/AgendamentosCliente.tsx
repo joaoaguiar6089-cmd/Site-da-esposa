@@ -27,16 +27,20 @@ interface AgendamentosClienteProps {
   onBack: () => void;
 }
 
-const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosClienteProps) => {
+const AgendamentosCliente = ({ client: initialClient, onNewAppointment, onBack }: AgendamentosClienteProps) => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingPhone, setEditingPhone] = useState(false);
   const [newPhone, setNewPhone] = useState("");
+  const [updatingPhone, setUpdatingPhone] = useState(false);
+  // Estado local para o cliente, permitindo atualizações
+  const [client, setClient] = useState<Client>(initialClient);
   const { toast } = useToast();
 
   useEffect(() => {
+    setClient(initialClient);
     loadAppointments();
-  }, [client.id]);
+  }, [initialClient, initialClient.id]);
 
   const loadAppointments = async () => {
     try {
@@ -46,7 +50,7 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
           *,
           procedures!appointments_procedure_id_fkey(name, duration, price)
         `)
-        .eq('client_id', client.id)
+        .eq('client_id', initialClient.id)
         .order('appointment_date', { ascending: false });
 
       if (error) throw error;
@@ -72,8 +76,13 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
   };
 
   const formatPhone = (phone: string) => {
+    if (!phone) return '';
     const numbers = phone.replace(/\D/g, '');
-    return numbers.replace(/(\d{2})(\d{4,5})(\d{4})/, '($1) $2-$3');
+    if (numbers.length === 0) return '';
+    if (numbers.length <= 2) return `(${numbers}`;
+    if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    if (numbers.length <= 10) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
   };
 
   const formatCPF = (cpf: string) => {
@@ -92,25 +101,49 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
     return <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>;
   };
 
+  const handlePhoneInputChange = (value: string) => {
+    // Remove tudo que não é número e limita a 11 dígitos
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 11) {
+      setNewPhone(formatPhone(numbers));
+    }
+  };
+
   const handlePhoneUpdate = async () => {
+    if (updatingPhone) return; // Previne múltiplas chamadas
+    
     const phoneNumbers = newPhone.replace(/\D/g, '');
     
     if (phoneNumbers.length < 10 || phoneNumbers.length > 11) {
       toast({
         title: "Telefone inválido",
-        description: "Digite um número válido.",
+        description: "Digite um número válido com 10 ou 11 dígitos.",
         variant: "destructive",
       });
       return;
     }
 
+    setUpdatingPhone(true);
+
     try {
-      const { error } = await supabase
+      console.log('Atualizando telefone:', phoneNumbers, 'para cliente ID:', client.id);
+      
+      const { data, error } = await supabase
         .from('clients')
         .update({ celular: phoneNumbers })
-        .eq('id', client.id);
+        .eq('id', client.id)
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro do Supabase ao atualizar telefone:', error);
+        throw error;
+      }
+
+      console.log('Telefone atualizado com sucesso:', data);
+
+      // Atualiza o estado local do cliente
+      setClient(prev => ({ ...prev, celular: phoneNumbers }));
 
       toast({
         title: "Telefone atualizado",
@@ -119,14 +152,30 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
 
       setEditingPhone(false);
       setNewPhone("");
-    } catch (error) {
+
+    } catch (error: any) {
       console.error('Erro ao atualizar telefone:', error);
+      
+      let message = "Erro ao atualizar telefone.";
+      if (error?.message?.includes('network') || error?.message?.includes('fetch')) {
+        message = "Problema de conexão. Verifique sua internet e tente novamente.";
+      } else if (error?.message) {
+        message = `Erro: ${error.message}`;
+      }
+      
       toast({
         title: "Erro",
-        description: "Erro ao atualizar telefone.",
+        description: message,
         variant: "destructive",
       });
+    } finally {
+      setUpdatingPhone(false);
     }
+  };
+
+  const cancelPhoneEdit = () => {
+    setEditingPhone(false);
+    setNewPhone("");
   };
 
   if (loading) {
@@ -158,27 +207,37 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
           <div>
             <p className="text-sm text-muted-foreground">Celular</p>
             {editingPhone ? (
-              <div className="flex gap-2">
+              <div className="space-y-2">
                 <Input
                   type="tel"
-                  placeholder="(00) 00000-0000"
+                  placeholder="(11) 99999-9999"
                   value={newPhone}
-                  onChange={(e) => setNewPhone(formatPhone(e.target.value))}
-                  className="flex-1"
+                  onChange={(e) => handlePhoneInputChange(e.target.value)}
+                  className="w-full"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoFocus
+                  style={{ fontSize: '16px' }} // Previne zoom no iOS
                 />
-                <Button size="sm" onClick={handlePhoneUpdate}>
-                  Salvar
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={() => {
-                    setEditingPhone(false);
-                    setNewPhone("");
-                  }}
-                >
-                  Cancelar
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm" 
+                    onClick={handlePhoneUpdate}
+                    disabled={updatingPhone || newPhone.replace(/\D/g, '').length < 10}
+                    className="flex-1"
+                  >
+                    {updatingPhone ? "Salvando..." : "Salvar"}
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={cancelPhoneEdit}
+                    disabled={updatingPhone}
+                    className="flex-1"
+                  >
+                    Cancelar
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="flex items-center justify-between">
@@ -190,6 +249,7 @@ const AgendamentosCliente = ({ client, onNewAppointment, onBack }: AgendamentosC
                     setEditingPhone(true);
                     setNewPhone(formatPhone(client.celular));
                   }}
+                  title="Editar telefone"
                 >
                   <Phone className="w-4 h-4" />
                 </Button>

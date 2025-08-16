@@ -135,7 +135,7 @@ const AgendamentosCliente = ({
       console.log('Profile encontrado:', profileData);
 
       // Usar a função RPC para atualizar em ambas as tabelas
-      const { data, error } = await supabase.rpc('update_client_phone', {
+      const { data, error } = await supabase.rpc('update_client_phone' as any, {
         p_client_id: client.id,
         p_user_id: profileData.user_id,
         p_phone: phoneNumbers

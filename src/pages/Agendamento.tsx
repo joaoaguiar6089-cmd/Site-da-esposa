@@ -74,10 +74,21 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
 
       if (data && data.length > 0) {
         console.log('Cliente encontrado:', data[0]);
-        onClientFound(data[0]);
+        if (typeof onClientFound === 'function') {
+          onClientFound(data[0]);
+        }
       } else {
         console.log('Cliente não encontrado para CPF:', cpfNumbers);
-        onClientNotFound(cpfNumbers);
+        if (typeof onClientNotFound === 'function') {
+          onClientNotFound(cpfNumbers);
+        } else {
+          console.error('onClientNotFound não é uma função:', typeof onClientNotFound);
+          toast({
+            title: "Cliente não encontrado",
+            description: "CPF não cadastrado no sistema.",
+            variant: "destructive",
+          });
+        }
       }
     } catch (error: any) {
       console.error('Erro geral:', error);

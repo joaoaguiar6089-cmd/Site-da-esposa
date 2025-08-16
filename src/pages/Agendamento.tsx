@@ -6,42 +6,33 @@ import { ArrowLeft, Calendar, Plus, Phone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
-import type { Client } from "@/pages/Agendamento";
-
-interface Appointment {
-  id: string;
-  appointment_date: string;
-  appointment_time: string;
-  status: string;
-  notes?: string;
-  procedures: {
-    name: string;
-    duration: number;
-    price: number;
-  };
-}
+import type { Client, Appointment } from "@/types/client";
 
 interface AgendamentosClienteProps {
   client: Client;
   onNewAppointment: () => void;
   onBack: () => void;
-  onClientUpdated?: (client: Client) => void; // Nova prop opcional
+  onClientUpdate?: (updatedClient: Client) => void; // Nova prop para atualizar cliente pai
 }
 
-const AgendamentosCliente = ({ client: initialClient, onNewAppointment, onBack, onClientUpdated }: AgendamentosClienteProps) => {
+const AgendamentosCliente = ({ 
+  client, 
+  onNewAppointment, 
+  onBack,
+  onClientUpdate 
+}: AgendamentosClienteProps) => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingPhone, setEditingPhone] = useState(false);
   const [newPhone, setNewPhone] = useState("");
   const [updatingPhone, setUpdatingPhone] = useState(false);
-  // Estado local para o cliente, permitindo atualizações
-  const [client, setClient] = useState<Client>(initialClient);
+  const [localClient, setLocalClient] = useState<Client>(client); // Estado local do cliente
   const { toast } = useToast();
 
   useEffect(() => {
-    setClient(initialClient);
+    setLocalClient(client);
     loadAppointments();
-  }, [initialClient, initialClient.id]);
+  }, [client, client.id]);
 
   const loadAppointments = async () => {
     try {
@@ -51,7 +42,7 @@ const AgendamentosCliente = ({ client: initialClient, onNewAppointment, onBack, 
           *,
           procedures!appointments_procedure_id_fkey(name, duration, price)
         `)
-        .eq('client_id', initialClient.id)
+        .eq('client_id', client.id)
         .order('appointment_date', { ascending: false });
 
       if (error) throw error;
@@ -127,29 +118,49 @@ const AgendamentosCliente = ({ client: initialClient, onNewAppointment, onBack, 
     setUpdatingPhone(true);
 
     try {
-      console.log('Atualizando telefone:', phoneNumbers, 'para cliente ID:', client.id);
+      console.log('Iniciando atualização do telefone para cliente:', client.id);
       
-      const { data, error } = await supabase
-        .from('clients')
-        .update({ celular: phoneNumbers })
-        .eq('id', client.id)
-        .select()
+      // Primeiro, busque o user_id associado ao cliente
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('cpf', client.cpf)
         .single();
 
+      if (profileError) {
+        console.error('Erro ao buscar profile:', profileError);
+        throw profileError;
+      }
+
+      console.log('Profile encontrado:', profileData);
+
+      // Usar a função RPC para atualizar em ambas as tabelas
+      const { data, error } = await supabase.rpc('update_client_phone' as any, {
+        p_client_id: client.id,
+        p_user_id: profileData.user_id,
+        p_phone: phoneNumbers
+      });
+
       if (error) {
-        console.error('Erro do Supabase ao atualizar telefone:', error);
+        console.error('Erro na função RPC update_client_phone:', error);
         throw error;
       }
 
-      console.log('Telefone atualizado com sucesso:', data);
+      console.log('Telefone atualizado com sucesso via RPC');
 
-      // Atualiza o estado local do cliente
-      const updatedClient = { ...prev, celular: phoneNumbers };
-      setClient(updatedClient);
+      // Atualizar o objeto cliente local
+      const updatedClient = {
+        ...client,
+        celular: phoneNumbers
+      };
 
-      // Notifica o componente pai sobre a atualização
-      if (onClientUpdated) {
-        onClientUpdated(updatedClient);
+      // Atualizar estado local
+      setLocalClient(updatedClient);
+
+      // Chamar a função de atualização do componente pai, se existir
+      if (onClientUpdate) {
+        console.log('Notificando componente pai sobre atualização');
+        onClientUpdate(updatedClient);
       }
 
       toast({
@@ -166,6 +177,8 @@ const AgendamentosCliente = ({ client: initialClient, onNewAppointment, onBack, 
       let message = "Erro ao atualizar telefone.";
       if (error?.message?.includes('network') || error?.message?.includes('fetch')) {
         message = "Problema de conexão. Verifique sua internet e tente novamente.";
+      } else if (error?.message?.includes('function') || error?.message?.includes('rpc')) {
+        message = "Função de atualização não encontrada. Contate o suporte.";
       } else if (error?.message) {
         message = `Erro: ${error.message}`;
       }
@@ -205,11 +218,11 @@ const AgendamentosCliente = ({ client: initialClient, onNewAppointment, onBack, 
         <CardContent className="space-y-3">
           <div>
             <p className="text-sm text-muted-foreground">Nome</p>
-            <p className="font-medium">{client.nome} {client.sobrenome}</p>
+            <p className="font-medium">{localClient.nome} {localClient.sobrenome}</p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground">CPF</p>
-            <p className="font-medium">{formatCPF(client.cpf)}</p>
+            <p className="font-medium">{formatCPF(localClient.cpf)}</p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Celular</p>
@@ -248,13 +261,13 @@ const AgendamentosCliente = ({ client: initialClient, onNewAppointment, onBack, 
               </div>
             ) : (
               <div className="flex items-center justify-between">
-                <p className="font-medium">{formatPhone(client.celular)}</p>
+                <p className="font-medium">{formatPhone(localClient.celular)}</p>
                 <Button 
                   size="sm" 
                   variant="ghost"
                   onClick={() => {
                     setEditingPhone(true);
-                    setNewPhone(formatPhone(client.celular));
+                    setNewPhone(formatPhone(localClient.celular));
                   }}
                   title="Editar telefone"
                 >

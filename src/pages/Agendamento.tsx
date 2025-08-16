@@ -1,107 +1,398 @@
-import { useState } from "react";
-import LoginCPF from "@/components/agendamento/LoginCPF";
-import CadastroCliente from "@/components/agendamento/CadastroCliente";
-import AgendamentosCliente from "@/components/agendamento/AgendamentosCliente";
-import AgendamentoForm from "@/components/agendamento/AgendamentoForm";
-import type { Client } from "@/types/client";
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Calendar, Plus, Phone } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
+import type { Client, Appointment } from "@/types/client";
 
-type ViewMode = 'cpf' | 'cadastro' | 'agendamentos' | 'novo-agendamento';
+interface AgendamentosClienteProps {
+  client: Client;
+  onNewAppointment: () => void;
+  onBack: () => void;
+  onClientUpdate?: (updatedClient: Client) => void; // Nova prop para atualizar cliente pai
+}
 
-const Agendamento = () => {
-  const [currentView, setCurrentView] = useState<ViewMode>('cpf');
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [pendingCPF, setPendingCPF] = useState<string>('');
+const AgendamentosCliente = ({ 
+  client, 
+  onNewAppointment, 
+  onBack,
+  onClientUpdate 
+}: AgendamentosClienteProps) => {
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [newPhone, setNewPhone] = useState("");
+  const [updatingPhone, setUpdatingPhone] = useState(false);
+  const [localClient, setLocalClient] = useState<Client>(client); // Estado local do cliente
+  const { toast } = useToast();
 
-  const handleClientFound = (client: Client) => {
-    setSelectedClient(client);
-    setCurrentView('agendamentos');
-  };
+  useEffect(() => {
+    setLocalClient(client);
+    loadAppointments();
+  }, [client, client.id]);
 
-  const handleClientNotFound = (cpf: string) => {
-    setPendingCPF(cpf);
-    setCurrentView('cadastro');
-  };
+  const loadAppointments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          procedures!appointments_procedure_id_fkey(name, duration, price)
+        `)
+        .eq('client_id', client.id)
+        .order('appointment_date', { ascending: false });
 
-  const handleClientRegistered = (client: Client) => {
-    setSelectedClient(client);
-    setCurrentView('agendamentos');
-  };
-
-  const handleNewAppointment = () => {
-    setCurrentView('novo-agendamento');
-  };
-
-  const handleAppointmentCreated = () => {
-    setCurrentView('agendamentos');
-  };
-
-  const handleBack = () => {
-    if (currentView === 'cadastro') {
-      setCurrentView('cpf');
-      setPendingCPF('');
-    } else if (currentView === 'novo-agendamento') {
-      setCurrentView('agendamentos');
-    } else if (currentView === 'agendamentos') {
-      setCurrentView('cpf');
-      setSelectedClient(null);
-    } else {
-      setCurrentView('cpf');
+      if (error) throw error;
+      setAppointments(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar agendamentos:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar agendamentos.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleClientUpdate = (updatedClient: Client) => {
-    setSelectedClient(updatedClient);
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('pt-BR');
   };
 
-  const renderCurrentView = () => {
-    switch (currentView) {
-      case 'cpf':
-        return (
-          <LoginCPF
-            onClientFound={handleClientFound}
-            onClientNotFound={handleClientNotFound}
-            onBack={() => window.history.back()}
-          />
-        );
-      
-      case 'cadastro':
-        return (
-          <CadastroCliente
-            cpf={pendingCPF}
-            onClientRegistered={handleClientRegistered}
-            onBack={handleBack}
-          />
-        );
-      
-      case 'agendamentos':
-        return selectedClient ? (
-          <AgendamentosCliente
-            client={selectedClient}
-            onNewAppointment={handleNewAppointment}
-            onBack={handleBack}
-            onClientUpdate={handleClientUpdate}
-          />
-        ) : null;
-      
-      case 'novo-agendamento':
-        return selectedClient ? (
-          <AgendamentoForm
-            client={selectedClient}
-            onAppointmentCreated={handleAppointmentCreated}
-            onBack={handleBack}
-          />
-        ) : null;
-      
-      default:
-        return null;
+  const formatTime = (time: string) => {
+    return time.slice(0, 5);
+  };
+
+  const formatPhone = (phone: string) => {
+    if (!phone) return '';
+    const numbers = phone.replace(/\D/g, '');
+    if (numbers.length === 0) return '';
+    if (numbers.length <= 2) return `(${numbers}`;
+    if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    if (numbers.length <= 10) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+  };
+
+  const formatCPF = (cpf: string) => {
+    return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusMap = {
+      'agendado': { label: 'Agendado', variant: 'default' as const },
+      'confirmado': { label: 'Confirmado', variant: 'default' as const },
+      'realizado': { label: 'Realizado', variant: 'secondary' as const },
+      'cancelado': { label: 'Cancelado', variant: 'destructive' as const },
+    };
+    
+    const statusInfo = statusMap[status as keyof typeof statusMap] || { label: status, variant: 'outline' as const };
+    return <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>;
+  };
+
+  const handlePhoneInputChange = (value: string) => {
+    // Remove tudo que não é número e limita a 11 dígitos
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 11) {
+      setNewPhone(formatPhone(numbers));
     }
   };
+
+  const handlePhoneUpdate = async () => {
+    if (updatingPhone) return; // Previne múltiplas chamadas
+    
+    const phoneNumbers = newPhone.replace(/\D/g, '');
+    
+    if (phoneNumbers.length < 10 || phoneNumbers.length > 11) {
+      toast({
+        title: "Telefone inválido",
+        description: "Digite um número válido com 10 ou 11 dígitos.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUpdatingPhone(true);
+
+    try {
+      console.log('Iniciando atualização do telefone para cliente:', client.id);
+      console.log('CPF do cliente:', client.cpf);
+      
+      // Primeiro, busque o user_id associado ao cliente
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('cpf', client.cpf);
+
+      console.log('Resultado da busca profiles:', profileData);
+
+      if (profileError) {
+        console.error('Erro ao buscar profile:', profileError);
+        throw profileError;
+      }
+
+      // Verificar se encontrou registros
+      if (!profileData || profileData.length === 0) {
+        console.log('Nenhum profile encontrado, atualizando apenas a tabela clients');
+        
+        // Se não encontrar profile, atualiza apenas a tabela clients
+        const { data: clientData, error: clientError } = await supabase
+          .from('clients')
+          .update({ celular: phoneNumbers })
+          .eq('id', client.id)
+          .select()
+          .single();
+
+        if (clientError) {
+          console.error('Erro ao atualizar cliente:', clientError);
+          throw clientError;
+        }
+
+        console.log('Cliente atualizado com sucesso (apenas tabela clients)');
+      } else if (profileData.length === 1) {
+        // Se encontrar exatamente um profile
+        console.log('Profile encontrado:', profileData[0]);
+
+        // Usar a função RPC para atualizar em ambas as tabelas
+        const { data, error } = await supabase.rpc('update_client_phone' as any, {
+          p_client_id: client.id,
+          p_user_id: profileData[0].user_id,
+          p_phone: phoneNumbers
+        });
+
+        if (error) {
+          console.error('Erro na função RPC update_client_phone:', error);
+          
+          // Se a função RPC falhar, tenta atualizar manualmente
+          console.log('Tentando atualização manual...');
+          
+          // Atualizar tabela clients
+          const { error: clientError } = await supabase
+            .from('clients')
+            .update({ celular: phoneNumbers })
+            .eq('id', client.id);
+
+          if (clientError) throw clientError;
+
+          // Atualizar tabela profiles
+          const { error: profileUpdateError } = await supabase
+            .from('profiles')
+            .update({ phone: phoneNumbers })
+            .eq('user_id', profileData[0].user_id);
+
+          if (profileUpdateError) throw profileUpdateError;
+
+          console.log('Atualização manual concluída com sucesso');
+        } else {
+          console.log('Telefone atualizado com sucesso via RPC');
+        }
+      } else {
+        // Se encontrar múltiplos profiles
+        console.error('Múltiplos profiles encontrados para o CPF:', client.cpf);
+        console.error('Profiles encontrados:', profileData);
+        
+        // Atualiza apenas a tabela clients para evitar problemas
+        const { data: clientData, error: clientError } = await supabase
+          .from('clients')
+          .update({ celular: phoneNumbers })
+          .eq('id', client.id)
+          .select()
+          .single();
+
+        if (clientError) {
+          console.error('Erro ao atualizar cliente:', clientError);
+          throw clientError;
+        }
+
+        console.log('Cliente atualizado (múltiplos profiles encontrados, atualizando apenas clients)');
+      }
+
+      // Atualizar o objeto cliente local
+      const updatedClient = {
+        ...client,
+        celular: phoneNumbers
+      };
+
+      // Atualizar estado local
+      setLocalClient(updatedClient);
+
+      // Chamar a função de atualização do componente pai, se existir
+      if (onClientUpdate) {
+        console.log('Notificando componente pai sobre atualização');
+        onClientUpdate(updatedClient);
+      }
+
+      toast({
+        title: "Telefone atualizado",
+        description: "Seu número foi atualizado com sucesso.",
+      });
+
+      setEditingPhone(false);
+      setNewPhone("");
+
+    } catch (error: any) {
+      console.error('Erro ao atualizar telefone:', error);
+      
+      let message = "Erro ao atualizar telefone.";
+      if (error?.message?.includes('network') || error?.message?.includes('fetch')) {
+        message = "Problema de conexão. Verifique sua internet e tente novamente.";
+      } else if (error?.message?.includes('function') || error?.message?.includes('rpc')) {
+        message = "Função de atualização não encontrada. Contate o suporte.";
+      } else if (error?.message) {
+        message = `Erro: ${error.message}`;
+      }
+      
+      toast({
+        title: "Erro",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingPhone(false);
+    }
+  };
+
+  const cancelPhoneEdit = () => {
+    setEditingPhone(false);
+    setNewPhone("");
+  };
+
+  if (loading) {
+    return (
+      <Card className="w-full max-w-md mx-auto">
+        <CardContent className="flex items-center justify-center py-8">
+          <p>Carregando...</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      {renderCurrentView()}
+    <div className="w-full max-w-md mx-auto space-y-4">
+      {/* Informações do Cliente */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Dados do Cliente</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <p className="text-sm text-muted-foreground">Nome</p>
+            <p className="font-medium">{localClient.nome} {localClient.sobrenome}</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">CPF</p>
+            <p className="font-medium">{formatCPF(localClient.cpf)}</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Celular</p>
+            {editingPhone ? (
+              <div className="space-y-2">
+                <Input
+                  type="tel"
+                  placeholder="(11) 99999-9999"
+                  value={newPhone}
+                  onChange={(e) => handlePhoneInputChange(e.target.value)}
+                  className="w-full"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoFocus
+                  style={{ fontSize: '16px' }} // Previne zoom no iOS
+                />
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm" 
+                    onClick={handlePhoneUpdate}
+                    disabled={updatingPhone || newPhone.replace(/\D/g, '').length < 10}
+                    className="flex-1"
+                  >
+                    {updatingPhone ? "Salvando..." : "Salvar"}
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={cancelPhoneEdit}
+                    disabled={updatingPhone}
+                    className="flex-1"
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <p className="font-medium">{formatPhone(localClient.celular)}</p>
+                <Button 
+                  size="sm" 
+                  variant="ghost"
+                  onClick={() => {
+                    setEditingPhone(true);
+                    setNewPhone(formatPhone(localClient.celular));
+                  }}
+                  title="Editar telefone"
+                >
+                  <Phone className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Lista de Agendamentos */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <CardTitle className="text-lg">Agendamentos</CardTitle>
+          <Button size="sm" onClick={onNewAppointment}>
+            <Plus className="w-4 h-4 mr-2" />
+            Novo
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {appointments.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p>Nenhum agendamento encontrado</p>
+              <p className="text-sm">Clique em "Novo" para agendar</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {appointments.map((appointment) => (
+                <div key={appointment.id} className="border rounded-lg p-3">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1">
+                      <p className="font-medium">{appointment.procedures.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatDate(appointment.appointment_date)} às {formatTime(appointment.appointment_time)}
+                      </p>
+                      {appointment.notes && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {appointment.notes}
+                        </p>
+                      )}
+                    </div>
+                    {getStatusBadge(appointment.status)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Botão Voltar */}
+      <Button
+        variant="outline"
+        onClick={onBack}
+        className="w-full flex items-center gap-2"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Voltar
+      </Button>
     </div>
   );
 };
 
-export default Agendamento;
+export default AgendamentosCliente;

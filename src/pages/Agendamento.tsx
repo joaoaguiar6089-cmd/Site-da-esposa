@@ -52,30 +52,38 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
     
     try {
       const cpfNumbers = cpf.replace(/\D/g, '');
+      console.log('Buscando cliente com CPF:', cpfNumbers);
       
-      const { data, error } = await supabase
+      // Primeiro tenta buscar sem .single() para ver se há dados
+      const { data, error, count } = await supabase
         .from('clients')
-        .select('*')
-        .eq('cpf', cpfNumbers)
-        .single();
+        .select('*', { count: 'exact' })
+        .eq('cpf', cpfNumbers);
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Erro ao buscar cliente:', error);
-        throw error;
+      console.log('Resultado da busca:', { data, error, count });
+
+      if (error) {
+        console.error('Erro na consulta Supabase:', error);
+        toast({
+          title: "Erro de conexão",
+          description: `Erro ao conectar com a base de dados: ${error.message}`,
+          variant: "destructive",
+        });
+        return;
       }
 
-      if (data && data.id) {
-        console.log('Cliente encontrado:', data);
-        onClientFound(data);
+      if (data && data.length > 0) {
+        console.log('Cliente encontrado:', data[0]);
+        onClientFound(data[0]);
       } else {
         console.log('Cliente não encontrado para CPF:', cpfNumbers);
         onClientNotFound(cpfNumbers);
       }
-    } catch (error) {
-      console.error('Erro ao buscar cliente:', error);
+    } catch (error: any) {
+      console.error('Erro geral:', error);
       toast({
         title: "Erro",
-        description: "Erro ao verificar CPF. Tente novamente.",
+        description: `Erro ao verificar CPF: ${error?.message || 'Erro desconhecido'}`,
         variant: "destructive",
       });
     } finally {

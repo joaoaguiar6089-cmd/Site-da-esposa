@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import type { Client } from "@/pages/Agendamento";
+import type { Client } from "@/types/client";
 
 interface CadastroClienteProps {
   cpf: string;

@@ -6,20 +6,7 @@ import { ArrowLeft, Calendar, Plus, Phone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
-import type { Client } from "@/pages/Agendamento";
-
-interface Appointment {
-  id: string;
-  appointment_date: string;
-  appointment_time: string;
-  status: string;
-  notes?: string;
-  procedures: {
-    name: string;
-    duration: number;
-    price: number;
-  };
-}
+import type { Client, Appointment } from "@/types/client";
 
 interface AgendamentosClienteProps {
   client: Client;

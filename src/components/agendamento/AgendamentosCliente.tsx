@@ -7,8 +7,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import type { Client, Appointment } from "@/types/client";
-import { supabase } from '../path/to/supabaseClient';
-// Mantenha outras importações que já existem
 
 interface AgendamentosClienteProps {
   client: Client;
@@ -136,19 +134,53 @@ const AgendamentosCliente = ({
 
       console.log('Profile encontrado:', profileData);
 
-      // Usar a função RPC para atualizar em ambas as tabelas
-      const { data, error } = await supabase.rpc('update_client_phone' as any, {
-        p_client_id: client.id,
-        p_user_id: profileData.user_id,
-        p_phone: phoneNumbers
-      });
+// Função para atualizar o telefone do cliente
+const updateClientPhone = async (cpf: string, phone: string) => {
+  try {
+    // Remove caracteres não numéricos do CPF e telefone
+    const cleanCPF = cpf.replace(/\D/g, '');
+    const cleanPhone = phone.replace(/\D/g, '');
 
-      if (error) {
-        console.error('Erro na função RPC update_client_phone:', error);
-        throw error;
-      }
+    // Chama a função RPC
+    const { data, error } = await supabase.rpc('update_client_phone', {
+      p_cpf: cleanCPF,     // CPF do cliente sem formatação
+      p_phone: cleanPhone  // Número de telefone sem formatação
+    });
 
-      console.log('Telefone atualizado com sucesso via RPC');
+    if (error) {
+      console.error('Erro ao atualizar telefone:', error);
+      return { success: false, error: error.message };
+    }
+
+    // Verifica se a operação foi bem-sucedida
+    if (data && data.success) {
+      console.log('Telefone atualizado com sucesso:', data);
+      return { success: true, data };
+    } else {
+      console.error('Falha ao atualizar telefone:', data?.message || 'Erro desconhecido');
+      return { success: false, error: data?.message || 'Erro desconhecido' };
+    }
+  } catch (err) {
+    console.error('Erro inesperado:', err);
+    return { success: false, error: String(err) };
+  }
+};
+
+// Exemplo de uso
+async function atualizarTelefoneCliente() {
+  const cpf = '12345678900'; // O CPF do cliente
+  const novoTelefone = '11987654321'; // O novo telefone
+  
+  const resultado = await updateClientPhone(cpf, novoTelefone);
+  
+  if (resultado.success) {
+    // Mostrar mensagem de sucesso
+    Alert.alert('Sucesso', 'Telefone atualizado com sucesso');
+  } else {
+    // Mostrar mensagem de erro
+    Alert.alert('Erro', resultado.error);
+  }
+}
 
       // Atualizar o objeto cliente local
       const updatedClient = {

@@ -5,17 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { isValidCPF, formatCPF, cleanCPF } from "@/utils/cpfValidator";
 import type { Client } from "@/pages/Agendamento";
 
 interface CadastroClienteProps {
+  cpf: string;
   onClientRegistered: (client: Client) => void;
   onBack: () => void;
 }
 
-const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) => {
+const CadastroCliente = ({ cpf, onClientRegistered, onBack }: CadastroClienteProps) => {
   const [formData, setFormData] = useState({
-    cpf: "",
     nome: "",
     sobrenome: "",
     celular: "",
@@ -23,150 +22,79 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+  const formatCPF = (cpf: string) => {
+    return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  };
 
   const formatPhone = (value: string) => {
     const numbers = value.replace(/\D/g, '');
-    const match = numbers.match(/^(\d{2})(\d{4,5})(\d{4})$/);
-    if (match) {
-      return `(${match[1]}) ${match[2]}-${match[3]}`;
+    if (numbers.length >= 10) {
+      return numbers.replace(/(\d{2})(\d{4,5})(\d{4})/, '($1) $2-$3');
     }
-    return numbers;
+    return value;
   };
 
   const handleInputChange = (field: string, value: string) => {
-    let formattedValue = value;
-    
-    if (field === 'cpf') {
-      const cleanValue = cleanCPF(value);
-      if (cleanValue.length <= 11) {
-        formattedValue = formatCPF(value);
-      } else {
-        return;
+    if (field === 'celular') {
+      const numbers = value.replace(/\D/g, '');
+      if (numbers.length <= 11) {
+        setFormData(prev => ({
+          ...prev,
+          [field]: formatPhone(value)
+        }));
       }
-    } else if (field === 'celular') {
-      const cleanValue = value.replace(/\D/g, '');
-      if (cleanValue.length <= 11) {
-        formattedValue = formatPhone(value);
-      } else {
-        return;
-      }
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value
+      }));
     }
+  };
 
-    setFormData(prev => ({
-      ...prev,
-      [field]: formattedValue
-    }));
+  const isValidForm = () => {
+    const phoneNumbers = formData.celular.replace(/\D/g, '');
+    return (
+      formData.nome.trim().length >= 2 &&
+      formData.sobrenome.trim().length >= 2 &&
+      phoneNumbers.length >= 10 &&
+      phoneNumbers.length <= 11
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('🔍 DEBUG: Iniciando cadastro...');
-    console.log('🔍 DEBUG: Dados do formulário:', formData);
-    
-    const cpfLimpo = cleanCPF(formData.cpf);
-    const cleanPhone = formData.celular.replace(/\D/g, '');
-    
-    console.log('🔍 DEBUG: CPF limpo:', cpfLimpo);
-    console.log('🔍 DEBUG: Telefone limpo:', cleanPhone);
-    console.log('🔍 DEBUG: CPF válido?', isValidCPF(formData.cpf));
-    
-    if (!isValidCPF(formData.cpf)) {
-      console.log('❌ DEBUG: Falha na validação do CPF');
+    if (!isValidForm()) {
       toast({
-        title: "CPF inválido",
-        description: "Por favor, digite um CPF válido.",
+        title: "Dados inválidos",
+        description: "Verifique se todos os campos estão preenchidos corretamente.",
         variant: "destructive",
       });
       return;
     }
 
-    if (cleanPhone.length < 10 || cleanPhone.length > 11) {
-      console.log('❌ DEBUG: Falha na validação do telefone');
-      toast({
-        title: "Celular inválido",
-        description: "Por favor, digite um número de celular válido.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    console.log('✅ DEBUG: Validações passaram, iniciando inserção no banco...');
     setLoading(true);
     
     try {
-      console.log('🔍 DEBUG: Tentando inserir no Supabase...');
+      const phoneNumbers = formData.celular.replace(/\D/g, '');
       
-      // Verificações adicionais para iOS
-      if (!cpfLimpo || cpfLimpo.length !== 11) {
-        throw new Error('CPF inválido após limpeza');
-      }
-      
-      if (!cleanPhone || cleanPhone.length < 10) {
-        throw new Error('Telefone inválido após limpeza');
-      }
-      
-      if (!formData.nome.trim()) {
-        throw new Error('Nome é obrigatório');
-      }
-      
-      if (!formData.sobrenome.trim()) {
-        throw new Error('Sobrenome é obrigatório');
-      }
-      
-      // Verificar se CPF já existe
-      console.log('🔍 DEBUG: Verificando se CPF já existe...');
-      const { data: existingClient, error: checkError } = await supabase
-        .from('clients')
-        .select('id')
-        .eq('cpf', cpfLimpo)
-        .maybeSingle();
-        
-      if (checkError) {
-        console.log('❌ DEBUG: Erro ao verificar CPF existente:', checkError);
-        throw new Error('Erro ao verificar CPF. Tente novamente.');
-      }
-      
-      if (existingClient) {
-        console.log('❌ DEBUG: CPF já existe no banco');
-        toast({
-          title: "CPF já cadastrado",
-          description: "Este CPF já está cadastrado no sistema.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      // Preparar dados para inserção
-      const insertData = {
-        cpf: cpfLimpo,
+      const clientData = {
+        cpf: cpf,
         nome: formData.nome.trim(),
         sobrenome: formData.sobrenome.trim(),
-        celular: cleanPhone,
+        celular: phoneNumbers,
       };
-      
-      console.log('🔍 DEBUG: Dados para inserção:', insertData);
-      
-      // Inserir cliente
+
       const { data, error } = await supabase
         .from('clients')
-        .insert(insertData)
+        .insert(clientData)
         .select()
-        .maybeSingle();
-
-      console.log('🔍 DEBUG: Resposta do Supabase:', { data, error });
+        .single();
 
       if (error) {
-        console.log('❌ DEBUG: Erro do Supabase:', error);
-        throw new Error(`Erro do banco de dados: ${error.message}`);
+        throw error;
       }
       
-      if (!data) {
-        console.log('❌ DEBUG: Dados não retornados após inserção');
-        throw new Error('Dados não foram salvos corretamente. Tente novamente.');
-      }
-      
-      console.log('✅ DEBUG: Cadastro realizado com sucesso!');
       toast({
         title: "Cadastro realizado!",
         description: "Seus dados foram salvos com sucesso.",
@@ -174,28 +102,16 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
 
       onClientRegistered(data);
     } catch (error: any) {
-      console.error('❌ DEBUG: Erro ao cadastrar cliente:', error);
-      console.error('❌ DEBUG: Tipo do erro:', typeof error);
-      console.error('❌ DEBUG: Message:', error?.message);
-      console.error('❌ DEBUG: Stack:', error?.stack);
+      console.error('Erro ao cadastrar cliente:', error);
       
-      let errorMessage = "Erro ao realizar cadastro. Tente novamente.";
-      
-      if (error?.message) {
-        if (error.message.includes('CPF inválido')) {
-          errorMessage = "CPF inválido. Verifique o número digitado.";
-        } else if (error.message.includes('Telefone inválido')) {
-          errorMessage = "Telefone inválido. Verifique o número digitado.";
-        } else if (error.message.includes('Nome é obrigatório')) {
-          errorMessage = "Nome é obrigatório.";
-        } else if (error.message.includes('Sobrenome é obrigatório')) {
-          errorMessage = "Sobrenome é obrigatório.";
-        }
+      let message = "Erro ao realizar cadastro. Tente novamente.";
+      if (error?.code === '23505') {
+        message = "Este CPF já está cadastrado no sistema.";
       }
       
       toast({
         title: "Erro",
-        description: errorMessage,
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -204,35 +120,32 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
   };
 
   return (
-    <Card className="w-full">
+    <Card className="w-full max-w-md mx-auto">
       <CardHeader className="text-center">
         <div className="flex items-center justify-center gap-2 mb-2">
           <UserPlus className="w-6 h-6 text-primary" />
           <CardTitle className="text-2xl">Novo Cadastro</CardTitle>
         </div>
         <p className="text-muted-foreground">
-          Preencha seus dados para continuar
+          Complete seus dados para continuar
         </p>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="cpf" className="text-sm font-medium">
-              CPF *
+            <label className="text-sm font-medium block mb-2">
+              CPF
             </label>
             <Input
-              id="cpf"
               type="text"
-              placeholder="000.000.000-00"
-              value={formData.cpf}
-              onChange={(e) => handleInputChange('cpf', e.target.value)}
-              className="mt-1"
-              required
+              value={formatCPF(cpf)}
+              disabled
+              className="bg-muted"
             />
           </div>
 
           <div>
-            <label htmlFor="nome" className="text-sm font-medium">
+            <label htmlFor="nome" className="text-sm font-medium block mb-2">
               Nome *
             </label>
             <Input
@@ -241,13 +154,13 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
               placeholder="Seu nome"
               value={formData.nome}
               onChange={(e) => handleInputChange('nome', e.target.value)}
-              className="mt-1"
               required
+              autoComplete="given-name"
             />
           </div>
 
           <div>
-            <label htmlFor="sobrenome" className="text-sm font-medium">
+            <label htmlFor="sobrenome" className="text-sm font-medium block mb-2">
               Sobrenome *
             </label>
             <Input
@@ -256,23 +169,24 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
               placeholder="Seu sobrenome"
               value={formData.sobrenome}
               onChange={(e) => handleInputChange('sobrenome', e.target.value)}
-              className="mt-1"
               required
+              autoComplete="family-name"
             />
           </div>
 
           <div>
-            <label htmlFor="celular" className="text-sm font-medium">
+            <label htmlFor="celular" className="text-sm font-medium block mb-2">
               Celular *
             </label>
             <Input
               id="celular"
-              type="text"
+              type="tel"
               placeholder="(00) 00000-0000"
               value={formData.celular}
               onChange={(e) => handleInputChange('celular', e.target.value)}
-              className="mt-1"
               required
+              autoComplete="tel"
+              inputMode="numeric"
             />
           </div>
           
@@ -288,7 +202,7 @@ const CadastroCliente = ({ onClientRegistered, onBack }: CadastroClienteProps) =
             </Button>
             <Button
               type="submit"
-              disabled={loading}
+              disabled={loading || !isValidForm()}
               className="flex-1"
             >
               {loading ? "Cadastrando..." : "Cadastrar"}

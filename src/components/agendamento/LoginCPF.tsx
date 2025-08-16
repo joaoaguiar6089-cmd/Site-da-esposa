@@ -5,13 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/components/auth/AuthContext";
-import { isValidCPF, formatCPF } from "@/utils/cpfValidator";
 import type { Client } from "@/pages/Agendamento";
 
 interface LoginCPFProps {
   onClientFound: (client: Client) => void;
-  onClientNotFound: () => void;
+  onClientNotFound: (cpf: string) => void;
   onBack: () => void;
 }
 
@@ -19,16 +17,26 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
   const [cpf, setCpf] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { signInWithCPF } = useAuth();
+
+  const formatCPF = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 11) {
+      return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    }
+    return value;
+  };
+
+  const isValidCPF = (cpf: string) => {
+    const numbers = cpf.replace(/\D/g, '');
+    return numbers.length === 11 && /^\d{11}$/.test(numbers);
+  };
 
   const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    const cleanValue = value.replace(/\D/g, '');
+    const numbers = value.replace(/\D/g, '');
     
-    // Limitar a 11 dígitos e sempre aplicar formatação
-    if (cleanValue.length <= 11) {
-      const formatted = formatCPF(cleanValue);
-      setCpf(formatted);
+    if (numbers.length <= 11) {
+      setCpf(formatCPF(value));
     }
   };
 
@@ -38,7 +46,7 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
     if (!isValidCPF(cpf)) {
       toast({
         title: "CPF inválido",
-        description: "Por favor, digite um CPF válido.",
+        description: "Digite um CPF válido com 11 dígitos.",
         variant: "destructive",
       });
       return;
@@ -48,25 +56,21 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
     setLoading(true);
     
     try {
-      // Buscar diretamente na tabela de clientes
-      const { data: clientData, error: clientError } = await supabase
+      const { data: client, error } = await supabase
         .from('clients')
         .select('*')
         .eq('cpf', cleanCPF)
         .maybeSingle();
 
-      if (clientError) {
-        console.error('Erro na consulta:', clientError);
-        throw new Error('Erro ao consultar dados do cliente');
+      if (error) {
+        throw error;
       }
 
-      if (!clientData) {
-        onClientNotFound();
-        return;
+      if (client) {
+        onClientFound(client);
+      } else {
+        onClientNotFound(cleanCPF);
       }
-
-      // Cliente encontrado
-      onClientFound(clientData);
     } catch (error) {
       console.error('Erro ao buscar cliente:', error);
       toast({
@@ -80,20 +84,20 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
   };
 
   return (
-    <Card className="w-full">
+    <Card className="w-full max-w-md mx-auto">
       <CardHeader className="text-center">
         <div className="flex items-center justify-center gap-2 mb-2">
           <Calendar className="w-6 h-6 text-primary" />
           <CardTitle className="text-2xl">Agendamento</CardTitle>
         </div>
         <p className="text-muted-foreground">
-          Digite seu CPF para acessar seus agendamentos
+          Digite seu CPF para acessar ou criar sua conta
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="cpf" className="text-sm font-medium">
+            <label htmlFor="cpf" className="text-sm font-medium block mb-2">
               CPF
             </label>
             <Input
@@ -102,8 +106,9 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
               placeholder="000.000.000-00"
               value={cpf}
               onChange={handleCPFChange}
-              className="mt-1"
               required
+              autoComplete="off"
+              inputMode="numeric"
             />
           </div>
           
@@ -122,7 +127,7 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
               disabled={loading || !isValidCPF(cpf)}
               className="flex-1"
             >
-              {loading ? "Buscando..." : "Continuar"}
+              {loading ? "Verificando..." : "Continuar"}
             </Button>
           </div>
         </form>

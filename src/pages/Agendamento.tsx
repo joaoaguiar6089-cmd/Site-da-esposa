@@ -20,6 +20,7 @@ const Agendamento = () => {
   const [step, setStep] = useState<'login' | 'cadastro' | 'agendamentos' | 'novo-agendamento'>('login');
   const [client, setClient] = useState<Client | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [cpfForRegistration, setCpfForRegistration] = useState<string>("");
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -28,13 +29,14 @@ const Agendamento = () => {
     setStep('agendamentos');
   };
 
-  const handleClientNotFound = () => {
+  const handleClientNotFound = (cpf: string) => {
+    setCpfForRegistration(cpf);
     setStep('cadastro');
   };
 
   const handleClientRegistered = (newClient: Client) => {
     setClient(newClient);
-    setStep('novo-agendamento');
+    setStep('agendamentos');
   };
 
   const handleNewAppointment = () => {
@@ -100,6 +102,7 @@ const Agendamento = () => {
           
           {step === 'cadastro' && (
             <CadastroCliente 
+              cpf={cpfForRegistration}
               onClientRegistered={handleClientRegistered}
               onBack={() => setStep('login')}
             />

@@ -424,9 +424,21 @@ export type Database = {
         Args: { cpf_param: string }
         Returns: boolean
       }
+      columns_match_current_user: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      current_user_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       generate_secure_cpf_password: {
         Args: { cpf_param: string }
         Returns: string
+      }
+      generic_view_policy: {
+        Args: { table_name: string }
+        Returns: boolean
       }
       get_current_user_cpf: {
         Args: Record<PropertyKey, never>

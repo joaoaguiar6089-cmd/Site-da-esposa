@@ -108,7 +108,6 @@ const LoginCPF = ({ onClientFound, onClientNotFound, onBack }: LoginCPFProps) =>
               onChange={(e) => handleCPFChange(e.target.value)}
               required
               inputMode="numeric"
-              pattern="[0-9]*"
               autoComplete="off"
               style={{ fontSize: '16px' }}
             />

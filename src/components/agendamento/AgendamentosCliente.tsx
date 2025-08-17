@@ -120,8 +120,9 @@ const AgendamentosCliente = ({
     try {
       console.log('Iniciando atualização do telefone para cliente:', client.id);
       
-      // Usar a função RPC que funciona apenas com CPF e não requer profile
-      const { data, error } = await supabase.rpc('update_client_phone' as any, {
+      // Usar a função RPC simples que atualiza apenas a tabela clients
+      const { data, error } = await supabase.rpc('update_client_phone_simple' as any, {
+        p_client_id: client.id,
         p_cpf: client.cpf,
         p_phone: phoneNumbers
       });

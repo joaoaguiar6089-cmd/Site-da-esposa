@@ -440,6 +440,10 @@ export type Database = {
         Args: { table_name: string }
         Returns: boolean
       }
+      get_client_by_cpf: {
+        Args: { p_cpf: string }
+        Returns: Json
+      }
       get_current_user_cpf: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -463,6 +467,22 @@ export type Database = {
           target_user_id?: string
         }
         Returns: undefined
+      }
+      update_client_phone: {
+        Args:
+          | { p_client_id: string; p_cpf: string; p_phone: string }
+          | { p_client_id: string; p_cpf: string; p_phone: string }
+          | { p_client_id: string; p_phone: string; p_user_id: string }
+          | { p_cpf: string; p_phone: string }
+        Returns: Json
+      }
+      update_client_phone_simple: {
+        Args: { p_client_id: string; p_cpf: string; p_phone: string }
+        Returns: boolean
+      }
+      validate_cpf: {
+        Args: { p_cpf: string }
+        Returns: boolean
       }
     }
     Enums: {

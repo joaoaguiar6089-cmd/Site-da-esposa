@@ -120,24 +120,9 @@ const AgendamentosCliente = ({
     try {
       console.log('Iniciando atualização do telefone para cliente:', client.id);
       
-      // Primeiro, busque o user_id associado ao cliente
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('user_id')
-        .eq('cpf', client.cpf)
-        .maybeSingle();
-
-      if (profileError) {
-        console.error('Erro ao buscar profile:', profileError);
-        throw profileError;
-      }
-
-      console.log('Profile encontrado:', profileData);
-
-      // Usar a função RPC para atualizar em ambas as tabelas
+      // Usar a função RPC que funciona apenas com CPF e não requer profile
       const { data, error } = await supabase.rpc('update_client_phone' as any, {
-        p_client_id: client.id,
-        p_user_id: profileData.user_id,
+        p_cpf: client.cpf,
         p_phone: phoneNumbers
       });
 

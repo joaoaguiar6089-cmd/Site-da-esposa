@@ -125,7 +125,7 @@ const AgendamentosCliente = ({
         .from('profiles')
         .select('user_id')
         .eq('cpf', client.cpf)
-        .single();
+        .maybeSingle();
 
       if (profileError) {
         console.error('Erro ao buscar profile:', profileError);

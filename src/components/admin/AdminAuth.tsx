@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock } from "lucide-react";
+import { Lock, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/auth/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +16,8 @@ const AdminAuth = ({ onAuth }: AdminAuthProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const { toast } = useToast();
   const { signIn, isAdmin } = useAuth();
 
@@ -23,7 +25,6 @@ const AdminAuth = ({ onAuth }: AdminAuthProps) => {
     setLoading(true);
     
     try {
-
       const { error } = await signIn(email, password);
       
       if (error) {
@@ -37,16 +38,31 @@ const AdminAuth = ({ onAuth }: AdminAuthProps) => {
         return;
       }
 
-      // Check if user has admin access after login
+      // Get current user session
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        console.error('User Error:', userError);
+        toast({
+          title: "Erro de autenticação",
+          description: "Não foi possível obter dados do usuário.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Check if user has admin access
       const { data: adminUser, error: adminError } = await supabase
         .from('admin_users')
         .select('is_active')
-        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+        .eq('user_id', user.id)
         .single();
 
-      console.log('Admin check:', { adminUser, adminError });
+      console.log('Admin check:', { adminUser, adminError, userId: user.id });
 
-      if (!adminUser?.is_active) {
+      if (adminError || !adminUser?.is_active) {
+        console.error('Admin Error:', adminError);
         toast({
           title: "Acesso negado",
           description: "Você não tem permissões administrativas.",
@@ -67,7 +83,7 @@ const AdminAuth = ({ onAuth }: AdminAuthProps) => {
       await supabase
         .from('admin_users')
         .update({ last_login: new Date().toISOString() })
-        .eq('user_id', (await supabase.auth.getUser()).data.user?.id);
+        .eq('user_id', user.id);
 
       toast({
         title: "Acesso autorizado",
@@ -85,6 +101,49 @@ const AdminAuth = ({ onAuth }: AdminAuthProps) => {
     }
     
     setLoading(false);
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      toast({
+        title: "Email necessário",
+        description: "Digite seu email para recuperar a senha.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setResetLoading(true);
+    
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/admin`,
+      });
+
+      if (error) {
+        console.error('Reset Password Error:', error);
+        toast({
+          title: "Erro ao enviar email",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Email enviado",
+          description: "Verifique sua caixa de entrada para redefinir a senha.",
+        });
+        setShowForgotPassword(false);
+      }
+    } catch (error) {
+      console.error('Reset Password Error:', error);
+      toast({
+        title: "Erro interno",
+        description: "Tente novamente mais tarde.",
+        variant: "destructive",
+      });
+    }
+    
+    setResetLoading(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -129,13 +188,48 @@ const AdminAuth = ({ onAuth }: AdminAuthProps) => {
               disabled={loading}
             />
           </div>
-          <Button 
-            onClick={handleAuth} 
-            className="w-full" 
-            disabled={loading || !email || !password}
-          >
-            {loading ? "Verificando..." : "Entrar"}
-          </Button>
+          {!showForgotPassword ? (
+            <>
+              <Button 
+                onClick={handleAuth} 
+                className="w-full" 
+                disabled={loading || !email || !password}
+              >
+                {loading ? "Verificando..." : "Entrar"}
+              </Button>
+              <div className="text-center">
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-muted-foreground hover:text-primary"
+                >
+                  Esqueceu a senha?
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <Button 
+                onClick={handleForgotPassword} 
+                className="w-full" 
+                disabled={resetLoading || !email}
+              >
+                <Mail className="w-4 h-4 mr-2" />
+                {resetLoading ? "Enviando..." : "Enviar Email de Recuperação"}
+              </Button>
+              <div className="text-center">
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={() => setShowForgotPassword(false)}
+                  className="text-muted-foreground hover:text-primary"
+                >
+                  Voltar ao login
+                </Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

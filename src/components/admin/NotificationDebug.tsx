@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Phone, CheckCircle, XCircle, MessageSquare, Edit } from "lucide-react";
+import { Send, Phone, CheckCircle, XCircle, MessageSquare, Edit, Copy, Info } from "lucide-react";
 
 const NotificationDebug = () => {
   const [testPhone, setTestPhone] = useState("");
@@ -18,7 +18,20 @@ const NotificationDebug = () => {
   const [templates, setTemplates] = useState<any[]>([]);
   const [editingTemplate, setEditingTemplate] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [showVariables, setShowVariables] = useState(false);
+  const [cursorPosition, setCursorPosition] = useState(0);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
+
+  // Variáveis disponíveis para os templates
+  const availableVariables = [
+    { name: "clientName", description: "Nome do cliente" },
+    { name: "clientPhone", description: "Telefone do cliente" },
+    { name: "appointmentDate", description: "Data do agendamento" },
+    { name: "appointmentTime", description: "Hora do agendamento" },
+    { name: "procedureName", description: "Nome do procedimento" },
+    { name: "notes", description: "Observações do agendamento" }
+  ];
 
   useEffect(() => {
     loadTemplates();
@@ -133,6 +146,49 @@ const NotificationDebug = () => {
   const startEditing = (template: any) => {
     setEditingTemplate(template.template_type);
     setEditContent(template.template_content);
+    setShowVariables(false);
+  };
+
+  const insertVariable = (variableName: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const before = editContent.substring(0, cursorPosition);
+    const after = editContent.substring(cursorPosition);
+    const newContent = before + `{${variableName}}` + after;
+    
+    setEditContent(newContent);
+    setShowVariables(false);
+    
+    // Reposicionar cursor
+    setTimeout(() => {
+      const newPosition = cursorPosition + variableName.length + 2;
+      textarea.setSelectionRange(newPosition, newPosition);
+      textarea.focus();
+    }, 0);
+  };
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    const position = e.target.selectionStart;
+    
+    setEditContent(value);
+    setCursorPosition(position);
+    
+    // Verificar se digitou "{"
+    if (value[position - 1] === '{') {
+      setShowVariables(true);
+    } else if (value[position - 1] === '}' || value[position - 1] === ' ') {
+      setShowVariables(false);
+    }
+  };
+
+  const copyVariable = (variableName: string) => {
+    navigator.clipboard.writeText(`{${variableName}}`);
+    toast({
+      title: "Copiado!",
+      description: `Variável {${variableName}} copiada para a área de transferência`,
+    });
   };
 
   const getTemplateDisplayName = (type: string) => {
@@ -229,16 +285,85 @@ const NotificationDebug = () => {
                   </div>
                   
                   {editingTemplate === template.template_type ? (
-                    <div className="space-y-3">
-                      <Textarea
-                        value={editContent}
-                        onChange={(e) => setEditContent(e.target.value)}
-                        rows={8}
-                        className="font-mono text-sm"
-                      />
-                      <div className="text-xs text-muted-foreground">
-                        Variáveis disponíveis: {"{clientName}"}, {"{appointmentDate}"}, {"{appointmentTime}"}, {"{procedureName}"}, {"{notes}"}, {"{clientPhone}"}
+                    <div className="space-y-4">
+                      {/* Painel de Variáveis */}
+                      <Card className="bg-blue-50 border-blue-200">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <Info className="h-4 w-4 text-blue-600" />
+                            Variáveis Disponíveis
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                            {availableVariables.map((variable) => (
+                              <div
+                                key={variable.name}
+                                className="flex items-center justify-between p-2 bg-white rounded border hover:bg-blue-50 transition-colors group cursor-pointer"
+                                onClick={() => insertVariable(variable.name)}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <code className="text-sm font-mono text-blue-700">
+                                    {`{${variable.name}}`}
+                                  </code>
+                                  <p className="text-xs text-gray-600 truncate">
+                                    {variable.description}
+                                  </p>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="opacity-0 group-hover:opacity-100 h-6 w-6 p-0"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    copyVariable(variable.name);
+                                  }}
+                                >
+                                  <Copy className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-3 text-xs text-blue-600 bg-blue-100 p-2 rounded">
+                            💡 <strong>Dica:</strong> Clique em uma variável para inserir ou digite &#123; para ver sugestões
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Editor de Template */}
+                      <div className="relative">
+                        <Textarea
+                          ref={textareaRef}
+                          value={editContent}
+                          onChange={handleTextareaChange}
+                          onSelect={(e) => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)}
+                          rows={8}
+                          className="font-mono text-sm"
+                          placeholder="Digite sua mensagem aqui... Use '{' para ver as variáveis disponíveis"
+                        />
+                        
+                        {/* Dropdown de Sugestões */}
+                        {showVariables && (
+                          <div className="absolute z-10 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto min-w-64 mt-1">
+                            <div className="p-2 border-b bg-gray-50">
+                              <p className="text-xs font-medium text-gray-700">Selecione uma variável:</p>
+                            </div>
+                            {availableVariables.map((variable) => (
+                              <div
+                                key={variable.name}
+                                className="p-2 hover:bg-blue-50 cursor-pointer border-b last:border-b-0"
+                                onClick={() => insertVariable(variable.name)}
+                              >
+                                <code className="text-sm font-mono text-blue-700">
+                                  {`{${variable.name}}`}
+                                </code>
+                                <p className="text-xs text-gray-600">{variable.description}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
+
                       <div className="flex gap-2">
                         <Button
                           onClick={() => saveTemplate(template.template_type)}
@@ -248,7 +373,10 @@ const NotificationDebug = () => {
                         </Button>
                         <Button
                           variant="outline"
-                          onClick={() => setEditingTemplate(null)}
+                          onClick={() => {
+                            setEditingTemplate(null);
+                            setShowVariables(false);
+                          }}
                           size="sm"
                         >
                           Cancelar

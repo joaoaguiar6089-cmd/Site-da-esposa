@@ -178,6 +178,7 @@ export type Database = {
           is_featured: boolean | null
           name: string
           price: number | null
+          sessions: number
           updated_at: string | null
         }
         Insert: {
@@ -191,6 +192,7 @@ export type Database = {
           is_featured?: boolean | null
           name: string
           price?: number | null
+          sessions?: number
           updated_at?: string | null
         }
         Update: {
@@ -204,6 +206,7 @@ export type Database = {
           is_featured?: boolean | null
           name?: string
           price?: number | null
+          sessions?: number
           updated_at?: string | null
         }
         Relationships: [
@@ -406,8 +409,16 @@ export type Database = {
       }
     }
     Functions: {
+      admin_login: {
+        Args: { p_email: string; p_password: string }
+        Returns: Json
+      }
       authenticate_for_cpf_lookup: {
         Args: { cpf_param: string }
+        Returns: boolean
+      }
+      check_admin_access: {
+        Args: { user_id_param: string }
         Returns: boolean
       }
       check_appointment_conflict: {
@@ -422,6 +433,10 @@ export type Database = {
       }
       check_cpf_exists: {
         Args: { cpf_param: string }
+        Returns: boolean
+      }
+      check_is_admin: {
+        Args: { user_id: string }
         Returns: boolean
       }
       columns_match_current_user: {

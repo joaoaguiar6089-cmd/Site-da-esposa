@@ -103,18 +103,40 @@ const FeaturedProcedures = () => {
         {/* Categories Section */}
         {categories.length > 0 && (
           <div className="text-center">
-            <h3 className="text-2xl font-bold text-primary mb-6">
+            <h3 className="text-3xl font-bold text-primary mb-8 animate-fade-in">
               Explore por Categoria
             </h3>
-            <div className="flex flex-wrap justify-center gap-4 mb-8">
-              {categories.map((category) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+              {categories.map((category, index) => (
                 <Link 
                   key={category.id} 
                   to={`/categoria/${category.id}`}
+                  className="group block animate-fade-in"
+                  style={{ animationDelay: `${index * 100}ms` }}
                 >
-                  <Button variant="outline" className="hover-scale">
-                    {category.name}
-                  </Button>
+                  <div className="relative overflow-hidden rounded-xl bg-gradient-hero p-6 text-white shadow-elegant transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-primary/30">
+                    <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                    <div className="relative z-10">
+                      <h4 className="text-lg font-semibold mb-2 group-hover:text-primary-foreground transition-colors">
+                        {category.name}
+                      </h4>
+                      <p className="text-sm text-primary-foreground/80 group-hover:text-primary-foreground/90 transition-colors">
+                        Descubra nossos tratamentos
+                      </p>
+                      <div className="mt-4 flex items-center text-sm font-medium">
+                        <span className="mr-2">Ver procedimentos</span>
+                        <svg 
+                          className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" 
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="absolute -bottom-2 -right-2 w-16 h-16 bg-white/10 rounded-full blur-xl transition-all duration-300 group-hover:scale-150 group-hover:bg-white/20" />
+                  </div>
                 </Link>
               ))}
             </div>

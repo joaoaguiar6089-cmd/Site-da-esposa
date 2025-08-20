@@ -16,7 +16,9 @@ const Procedures = () => {
         "Prevenção de novas linhas",
         "Resultado natural e duradouro",
         "Procedimento minimamente invasivo"
-      ]
+      ],
+      sessions: 1,
+      indication: "Pessoas com rugas dinâmicas e linhas de expressão"
     },
     {
       title: "Preenchimento com Ácido Hialurônico",
@@ -29,7 +31,9 @@ const Procedures = () => {
         "Preenchimento de sulcos",
         "Hidratação profunda",
         "Efeito lifting natural"
-      ]
+      ],
+      sessions: 1,
+      indication: "Pessoas que desejam restaurar volume facial e definir contornos"
     },
     {
       title: "Peeling Químico",
@@ -42,7 +46,9 @@ const Procedures = () => {
         "Melhora da textura",
         "Redução de manchas",
         "Pele mais luminosa"
-      ]
+      ],
+      sessions: 3,
+      indication: "Pessoas com manchas, melasma ou irregularidades na textura da pele"
     },
     {
       title: "Microagulhamento",
@@ -55,7 +61,9 @@ const Procedures = () => {
         "Redução de cicatrizes",
         "Melhora da firmeza",
         "Poros menos aparentes"
-      ]
+      ],
+      sessions: 4,
+      indication: "Pessoas com cicatrizes de acne, estrias ou flacidez facial"
     },
     {
       title: "Harmonização Facial",
@@ -68,7 +76,9 @@ const Procedures = () => {
         "Contornos definidos",
         "Resultado personalizado",
         "Técnicas avançadas"
-      ]
+      ],
+      sessions: 1,
+      indication: "Pessoas que desejam equilibrar e harmonizar traços faciais"
     },
     {
       title: "Limpeza de Pele Profunda",
@@ -81,7 +91,9 @@ const Procedures = () => {
         "Desobstrução dos poros",
         "Pele mais saudável",
         "Hidratação intensa"
-      ]
+      ],
+      sessions: 1,
+      indication: "Pessoas com pele oleosa, cravos ou necessidade de limpeza profunda"
     }
   ];
 

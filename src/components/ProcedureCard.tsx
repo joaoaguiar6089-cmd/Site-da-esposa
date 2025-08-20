@@ -9,6 +9,8 @@ interface ProcedureCardProps {
   image: string;
   benefits: string[];
   duration?: string;
+  sessions?: number;
+  indication?: string;
 }
 
 const ProcedureCard = ({ 
@@ -17,7 +19,9 @@ const ProcedureCard = ({
   price, 
   image, 
   benefits, 
-  duration 
+  duration,
+  sessions,
+  indication 
 }: ProcedureCardProps) => {
   const whatsappLink = "https://wa.me/5597984387295";
   
@@ -44,11 +48,18 @@ const ProcedureCard = ({
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-xl text-primary">{title}</CardTitle>
-          {duration && (
-            <Badge variant="outline" className="text-xs">
-              {duration}
-            </Badge>
-          )}
+          <div className="flex gap-2">
+            {duration && (
+              <Badge variant="outline" className="text-xs">
+                {duration}
+              </Badge>
+            )}
+            {sessions && sessions > 1 && (
+              <Badge variant="secondary" className="text-xs">
+                {sessions} sessões
+              </Badge>
+            )}
+          </div>
         </div>
         <CardDescription className="text-base leading-relaxed">
           {description}
@@ -57,6 +68,13 @@ const ProcedureCard = ({
       
       <CardContent>
         <div className="space-y-4">
+          {indication && (
+            <div>
+              <h4 className="font-semibold text-sm text-primary mb-2">Indicado para:</h4>
+              <p className="text-sm text-muted-foreground">{indication}</p>
+            </div>
+          )}
+          
           <div>
             <h4 className="font-semibold text-sm text-primary mb-2">Benefícios:</h4>
             <ul className="space-y-1">

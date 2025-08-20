@@ -28,6 +28,7 @@ interface Procedure {
   benefits: string[] | null;
   is_featured: boolean;
   sessions: number;
+  indication: string | null;
   categories?: Category;
 }
 
@@ -46,7 +47,8 @@ const ProceduresManagement = () => {
     image_url: "",
     benefits: [] as string[],
     is_featured: false,
-    sessions: "1"
+    sessions: "1",
+    indication: ""
   });
   const [newBenefit, setNewBenefit] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -114,7 +116,8 @@ const ProceduresManagement = () => {
         image_url: formData.image_url || null,
         benefits: formData.benefits.length > 0 ? formData.benefits : null,
         is_featured: formData.is_featured,
-        sessions: parseInt(formData.sessions)
+        sessions: parseInt(formData.sessions),
+        indication: formData.indication || null
       };
 
       if (editingProcedure) {
@@ -142,7 +145,7 @@ const ProceduresManagement = () => {
         });
       }
 
-      setFormData({ name: "", description: "", duration: "60", price: "", category_id: "", image_url: "", benefits: [], is_featured: false, sessions: "1" });
+      setFormData({ name: "", description: "", duration: "60", price: "", category_id: "", image_url: "", benefits: [], is_featured: false, sessions: "1", indication: "" });
       setEditingProcedure(null);
       setDialogOpen(false);
       loadProcedures();
@@ -166,7 +169,8 @@ const ProceduresManagement = () => {
       image_url: procedure.image_url || "",
       benefits: procedure.benefits || [],
       is_featured: procedure.is_featured,
-      sessions: procedure.sessions.toString()
+      sessions: procedure.sessions.toString(),
+      indication: procedure.indication || ""
     });
     setDialogOpen(true);
   };
@@ -198,7 +202,7 @@ const ProceduresManagement = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: "", description: "", duration: "60", price: "", category_id: "", image_url: "", benefits: [], is_featured: false, sessions: "1" });
+    setFormData({ name: "", description: "", duration: "60", price: "", category_id: "", image_url: "", benefits: [], is_featured: false, sessions: "1", indication: "" });
     setEditingProcedure(null);
     setNewBenefit("");
   };
@@ -372,6 +376,17 @@ const ProceduresManagement = () => {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Descrição do procedimento"
                   rows={3}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="indication">Indicação</Label>
+                <Textarea
+                  id="indication"
+                  value={formData.indication}
+                  onChange={(e) => setFormData({ ...formData, indication: e.target.value })}
+                  placeholder="Para quem é indicado este procedimento"
+                  rows={2}
                 />
               </div>
 
@@ -562,6 +577,11 @@ const ProceduresManagement = () => {
                     )}
                     {procedure.description && (
                       <p className="text-sm text-muted-foreground mt-1">{procedure.description}</p>
+                    )}
+                    {procedure.indication && (
+                      <p className="text-sm text-primary/80 mt-1">
+                        <span className="font-medium">Indicado para:</span> {procedure.indication}
+                      </p>
                     )}
                     
                     {procedure.benefits && procedure.benefits.length > 0 && (

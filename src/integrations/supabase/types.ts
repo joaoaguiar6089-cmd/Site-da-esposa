@@ -175,6 +175,7 @@ export type Database = {
           duration: number
           id: string
           image_url: string | null
+          indication: string | null
           is_featured: boolean | null
           name: string
           price: number | null
@@ -189,6 +190,7 @@ export type Database = {
           duration?: number
           id?: string
           image_url?: string | null
+          indication?: string | null
           is_featured?: boolean | null
           name: string
           price?: number | null
@@ -203,6 +205,7 @@ export type Database = {
           duration?: number
           id?: string
           image_url?: string | null
+          indication?: string | null
           is_featured?: boolean | null
           name?: string
           price?: number | null

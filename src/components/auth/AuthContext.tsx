@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -29,20 +29,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Timeout de inatividade de 5 minutos
-  const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutos em milissegundos
-  const [inactivityTimer, setInactivityTimer] = useState<NodeJS.Timeout | null>(null);
+  // Aumentar timeout de inatividade para 30 minutos para admin
+  const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutos
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isAdminRef = useRef(false);
+  const userRef = useRef<User | null>(null);
+
+  // Atualizar refs quando states mudarem
+  useEffect(() => {
+    isAdminRef.current = isAdmin;
+    userRef.current = user;
+  }, [isAdmin, user]);
 
   // Função para verificar se o usuário é admin
-  const checkAdminStatus = async (userId: string) => {
+  const checkAdminStatus = useCallback(async (userId: string) => {
     try {
+      console.log('Checking admin status for user:', userId);
+      
       const { data: adminUser, error: adminError } = await supabase
         .from('admin_users')
         .select('is_active')
         .eq('user_id', userId)
         .single();
       
+      if (adminError) {
+        console.log('Admin check error (user not admin):', adminError);
+        setIsAdmin(false);
+        return false;
+      }
+      
       const isAdminActive = adminUser?.is_active === true;
+      console.log('Admin status result:', isAdminActive);
       setIsAdmin(isAdminActive);
       
       return isAdminActive;
@@ -51,55 +68,102 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAdmin(false);
       return false;
     }
-  };
+  }, []);
 
   // Função para resetar o timer de inatividade
-  const resetInactivityTimer = () => {
-    if (inactivityTimer) {
-      clearTimeout(inactivityTimer);
+  const resetInactivityTimer = useCallback(() => {
+    // Só ativar timer se usuário for admin
+    if (!isAdminRef.current || !userRef.current) {
+      return;
     }
 
-    const timer = setTimeout(() => {
+    // Limpar timer anterior
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+
+    // Criar novo timer
+    inactivityTimerRef.current = setTimeout(async () => {
       console.log('Auto logout due to inactivity');
-      signOut();
+      await signOut();
     }, INACTIVITY_TIMEOUT);
+  }, []);
 
-    setInactivityTimer(timer);
-  };
+  // Função para limpar timer
+  const clearInactivityTimer = useCallback(() => {
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+  }, []);
 
-  // Adicionar listeners para atividade do usuário
+  // Effect para gerenciar timer de inatividade
   useEffect(() => {
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-    
-    const resetTimer = () => {
-      if (user && isAdmin) {
-        resetInactivityTimer();
-      }
-    };
-
-    // Adicionar listeners
-    events.forEach(event => {
-      document.addEventListener(event, resetTimer, { passive: true });
-    });
-
-    return () => {
-      // Limpar listeners
-      events.forEach(event => {
-        document.removeEventListener(event, resetTimer);
-      });
+    if (user && isAdmin) {
+      // Usuário admin logado - iniciar timer
+      resetInactivityTimer();
       
-      if (inactivityTimer) {
-        clearTimeout(inactivityTimer);
-      }
-    };
-  }, [user, isAdmin, inactivityTimer]);
+      // Adicionar listeners para atividade
+      const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+      
+      events.forEach(event => {
+        document.addEventListener(event, resetInactivityTimer, { passive: true });
+      });
 
+      return () => {
+        // Cleanup
+        events.forEach(event => {
+          document.removeEventListener(event, resetInactivityTimer);
+        });
+      };
+    } else {
+      // Usuário não admin ou deslogado - limpar timer
+      clearInactivityTimer();
+    }
+
+    return clearInactivityTimer;
+  }, [user, isAdmin, resetInactivityTimer, clearInactivityTimer]);
+
+  // Effect principal para gerenciar auth state
   useEffect(() => {
     let mounted = true;
 
-    // Set up auth state listener FIRST
+    const initializeAuth = async () => {
+      try {
+        // Primeiro, verificar sessão existente
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Session error:', error);
+          setLoading(false);
+          return;
+        }
+
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          
+          if (session?.user) {
+            await checkAdminStatus(session.user.id);
+          } else {
+            setIsAdmin(false);
+          }
+          
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.id);
+        
         if (!mounted) return;
         
         setSession(session);
@@ -111,42 +175,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsAdmin(false);
         }
         
-        setLoading(false);
+        if (!loading) {
+          setLoading(false);
+        }
       }
     );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!mounted) return;
-      
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        await checkAdminStatus(session.user.id);
-      }
-      
-      setLoading(false);
-    });
+    // Initialize auth
+    initializeAuth();
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      clearInactivityTimer();
     };
-  }, []);
-
-  // Iniciar timer quando admin faz login
-  useEffect(() => {
-    if (user && isAdmin) {
-      resetInactivityTimer();
-    } else if (inactivityTimer) {
-      clearTimeout(inactivityTimer);
-      setInactivityTimer(null);
-    }
-  }, [user, isAdmin]);
+  }, [checkAdminStatus, clearInactivityTimer]);
 
   const signInWithCPF = async (cpf: string) => {
     try {
+      setLoading(true);
+      
       // Clean CPF and validate format
       const cleanCPF = cpf.replace(/\D/g, '');
       
@@ -167,7 +215,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (signInError) {
         // If sign in fails, create the account with secure password
-        const { error: signUpError } = await supabase.auth.signUp({
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email: tempEmail,
           password: securePassword,
           options: {
@@ -179,31 +227,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return { error: signUpError };
         }
 
-        // Create profile with CPF
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([{
-            user_id: (await supabase.auth.getUser()).data.user?.id,
-            cpf: cleanCPF,
-            role: 'client'
-          }]);
+        // Create profile with CPF if user was created
+        if (signUpData.user) {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert([{
+              user_id: signUpData.user.id,
+              cpf: cleanCPF,
+              role: 'client'
+            }]);
 
-        if (profileError) {
-          return { error: profileError };
+          if (profileError) {
+            console.error('Profile creation error:', profileError);
+            // Don't return error here as user is created
+          }
         }
       }
 
       return { error: null };
     } catch (error) {
       return { error: error as Error };
+    } finally {
+      setLoading(false);
     }
   };
 
   const signUp = async (email: string, password: string, cpf: string) => {
     try {
+      setLoading(true);
+      
       const redirectUrl = `${window.location.origin}/`;
       
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -216,38 +271,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Create profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([{
-          user_id: (await supabase.auth.getUser()).data.user?.id,
-          cpf: cpf.replace(/\D/g, ''),
-          role: 'client'
-        }]);
+      if (signUpData.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([{
+            user_id: signUpData.user.id,
+            cpf: cpf.replace(/\D/g, ''),
+            role: 'client'
+          }]);
 
-      if (profileError) {
-        return { error: profileError };
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+          // Don't return error as user is created
+        }
       }
 
       return { error: null };
     } catch (error) {
       return { error: error as Error };
+    } finally {
+      setLoading(false);
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
+      setLoading(true);
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
+      
       return { error };
     } catch (error) {
       return { error: error as Error };
+    } finally {
+      setLoading(false);
     }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      clearInactivityTimer();
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
   };
 
   const value = {

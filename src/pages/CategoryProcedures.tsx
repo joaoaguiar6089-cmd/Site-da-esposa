@@ -109,6 +109,8 @@ const CategoryProcedures = () => {
                   image={procedure.image_url || '/placeholder.svg'}
                   duration={`${procedure.duration} min`}
                   benefits={procedure.benefits || []}
+                  sessions={procedure.sessions}
+                  indication={procedure.indication || undefined}
                 />
               ))}
             </div>

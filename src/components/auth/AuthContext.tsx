@@ -29,33 +29,93 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Timeout de inatividade de 5 minutos
+  const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutos em milissegundos
+  const [inactivityTimer, setInactivityTimer] = useState<NodeJS.Timeout | null>(null);
+
+  // Função para verificar se o usuário é admin
+  const checkAdminStatus = async (userId: string) => {
+    try {
+      console.log('Admin check:', { userId });
+      
+      const { data: adminUser, error: adminError } = await supabase
+        .from('admin_users')
+        .select('is_active')
+        .eq('user_id', userId)
+        .single();
+      
+      console.log('Admin check:', { adminUser, adminError, userId });
+      
+      const isAdminActive = adminUser?.is_active === true;
+      setIsAdmin(isAdminActive);
+      
+      return isAdminActive;
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      setIsAdmin(false);
+      return false;
+    }
+  };
+
+  // Função para resetar o timer de inatividade
+  const resetInactivityTimer = () => {
+    if (inactivityTimer) {
+      clearTimeout(inactivityTimer);
+    }
+
+    const timer = setTimeout(() => {
+      console.log('Auto logout due to inactivity');
+      signOut();
+    }, INACTIVITY_TIMEOUT);
+
+    setInactivityTimer(timer);
+  };
+
+  // Adicionar listeners para atividade do usuário
   useEffect(() => {
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    const resetTimer = () => {
+      if (user && isAdmin) {
+        resetInactivityTimer();
+      }
+    };
+
+    // Adicionar listeners
+    events.forEach(event => {
+      document.addEventListener(event, resetTimer, { passive: true });
+    });
+
+    return () => {
+      // Limpar listeners
+      events.forEach(event => {
+        document.removeEventListener(event, resetTimer);
+      });
+      
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+    };
+  }, [user, isAdmin, inactivityTimer]);
+
+  useEffect(() => {
+    let mounted = true;
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
+        if (!mounted) return;
+        
+        console.log('Auth state changed:', event, !!session);
+        
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Check if user is admin using the new secure method
-          setTimeout(async () => {
-            try {
-              const { data: adminUser } = await supabase
-                .from('admin_users')
-                .select('is_active')
-                .eq('user_id', session.user.id)
-                .single();
-              
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('role')
-                .eq('user_id', session.user.id)
-                .single();
-              
-              setIsAdmin(adminUser?.is_active === true && profile?.role === 'admin');
-            } catch (error) {
-              console.error('Error checking admin status:', error);
-              setIsAdmin(false);
+          // Check admin status without async in the callback
+          setTimeout(() => {
+            if (mounted) {
+              checkAdminStatus(session.user.id);
             }
           }, 0);
         } else {
@@ -68,13 +128,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+      
       setSession(session);
       setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        checkAdminStatus(session.user.id);
+      }
+      
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
+
+  // Iniciar timer quando admin faz login
+  useEffect(() => {
+    if (user && isAdmin) {
+      resetInactivityTimer();
+    } else if (inactivityTimer) {
+      clearTimeout(inactivityTimer);
+      setInactivityTimer(null);
+    }
+  }, [user, isAdmin]);
 
   const signInWithCPF = async (cpf: string) => {
     try {

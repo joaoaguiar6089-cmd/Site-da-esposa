@@ -36,15 +36,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Função para verificar se o usuário é admin
   const checkAdminStatus = async (userId: string) => {
     try {
-      console.log('Admin check:', { userId });
-      
       const { data: adminUser, error: adminError } = await supabase
         .from('admin_users')
         .select('is_active')
         .eq('user_id', userId)
         .single();
-      
-      console.log('Admin check:', { adminUser, adminError, userId });
       
       const isAdminActive = adminUser?.is_active === true;
       setIsAdmin(isAdminActive);
@@ -103,21 +99,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         if (!mounted) return;
-        
-        console.log('Auth state changed:', event, !!session);
         
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Check admin status without async in the callback
-          setTimeout(() => {
-            if (mounted) {
-              checkAdminStatus(session.user.id);
-            }
-          }, 0);
+          await checkAdminStatus(session.user.id);
         } else {
           setIsAdmin(false);
         }
@@ -127,14 +116,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!mounted) return;
       
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        checkAdminStatus(session.user.id);
+        await checkAdminStatus(session.user.id);
       }
       
       setLoading(false);

@@ -26,14 +26,21 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
 
   const MenuItem = ({ item, isMobile = false }: { item: typeof menuItems[0]; isMobile?: boolean }) => {
     const Icon = item.icon;
+    
+    const handleClick = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Menu item clicked:', item.id);
+      onTabChange(item.id);
+      if (isMobile) setIsOpen(false);
+    };
+    
     return (
       <Button
         variant={activeTab === item.id ? "secondary" : "ghost"}
-        className="w-full justify-start"
-        onClick={() => {
-          onTabChange(item.id);
-          if (isMobile) setIsOpen(false);
-        }}
+        className="w-full justify-start cursor-pointer"
+        onClick={handleClick}
+        type="button"
       >
         <Icon className="mr-2 h-4 w-4" />
         {item.label}

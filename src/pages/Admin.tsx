@@ -19,15 +19,16 @@ import { supabase } from "@/integrations/supabase/client";
 
 
 const Admin = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
   const { toast } = useToast();
-  const { user, isAdmin, signOut } = useAuth();
+  const { user, isAdmin, signOut, loading } = useAuth();
 
-  useEffect(() => {
-    // Check if user is authenticated and is an admin
-    setIsAuthenticated(!!user && isAdmin);
-  }, [user, isAdmin]);
+  console.log('Admin component render:', { user: !!user, isAdmin, loading, activeTab });
+
+  const handleTabChange = (tab: string) => {
+    console.log('Tab change requested:', tab);
+    setActiveTab(tab);
+  };
 
   const handleLogout = async () => {
     try {
@@ -37,7 +38,6 @@ const Admin = () => {
       });
       
       await signOut();
-      setIsAuthenticated(false);
       
       toast({
         title: "Logout realizado",
@@ -47,7 +47,6 @@ const Admin = () => {
       console.error('Logout error:', error);
       // Force logout even if logging fails
       await signOut();
-      setIsAuthenticated(false);
     }
   };
 
@@ -55,8 +54,19 @@ const Admin = () => {
     window.location.href = "/";
   };
 
-  if (!isAuthenticated) {
-    return <AdminAuth onAuth={() => setIsAuthenticated(true)} />;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Verificando autenticação...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || !isAdmin) {
+    return <AdminAuth onAuth={() => {}} />;
   }
 
   const renderContent = () => {
@@ -89,7 +99,7 @@ const Admin = () => {
   return (
     <div className="min-h-screen bg-gradient-elegant">
       <div className="flex">
-        <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        <AdminSidebar activeTab={activeTab} onTabChange={handleTabChange} />
         
         <div className="flex-1">
           {/* Header da Admin */}

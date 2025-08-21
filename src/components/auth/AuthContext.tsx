@@ -29,29 +29,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Timer de inatividade para admin (30 minutos)
-  const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutos
+  // Timer de inatividade para admin (5 minutos)
+  const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutos
   const [inactivityTimer, setInactivityTimer] = useState<NodeJS.Timeout | null>(null);
 
   // Função para verificar se o usuário é admin
   const checkAdminStatus = async (userId: string) => {
     try {
-      console.log('Checking admin status for user:', userId);
-      
       const { data: adminUser, error: adminError } = await supabase
         .from('admin_users')
         .select('is_active')
         .eq('user_id', userId)
         .maybeSingle();
       
-      if (adminError) {
-        console.log('Admin check error (user not admin):', adminError.message);
+      if (adminError || !adminUser) {
         setIsAdmin(false);
         return false;
       }
       
       const isAdminActive = adminUser?.is_active === true;
-      console.log('Admin status result:', isAdminActive);
       setIsAdmin(isAdminActive);
       
       return isAdminActive;
@@ -114,26 +110,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let mounted = true;
 
     // Função para lidar com mudanças de estado de auth
-    const handleAuthStateChange = async (event: any, session: Session | null) => {
-      console.log('Auth state changed:', event, session?.user?.id);
-      
+    const handleAuthStateChange = (event: any, session: Session | null) => {
       if (!mounted) return;
       
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        try {
-          await checkAdminStatus(session.user.id);
-        } catch (error) {
-          console.error('Error checking admin status:', error);
-          setIsAdmin(false);
-        }
+        // Verificar status de admin sem logs excessivos
+        setTimeout(() => {
+          checkAdminStatus(session.user.id);
+        }, 0);
       } else {
         setIsAdmin(false);
       }
       
-      // Sempre definir loading como false após processar
       setLoading(false);
     };
 
@@ -144,7 +135,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initializeAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        await handleAuthStateChange('INITIAL_SESSION', session);
+        handleAuthStateChange('INITIAL_SESSION', session);
       } catch (error) {
         console.error('Error initializing auth:', error);
         if (mounted) {

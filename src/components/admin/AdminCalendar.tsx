@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { format, parseISO, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import AgendamentoForm from "@/components/agendamento/AgendamentoForm";
 
 interface Appointment {
   id: string;
@@ -41,6 +42,8 @@ const AdminCalendar = () => {
   const [loading, setLoading] = useState(true);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<string | null>(null);
+  const [showEditForm, setShowEditForm] = useState(false);
   const { toast } = useToast();
 
   // Carregar todos os agendamentos
@@ -111,6 +114,32 @@ const AdminCalendar = () => {
   const handleAppointmentClick = (appointment: Appointment) => {
     setSelectedAppointment(appointment);
     setDialogOpen(true);
+  };
+
+  // Abrir formulário de edição
+  const handleEditAppointment = () => {
+    if (selectedAppointment) {
+      setEditingAppointment(selectedAppointment.id);
+      setShowEditForm(true);
+      setDialogOpen(false);
+    }
+  };
+
+  // Fechar formulário de edição e voltar ao calendário
+  const handleCloseEditForm = () => {
+    setShowEditForm(false);
+    setEditingAppointment(null);
+    setSelectedAppointment(null);
+    loadAppointments(); // Recarregar dados após edição
+  };
+
+  // Callback para quando agendamento for atualizado
+  const handleAppointmentUpdated = () => {
+    toast({
+      title: "Agendamento atualizado",
+      description: "O agendamento foi atualizado com sucesso.",
+    });
+    handleCloseEditForm();
   };
 
   // Atualizar status do agendamento
@@ -210,6 +239,27 @@ Aguardamos você!`;
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p>Carregando calendário...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Se estiver no modo de edição, mostrar o formulário
+  if (showEditForm && selectedAppointment) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-2">
+          <CalendarIcon className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-bold">Editar Agendamento</h1>
+        </div>
+        
+        <div className="max-w-md mx-auto">
+          <AgendamentoForm
+            client={selectedAppointment.clients}
+            onAppointmentCreated={handleAppointmentUpdated}
+            onBack={handleCloseEditForm}
+            editingId={editingAppointment || undefined}
+          />
         </div>
       </div>
     );
@@ -356,6 +406,16 @@ Aguardamos você!`;
                 >
                   <MessageSquare className="h-3 w-3" />
                   WhatsApp
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleEditAppointment}
+                  className="flex items-center gap-1"
+                >
+                  <Edit className="h-3 w-3" />
+                  Editar
                 </Button>
 
                 {selectedAppointment.status !== 'confirmado' && (

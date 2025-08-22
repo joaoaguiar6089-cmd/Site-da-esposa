@@ -27,24 +27,29 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
   const MenuItem = ({ item, isMobile = false }: { item: typeof menuItems[0]; isMobile?: boolean }) => {
     const Icon = item.icon;
     
-    const handleClick = (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('Menu item clicked:', item.id);
+    const handleClick = () => {
+      console.log('MenuItem handleClick called for:', item.id);
       onTabChange(item.id);
       if (isMobile) setIsOpen(false);
     };
     
+    const handleMouseDown = () => {
+      console.log('MenuItem mousedown for:', item.id);
+    };
+    
     return (
-      <Button
-        variant={activeTab === item.id ? "secondary" : "ghost"}
-        className="w-full justify-start cursor-pointer"
+      <div
+        className={`w-full p-2 rounded-md cursor-pointer hover:bg-accent flex items-center gap-2 transition-colors ${
+          activeTab === item.id ? "bg-accent text-accent-foreground" : ""
+        }`}
         onClick={handleClick}
-        type="button"
+        onMouseDown={handleMouseDown}
+        role="button"
+        tabIndex={0}
       >
-        <Icon className="mr-2 h-4 w-4" />
-        {item.label}
-      </Button>
+        <Icon className="h-4 w-4" />
+        <span>{item.label}</span>
+      </div>
     );
   };
 

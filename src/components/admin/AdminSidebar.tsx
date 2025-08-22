@@ -35,23 +35,27 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
 
   const MenuItem = ({ item, isMobile = false }: { item: typeof menuItems[0]; isMobile?: boolean }) => {
     const Icon = item.icon;
-    
-    const handleClick = useCallback(() => {
-      console.log('MenuItem handleClick called for:', item.id);
-      handleTabChange(item.id);
-      if (isMobile) handleMobileClose();
-    }, [item.id, isMobile, handleTabChange, handleMobileClose]);
+    const isActive = activeTab === item.id;
     
     return (
-      <Button
-        variant={activeTab === item.id ? "secondary" : "ghost"}
-        className="w-full justify-start cursor-pointer"
-        onClick={handleClick}
+      <button
+        className={`w-full flex items-center gap-3 px-3 py-2 text-left rounded-md transition-colors ${
+          isActive 
+            ? "bg-secondary text-secondary-foreground font-medium" 
+            : "hover:bg-secondary/50 text-muted-foreground hover:text-foreground"
+        }`}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('Direct click handler:', item.id);
+          onTabChange(item.id);
+          if (isMobile) setIsOpen(false);
+        }}
         type="button"
       >
-        <Icon className="mr-2 h-4 w-4" />
-        {item.label}
-      </Button>
+        <Icon className="h-4 w-4 shrink-0" />
+        <span>{item.label}</span>
+      </button>
     );
   };
 

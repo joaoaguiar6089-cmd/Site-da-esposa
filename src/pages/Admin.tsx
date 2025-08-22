@@ -23,10 +23,7 @@ const Admin = () => {
   const { toast } = useToast();
   const { user, isAdmin, signOut, loading } = useAuth();
 
-  console.log('Admin component render:', { user: !!user, isAdmin, loading, activeTab });
-
   const handleTabChange = (tab: string) => {
-    console.log('Tab change requested:', tab);
     setActiveTab(tab);
   };
 

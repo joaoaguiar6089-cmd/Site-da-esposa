@@ -74,36 +74,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Effect para gerenciar timer de inatividade
+  // Effect para gerenciar timer de inatividade - TEMPORARIAMENTE DESABILITADO
   useEffect(() => {
-    if (user && isAdmin) {
-      const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-      
-      const resetTimer = () => resetInactivityTimer();
-
-      // Iniciar timer
-      resetInactivityTimer();
-
-      // Adicionar listeners
-      events.forEach(event => {
-        document.addEventListener(event, resetTimer, { passive: true });
-      });
-
-      return () => {
-        // Limpar listeners
-        events.forEach(event => {
-          document.removeEventListener(event, resetTimer);
-        });
-        
-        if (inactivityTimer) {
-          clearTimeout(inactivityTimer);
-        }
-      };
-    } else if (inactivityTimer) {
-      clearTimeout(inactivityTimer);
-      setInactivityTimer(null);
-    }
-  }, [user, isAdmin]);
+    // Timer desabilitado para evitar conflitos com cliques
+    return () => {
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+    };
+  }, []);
 
   // Effect principal para auth
   useEffect(() => {

@@ -22,7 +22,8 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
 
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: BarChart3 },
-    { id: "appointments", label: "Agendamentos", icon: Calendar },
+    { id: "calendar", label: "Calendário", icon: Calendar },
+    { id: "appointments", label: "Agendamentos", icon: Users },
     { id: "professionals", label: "Profissionais", icon: UserPlus },
     { id: "categories", label: "Categorias", icon: Tag },
     { id: "procedures", label: "Procedimentos", icon: Stethoscope },

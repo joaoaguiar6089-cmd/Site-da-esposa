@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { LogOut, Home } from "lucide-react";
 import AdminAuth from "@/components/admin/AdminAuth";
 import AdminDashboard from "@/components/admin/AdminDashboard";
+import AdminCalendar from "@/components/admin/AdminCalendar";
 import AppointmentsList from "@/components/admin/AppointmentsList";
 import ProfessionalsList from "@/components/admin/ProfessionalsList";
 import CategoriesList from "@/components/admin/CategoriesList";
@@ -70,6 +71,8 @@ const Admin = () => {
     switch (activeTab) {
       case "dashboard":
         return <AdminDashboard />;
+      case "calendar":
+        return <AdminCalendar />;
       case "appointments":
         return <AppointmentsList />;
       case "professionals":

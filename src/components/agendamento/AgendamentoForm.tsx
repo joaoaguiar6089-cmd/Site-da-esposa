@@ -172,23 +172,62 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
         return;
       }
 
-      const { data, error } = await supabase
+      // Buscar agendamentos existentes com detalhes do procedimento
+      const { data: appointments, error } = await supabase
         .from('appointments')
-        .select('appointment_time')
+        .select(`
+          appointment_time,
+          procedures (
+            duration
+          )
+        `)
         .eq('appointment_date', date)
         .neq('status', 'cancelado');
 
       if (error) throw error;
 
-      const bookedTimes = data?.map(apt => apt.appointment_time) || [];
-      const available = allTimes.filter(time => !bookedTimes.includes(time));
+      // Obter duração do procedimento selecionado
+      const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
+      const selectedDuration = selectedProcedure?.duration || 60;
+
+      // Filtrar horários considerando conflitos de duração
+      const available = allTimes.filter(time => {
+        // Converter horário para minutos para facilitar cálculos
+        const [hour, minute] = time.split(':').map(Number);
+        const timeInMinutes = hour * 60 + minute;
+        
+        // Verificar se este horário conflita com agendamentos existentes
+        const hasConflict = appointments?.some(apt => {
+          const [aptHour, aptMinute] = apt.appointment_time.split(':').map(Number);
+          const aptTimeInMinutes = aptHour * 60 + aptMinute;
+          const aptDuration = apt.procedures?.duration || 60;
+          
+          // Verificar sobreposição:
+          // 1. Novo agendamento começa durante um existente
+          const startsInExisting = timeInMinutes >= aptTimeInMinutes && 
+                                   timeInMinutes < (aptTimeInMinutes + aptDuration);
+          
+          // 2. Novo agendamento termina durante um existente  
+          const endsInExisting = (timeInMinutes + selectedDuration) > aptTimeInMinutes && 
+                                 (timeInMinutes + selectedDuration) <= (aptTimeInMinutes + aptDuration);
+          
+          // 3. Novo agendamento engloba um existente
+          const engulfsExisting = timeInMinutes <= aptTimeInMinutes && 
+                                  (timeInMinutes + selectedDuration) >= (aptTimeInMinutes + aptDuration);
+          
+          return startsInExisting || endsInExisting || engulfsExisting;
+        });
+
+        return !hasConflict;
+      });
       
       setAvailableTimes(available);
     } catch (error) {
       console.error('Erro ao carregar horários:', error);
+      // Fallback mais conservador em caso de erro
       const fallbackTimes = [];
-      for (let hour = 8; hour <= 18; hour++) {
-        for (let minute = 0; minute < 60; minute += 30) {
+      for (let hour = 8; hour <= 17; hour++) {
+        for (let minute = 0; minute < 60; minute += 60) {
           const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
           fallbackTimes.push(timeString);
         }
@@ -436,7 +475,13 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
             </label>
             <Select
               value={formData.procedure_id}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, procedure_id: value }))}
+              onValueChange={(value) => {
+                setFormData(prev => ({ ...prev, procedure_id: value }));
+                // Recarregar horários quando procedimento mudar
+                if (formData.appointment_date) {
+                  loadAvailableTimes(formData.appointment_date);
+                }
+              }}
             >
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="Selecione um procedimento" />

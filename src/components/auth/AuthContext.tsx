@@ -109,24 +109,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let mounted = true;
 
-    // Função para lidar com mudanças de estado de auth
-    const handleAuthStateChange = (event: any, session: Session | null) => {
-      if (!mounted) return;
-      
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        // Verificar status de admin sem logs excessivos
+  // Função para lidar com mudanças de estado de auth
+  const handleAuthStateChange = (event: any, session: Session | null) => {
+    if (!mounted) return;
+    
+    setSession(session);
+    setUser(session?.user ?? null);
+    
+    if (session?.user) {
+      // Só verificar admin status se ainda não foi verificado ou se mudou o usuário
+      if (!isAdmin || user?.id !== session.user.id) {
         setTimeout(() => {
           checkAdminStatus(session.user.id);
-        }, 0);
-      } else {
-        setIsAdmin(false);
+        }, 100);
       }
-      
-      setLoading(false);
-    };
+    } else {
+      setIsAdmin(false);
+    }
+    
+    setLoading(false);
+  };
 
     // Configurar listener de mudanças de auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange);

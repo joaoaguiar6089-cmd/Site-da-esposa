@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, BarChart3, Calendar, Users, UserPlus, Tag, Stethoscope, MessageSquare, Shield, Image, Clock } from "lucide-react";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 
 interface AdminSidebarProps {
   activeTab: string;
@@ -10,6 +10,15 @@ interface AdminSidebarProps {
 
 const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
   const [isOpen, setIsOpen] = useState(false);
+
+  const handleTabChange = useCallback((tabId: string) => {
+    console.log('AdminSidebar handleTabChange:', tabId);
+    onTabChange(tabId);
+  }, [onTabChange]);
+
+  const handleMobileClose = useCallback(() => {
+    setIsOpen(false);
+  }, []);
 
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: BarChart3 },
@@ -27,29 +36,22 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
   const MenuItem = ({ item, isMobile = false }: { item: typeof menuItems[0]; isMobile?: boolean }) => {
     const Icon = item.icon;
     
-    const handleClick = () => {
+    const handleClick = useCallback(() => {
       console.log('MenuItem handleClick called for:', item.id);
-      onTabChange(item.id);
-      if (isMobile) setIsOpen(false);
-    };
-    
-    const handleMouseDown = () => {
-      console.log('MenuItem mousedown for:', item.id);
-    };
+      handleTabChange(item.id);
+      if (isMobile) handleMobileClose();
+    }, [item.id, isMobile, handleTabChange, handleMobileClose]);
     
     return (
-      <div
-        className={`w-full p-2 rounded-md cursor-pointer hover:bg-accent flex items-center gap-2 transition-colors ${
-          activeTab === item.id ? "bg-accent text-accent-foreground" : ""
-        }`}
+      <Button
+        variant={activeTab === item.id ? "secondary" : "ghost"}
+        className="w-full justify-start cursor-pointer"
         onClick={handleClick}
-        onMouseDown={handleMouseDown}
-        role="button"
-        tabIndex={0}
+        type="button"
       >
-        <Icon className="h-4 w-4" />
-        <span>{item.label}</span>
-      </div>
+        <Icon className="mr-2 h-4 w-4" />
+        {item.label}
+      </Button>
     );
   };
 

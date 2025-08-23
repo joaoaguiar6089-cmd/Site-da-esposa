@@ -4,6 +4,7 @@ export interface Client {
   nome: string;
   sobrenome: string;
   celular: string;
+  data_nascimento?: string;
 }
 
 export interface Appointment {
@@ -24,4 +25,13 @@ export interface Procedure {
   name: string;
   duration: number;
   price: number;
+}
+
+export interface ProcedureResult {
+  id: string;
+  appointment_id: string;
+  image_url: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
 }

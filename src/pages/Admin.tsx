@@ -5,6 +5,7 @@ import AdminAuth from "@/components/admin/AdminAuth";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 import AdminCalendar from "@/components/admin/AdminCalendar";
 import AppointmentsList from "@/components/admin/AppointmentsList";
+import ClientManagement from "@/components/admin/ClientManagement";
 import ProfessionalsList from "@/components/admin/ProfessionalsList";
 import CategoriesList from "@/components/admin/CategoriesList";
 import ProceduresManagement from "@/components/admin/ProceduresManagement";
@@ -75,6 +76,8 @@ const Admin = () => {
         return <AdminCalendar />;
       case "appointments":
         return <AppointmentsList />;
+      case "clients":
+        return <ClientManagement />;
       case "professionals":
         return <ProfessionalsList />;
       case "categories":

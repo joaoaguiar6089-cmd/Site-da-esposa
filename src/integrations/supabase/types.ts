@@ -141,6 +141,7 @@ export type Database = {
           celular: string
           cpf: string
           created_at: string
+          data_nascimento: string | null
           id: string
           nome: string
           sobrenome: string
@@ -150,6 +151,7 @@ export type Database = {
           celular: string
           cpf: string
           created_at?: string
+          data_nascimento?: string | null
           id?: string
           nome: string
           sobrenome: string
@@ -159,12 +161,48 @@ export type Database = {
           celular?: string
           cpf?: string
           created_at?: string
+          data_nascimento?: string | null
           id?: string
           nome?: string
           sobrenome?: string
           updated_at?: string
         }
         Relationships: []
+      }
+      procedure_results: {
+        Row: {
+          appointment_id: string
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string
+          updated_at: string
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url: string
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procedure_results_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       procedures: {
         Row: {

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, Camera, User, Calendar, Phone, FileText } from "lucide-react";
+import { Upload, Camera, User, Calendar, Phone, FileText, Edit, MessageCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatCPF, cleanCPF, isValidCPF } from "@/utils/cpfValidator";
@@ -21,6 +21,7 @@ interface Client {
   sobrenome: string;
   celular: string;
   data_nascimento?: string;
+  cidade?: string;
   created_at: string;
 }
 
@@ -59,6 +60,8 @@ const ClientManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
   const [showClientForm, setShowClientForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [showResultDialog, setShowResultDialog] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [resultDescription, setResultDescription] = useState("");
@@ -69,7 +72,8 @@ const ClientManagement = () => {
     sobrenome: "",
     cpf: "",
     celular: "",
-    data_nascimento: ""
+    data_nascimento: "",
+    cidade: ""
   });
 
   const { toast } = useToast();
@@ -155,6 +159,7 @@ const ClientManagement = () => {
           cpf: cleanCPF(formData.cpf),
           celular: formData.celular,
           data_nascimento: formData.data_nascimento || null,
+          cidade: formData.cidade || null,
         },
       ]);
 
@@ -165,7 +170,7 @@ const ClientManagement = () => {
         description: "Cliente cadastrado com sucesso!",
       });
 
-      setFormData({ nome: "", sobrenome: "", cpf: "", celular: "", data_nascimento: "" });
+      setFormData({ nome: "", sobrenome: "", cpf: "", celular: "", data_nascimento: "", cidade: "" });
       setShowClientForm(false);
       loadClients();
     } catch (error: any) {
@@ -178,6 +183,88 @@ const ClientManagement = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEditClient = (client: Client) => {
+    setEditingClient(client);
+    setFormData({
+      nome: client.nome,
+      sobrenome: client.sobrenome,
+      cpf: client.cpf,
+      celular: client.celular,
+      data_nascimento: client.data_nascimento || "",
+      cidade: client.cidade || ""
+    });
+    setShowEditForm(true);
+  };
+
+  const handleUpdateClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!editingClient) return;
+
+    if (!isValidCPF(formData.cpf)) {
+      toast({
+        title: "Erro",
+        description: "CPF inválido.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from("clients")
+        .update({
+          nome: formData.nome,
+          sobrenome: formData.sobrenome,
+          cpf: cleanCPF(formData.cpf),
+          celular: formData.celular,
+          data_nascimento: formData.data_nascimento || null,
+          cidade: formData.cidade || null,
+        })
+        .eq('id', editingClient.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Cliente atualizado com sucesso!",
+      });
+
+      setFormData({ nome: "", sobrenome: "", cpf: "", celular: "", data_nascimento: "", cidade: "" });
+      setShowEditForm(false);
+      setEditingClient(null);
+      loadClients();
+    } catch (error: any) {
+      console.error("Erro ao atualizar cliente:", error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao atualizar cliente.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatWhatsAppNumber = (phone: string) => {
+    // Remove todos os caracteres não numéricos
+    const cleanPhone = phone.replace(/\D/g, '');
+    
+    // Se não começar com 55 (código do Brasil), adicionar
+    if (!cleanPhone.startsWith('55')) {
+      return `55${cleanPhone}`;
+    }
+    
+    return cleanPhone;
+  };
+
+  const openWhatsApp = (phone: string) => {
+    const formattedPhone = formatWhatsAppNumber(phone);
+    const url = `https://wa.me/${formattedPhone}`;
+    window.open(url, '_blank');
   };
 
   const handleFileUpload = async () => {
@@ -351,10 +438,33 @@ const ClientManagement = () => {
                             Nascimento: {format(new Date(client.data_nascimento), "dd/MM/yyyy")}
                           </p>
                         )}
+                        {client.cidade && (
+                          <p className="text-sm text-muted-foreground">
+                            Cidade: {client.cidade}
+                          </p>
+                        )}
                       </div>
-                      <Badge variant="secondary">
-                        {getClientAppointments(client.id).length} agendamentos
-                      </Badge>
+                      <div className="flex flex-col items-end gap-2">
+                        <Badge variant="secondary">
+                          {getClientAppointments(client.id).length} agendamentos
+                        </Badge>
+                        <div className="flex gap-1">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleEditClient(client)}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => openWhatsApp(client.celular)}
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -493,12 +603,106 @@ const ClientManagement = () => {
                 onChange={(e) => setFormData({...formData, data_nascimento: e.target.value})}
               />
             </div>
+            <div>
+              <Label htmlFor="cidade">Cidade</Label>
+              <Input
+                id="cidade"
+                value={formData.cidade}
+                onChange={(e) => setFormData({...formData, cidade: e.target.value})}
+                placeholder="São Paulo"
+              />
+            </div>
             <div className="flex gap-2 justify-end">
               <Button type="button" variant="outline" onClick={() => setShowClientForm(false)}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={loading}>
                 {loading ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para Editar Cliente */}
+      <Dialog open={showEditForm} onOpenChange={setShowEditForm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Cliente</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdateClient} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-nome">Nome</Label>
+                <Input
+                  id="edit-nome"
+                  value={formData.nome}
+                  onChange={(e) => setFormData({...formData, nome: e.target.value})}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-sobrenome">Sobrenome</Label>
+                <Input
+                  id="edit-sobrenome"
+                  value={formData.sobrenome}
+                  onChange={(e) => setFormData({...formData, sobrenome: e.target.value})}
+                  required
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="edit-cpf">CPF</Label>
+              <Input
+                id="edit-cpf"
+                value={formData.cpf}
+                onChange={(e) => setFormData({...formData, cpf: formatCPF(e.target.value)})}
+                placeholder="000.000.000-00"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-celular">Celular</Label>
+              <Input
+                id="edit-celular"
+                value={formData.celular}
+                onChange={(e) => setFormData({...formData, celular: e.target.value})}
+                placeholder="(00) 00000-0000"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-data_nascimento">Data de Nascimento</Label>
+              <Input
+                id="edit-data_nascimento"
+                type="date"
+                value={formData.data_nascimento}
+                onChange={(e) => setFormData({...formData, data_nascimento: e.target.value})}
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-cidade">Cidade</Label>
+              <Input
+                id="edit-cidade"
+                value={formData.cidade}
+                onChange={(e) => setFormData({...formData, cidade: e.target.value})}
+                placeholder="São Paulo"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setShowEditForm(false);
+                  setEditingClient(null);
+                  setFormData({ nome: "", sobrenome: "", cpf: "", celular: "", data_nascimento: "", cidade: "" });
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? "Salvando..." : "Salvar Alterações"}
               </Button>
             </div>
           </form>

@@ -5,6 +5,7 @@ export interface Client {
   sobrenome: string;
   celular: string;
   data_nascimento?: string;
+  cidade?: string;
 }
 
 export interface Appointment {

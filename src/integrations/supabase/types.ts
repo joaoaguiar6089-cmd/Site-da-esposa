@@ -139,6 +139,7 @@ export type Database = {
       clients: {
         Row: {
           celular: string
+          cidade: string | null
           cpf: string
           created_at: string
           data_nascimento: string | null
@@ -149,6 +150,7 @@ export type Database = {
         }
         Insert: {
           celular: string
+          cidade?: string | null
           cpf: string
           created_at?: string
           data_nascimento?: string | null
@@ -159,6 +161,7 @@ export type Database = {
         }
         Update: {
           celular?: string
+          cidade?: string | null
           cpf?: string
           created_at?: string
           data_nascimento?: string | null

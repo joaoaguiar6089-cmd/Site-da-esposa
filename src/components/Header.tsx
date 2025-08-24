@@ -63,26 +63,38 @@ const Header = () => {
   ];
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100">
+    <header className="absolute top-0 left-0 right-0 z-50 bg-transparent">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
-          {/* Logo com Nome */}
-          <div className="flex-shrink-0">
-            <a href="/" className="flex items-center space-x-3">
-              <img 
-                src="/lovable-uploads/648c7c53-0d63-4091-b28f-2ded7b542feb.png" 
-                alt="Dra Karoline" 
-                className="h-12 w-auto"
-              />
-              <div className="hidden sm:block">
-                <h1 className="text-xl font-bold text-gray-800">Dra. Karoline Ferreira</h1>
-                <p className="text-sm text-gray-600">Estética e Saúde Integrativa</p>
+          {/* Logo Centralizada */}
+          <div className="flex-1 flex justify-start lg:justify-center">
+            <a href="/" className="flex items-center">
+              {/* Logo SVG Inline */}
+              <div className="w-12 h-12 flex items-center justify-center">
+                <svg viewBox="0 0 200 200" className="w-full h-full">
+                  {/* Silhueta da mulher em linha vermelha */}
+                  <path 
+                    d="M100 30 C85 30, 75 40, 75 55 C75 65, 80 70, 85 75 L90 80 C95 85, 100 90, 100 100 L100 120 C95 125, 90 130, 85 135 L80 140 C75 145, 70 150, 70 160 L70 170 C70 175, 75 180, 80 180 L120 180 C125 180, 130 175, 130 170 L130 160 C130 150, 125 145, 120 140 L115 135 C110 130, 105 125, 100 120 L100 100 C100 90, 105 85, 110 80 L115 75 C120 70, 125 65, 125 55 C125 40, 115 30, 100 30 Z" 
+                    fill="none" 
+                    stroke="#dc2626" 
+                    strokeWidth="2" 
+                    className="drop-shadow-sm"
+                  />
+                  {/* Linha decorativa na base */}
+                  <path 
+                    d="M60 180 Q100 185 140 180" 
+                    fill="none" 
+                    stroke="#dc2626" 
+                    strokeWidth="2"
+                    className="drop-shadow-sm"
+                  />
+                </svg>
               </div>
             </a>
           </div>
 
-          {/* Desktop Navigation - Centralizado */}
-          <nav className="hidden lg:flex items-center justify-center flex-1">
+          {/* Desktop Navigation */}
+          <nav className="hidden lg:flex items-center space-x-8 absolute left-1/2 transform -translate-x-1/2">
             {navItems.map((item) => (
               <div key={item.name} className="relative group">
                 {item.hasDropdown ? (
@@ -94,15 +106,14 @@ const Header = () => {
                       setActiveCategory(null);
                     }}
                   >
-                    <button className="flex items-center space-x-2 text-gray-700 hover:text-rose-600 font-medium transition-colors duration-200 py-2 px-4">
-                      <Menu className="w-4 h-4" />
-                      <span>{item.name}</span>
-                      <ChevronDown className="w-4 h-4" />
+                    <button className="flex items-center space-x-1 text-white hover:text-red-300 font-medium transition-all duration-300 py-2 px-1 backdrop-blur-sm hover:backdrop-blur-md">
+                      <span className="drop-shadow-md">{item.name}</span>
+                      <ChevronDown className="w-4 h-4 drop-shadow-md" />
                     </button>
                     
                     {/* Dropdown Menu */}
                     {showProcedimentos && (
-                      <div className="absolute top-full left-0 w-80 bg-white rounded-lg shadow-xl border border-gray-200 py-4 mt-1">
+                      <div className="absolute top-full left-0 w-80 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-4 mt-2">
                         {categories.map((category) => (
                           <div 
                             key={category.id}
@@ -111,22 +122,22 @@ const Header = () => {
                           >
                             <a
                               href={`/categoria/${category.id}`}
-                              className="flex items-center justify-between px-4 py-3 text-gray-700 hover:bg-rose-50 hover:text-rose-600 transition-colors duration-200"
+                              className="flex items-center justify-between px-6 py-3 text-gray-700 hover:bg-red-50/80 hover:text-red-600 transition-all duration-300 group"
                             >
                               <span className="font-medium">{category.name}</span>
                               {category.subcategories && category.subcategories.length > 0 && (
-                                <ChevronRight className="w-4 h-4" />
+                                <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
                               )}
                             </a>
                             
                             {/* Subcategories Submenu */}
                             {activeCategory === category.id && category.subcategories && category.subcategories.length > 0 && (
-                              <div className="absolute left-full top-0 w-72 bg-white rounded-lg shadow-xl border border-gray-200 py-2 ml-1">
+                              <div className="absolute left-full top-0 w-72 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-3 ml-2">
                                 {category.subcategories.map((subcategory) => (
                                   <a
                                     key={subcategory.id}
                                     href={`/subcategoria/${subcategory.id}`}
-                                    className="block px-4 py-2 text-gray-600 hover:bg-rose-50 hover:text-rose-600 transition-colors duration-200"
+                                    className="block px-6 py-2 text-gray-600 hover:bg-red-50/80 hover:text-red-600 transition-all duration-300 hover:translate-x-2"
                                   >
                                     {subcategory.name}
                                   </a>
@@ -134,7 +145,7 @@ const Header = () => {
                                 <div className="border-t border-gray-100 mt-2 pt-2">
                                   <a
                                     href={`/categoria/${category.id}`}
-                                    className="block px-4 py-2 text-rose-600 font-medium hover:bg-rose-50 transition-colors duration-200"
+                                    className="block px-6 py-2 text-red-600 font-medium hover:bg-red-50/80 transition-all duration-300 hover:translate-x-2"
                                   >
                                     Ver todos os procedimentos
                                   </a>
@@ -149,7 +160,7 @@ const Header = () => {
                 ) : (
                   <a
                     href={item.href}
-                    className="text-gray-700 hover:text-rose-600 font-medium transition-colors duration-200 py-2 px-4"
+                    className="text-white hover:text-red-300 font-medium transition-all duration-300 py-2 px-1 backdrop-blur-sm hover:backdrop-blur-md drop-shadow-md hover:drop-shadow-lg"
                   >
                     {item.name}
                   </a>
@@ -159,25 +170,25 @@ const Header = () => {
           </nav>
 
           {/* Right Side Actions */}
-          <div className="hidden lg:flex items-center space-x-2">
+          <div className="hidden lg:flex items-center space-x-3 flex-1 justify-end">
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => window.location.href = '/agendamento'}
-              className="text-gray-700 hover:text-rose-600 hover:border-rose-600 font-medium"
+              className="text-white hover:text-red-300 font-medium bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/30 hover:border-red-300/50 transition-all duration-300"
             >
               Agendar
             </Button>
             
             <Button
               onClick={handleWhatsApp}
-              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2"
+              className="bg-green-500/90 hover:bg-green-600 text-white backdrop-blur-sm hover:scale-105 transition-all duration-300 shadow-lg"
             >
               WhatsApp
             </Button>
             
             <Button
               onClick={() => window.open('https://instagram.com/drakarolineferreira', '_blank')}
-              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-4 py-2"
+              className="bg-gradient-to-r from-purple-500/90 to-pink-500/90 hover:from-purple-600 hover:to-pink-600 text-white backdrop-blur-sm hover:scale-105 transition-all duration-300 shadow-lg"
             >
               <Instagram className="w-4 h-4 mr-2" />
               Instagram
@@ -190,25 +201,35 @@ const Header = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                className="lg:hidden"
+                className="lg:hidden text-white hover:text-red-300 bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/30"
               >
                 <Menu className="h-6 w-6" />
               </Button>
             </SheetTrigger>
             
-            <SheetContent side="left" className="w-80 p-0">
+            <SheetContent side="left" className="w-80 p-0 bg-white/95 backdrop-blur-md">
               <div className="flex flex-col h-full">
                 {/* Mobile Header */}
-                <div className="p-6 border-b border-gray-200">
+                <div className="p-6 border-b border-gray-200/50">
                   <a href="/" className="flex items-center space-x-3" onClick={() => setIsOpen(false)}>
-                    <img 
-                      src="/lovable-uploads/648c7c53-0d63-4091-b28f-2ded7b542feb.png" 
-                      alt="Dra Karoline" 
-                      className="h-10 w-auto"
-                    />
+                    <div className="w-10 h-10 flex items-center justify-center">
+                      <svg viewBox="0 0 200 200" className="w-full h-full">
+                        <path 
+                          d="M100 30 C85 30, 75 40, 75 55 C75 65, 80 70, 85 75 L90 80 C95 85, 100 90, 100 100 L100 120 C95 125, 90 130, 85 135 L80 140 C75 145, 70 150, 70 160 L70 170 C70 175, 75 180, 80 180 L120 180 C125 180, 130 175, 130 170 L130 160 C130 150, 125 145, 120 140 L115 135 C110 130, 105 125, 100 120 L100 100 C100 90, 105 85, 110 80 L115 75 C120 70, 125 65, 125 55 C125 40, 115 30, 100 30 Z" 
+                          fill="none" 
+                          stroke="#dc2626" 
+                          strokeWidth="2"
+                        />
+                        <path 
+                          d="M60 180 Q100 185 140 180" 
+                          fill="none" 
+                          stroke="#dc2626" 
+                          strokeWidth="2"
+                        />
+                      </svg>
+                    </div>
                     <div>
-                      <h1 className="text-lg font-bold text-gray-800">Dra. Karoline Ferreira</h1>
-                      <p className="text-xs text-gray-600">Estética e Saúde Integrativa</p>
+                      <p className="text-sm text-red-600 font-bold">Estética e Saúde Integrativa</p>
                     </div>
                   </a>
                 </div>
@@ -224,43 +245,40 @@ const Header = () => {
                               onClick={() => setExpandedMobileCategory(
                                 expandedMobileCategory === 'procedimentos' ? null : 'procedimentos'
                               )}
-                              className="flex items-center justify-between w-full px-3 py-3 text-left text-gray-700 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors duration-200"
+                              className="flex items-center justify-between w-full px-4 py-3 text-left text-gray-700 hover:bg-red-50/80 hover:text-red-600 rounded-xl transition-all duration-300"
                             >
-                              <div className="flex items-center space-x-2">
-                                <Menu className="w-4 h-4" />
-                                <span className="font-medium">{item.name}</span>
-                              </div>
-                              <ChevronDown className={`w-4 h-4 transform transition-transform duration-200 ${
+                              <span className="font-medium">{item.name}</span>
+                              <ChevronDown className={`w-4 h-4 transform transition-all duration-300 ${
                                 expandedMobileCategory === 'procedimentos' ? 'rotate-180' : ''
                               }`} />
                             </button>
                             
                             {expandedMobileCategory === 'procedimentos' && (
-                              <div className="ml-4 space-y-1">
+                              <div className="ml-4 space-y-1 animate-in slide-in-from-left duration-300">
                                 {categories.map((category) => (
                                   <div key={category.id} className="space-y-1">
                                     <button
                                       onClick={() => setExpandedMobileCategory(
                                         expandedMobileCategory === category.id ? 'procedimentos' : category.id
                                       )}
-                                      className="flex items-center justify-between w-full px-3 py-2 text-left text-gray-600 hover:bg-gray-50 hover:text-rose-600 rounded-lg transition-colors duration-200"
+                                      className="flex items-center justify-between w-full px-4 py-2 text-left text-gray-600 hover:bg-gray-50/80 hover:text-red-600 rounded-lg transition-all duration-300"
                                     >
                                       <span>{category.name}</span>
                                       {category.subcategories && category.subcategories.length > 0 && (
-                                        <ChevronRight className={`w-3 h-3 transform transition-transform duration-200 ${
+                                        <ChevronRight className={`w-3 h-3 transform transition-all duration-300 ${
                                           expandedMobileCategory === category.id ? 'rotate-90' : ''
                                         }`} />
                                       )}
                                     </button>
                                     
                                     {expandedMobileCategory === category.id && category.subcategories && category.subcategories.length > 0 && (
-                                      <div className="ml-4 space-y-1">
+                                      <div className="ml-4 space-y-1 animate-in slide-in-from-left duration-300">
                                         {category.subcategories.map((subcategory) => (
                                           <a
                                             key={subcategory.id}
                                             href={`/subcategoria/${subcategory.id}`}
                                             onClick={() => setIsOpen(false)}
-                                            className="block px-3 py-2 text-sm text-gray-500 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors duration-200"
+                                            className="block px-4 py-2 text-sm text-gray-500 hover:bg-red-50/80 hover:text-red-600 rounded-lg transition-all duration-300 hover:translate-x-1"
                                           >
                                             {subcategory.name}
                                           </a>
@@ -268,7 +286,7 @@ const Header = () => {
                                         <a
                                           href={`/categoria/${category.id}`}
                                           onClick={() => setIsOpen(false)}
-                                          className="block px-3 py-2 text-sm text-rose-600 font-medium hover:bg-rose-50 rounded-lg transition-colors duration-200"
+                                          className="block px-4 py-2 text-sm text-red-600 font-medium hover:bg-red-50/80 rounded-lg transition-all duration-300 hover:translate-x-1"
                                         >
                                           Ver todos os procedimentos
                                         </a>
@@ -283,7 +301,7 @@ const Header = () => {
                           <a
                             href={item.href}
                             onClick={() => setIsOpen(false)}
-                            className="block px-3 py-3 text-gray-700 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors duration-200 font-medium"
+                            className="block px-4 py-3 text-gray-700 hover:bg-red-50/80 hover:text-red-600 rounded-xl transition-all duration-300 font-medium hover:translate-x-1"
                           >
                             {item.name}
                           </a>
@@ -294,10 +312,10 @@ const Header = () => {
                 </div>
 
                 {/* Mobile Footer Actions */}
-                <div className="border-t border-gray-200 p-6 space-y-3">
+                <div className="border-t border-gray-200/50 p-6 space-y-3">
                   <Button 
                     variant="outline" 
-                    className="w-full justify-center hover:bg-rose-50 hover:border-rose-600 hover:text-rose-600"
+                    className="w-full justify-center hover:bg-red-50/80 hover:border-red-600 hover:text-red-600 transition-all duration-300"
                     onClick={() => {
                       window.location.href = '/agendamento';
                       setIsOpen(false);
@@ -308,7 +326,7 @@ const Header = () => {
                   
                   <div className="flex space-x-3">
                     <Button
-                      className="flex-1 bg-green-500 hover:bg-green-600 text-white"
+                      className="flex-1 bg-green-500 hover:bg-green-600 text-white hover:scale-105 transition-all duration-300"
                       onClick={() => {
                         handleWhatsApp();
                         setIsOpen(false);
@@ -318,7 +336,7 @@ const Header = () => {
                     </Button>
                     
                     <Button
-                      className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white"
+                      className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white hover:scale-105 transition-all duration-300"
                       onClick={() => {
                         window.open('https://instagram.com/drakarolineferreira', '_blank');
                         setIsOpen(false);

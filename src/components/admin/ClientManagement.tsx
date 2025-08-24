@@ -2,17 +2,17 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, Camera, User, Calendar, Phone, FileText, Edit, MessageCircle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { formatCPF, cleanCPF, isValidCPF } from "@/utils/cpfValidator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
+import { User, Calendar, Plus, Edit, Camera, Settings, MessageCircle, Eye, Download } from "lucide-react";
+import { formatCPF, cleanCPF, isValidCPF } from "@/utils/cpfValidator";
 
 interface Client {
   id: string;
@@ -84,7 +84,7 @@ const ClientManagement = () => {
     cidade: ""
   });
 
-  const { toast } = useToast();
+  
 
   useEffect(() => {
     loadClients();
@@ -640,17 +640,39 @@ const ClientManagement = () => {
                           <h5 className="text-sm font-semibold">Resultados:</h5>
                           {results.map((result) => (
                             <div key={result.id} className="flex items-center gap-2 p-2 bg-muted rounded">
-                              <img 
-                                src={result.image_url} 
-                                alt="Resultado" 
-                                className="w-12 h-12 object-cover rounded"
-                              />
+                              <div className="relative group">
+                                <img 
+                                  src={result.image_url} 
+                                  alt="Resultado" 
+                                  className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-75 transition-opacity"
+                                  onClick={() => window.open(result.image_url, '_blank')}
+                                />
+                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                  <Eye className="w-4 h-4 text-white" />
+                                </div>
+                              </div>
                               <div className="flex-1">
                                 <p className="text-sm">{result.description || "Sem descrição"}</p>
                                 <p className="text-xs text-muted-foreground">
                                   {format(new Date(result.created_at), "dd/MM/yyyy 'às' HH:mm")}
                                 </p>
                               </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const link = document.createElement('a');
+                                  link.href = result.image_url;
+                                  link.download = `resultado_${result.id}.jpg`;
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                }}
+                                className="shrink-0"
+                              >
+                                <Download className="w-3 h-3 mr-1" />
+                                Download
+                              </Button>
                             </div>
                           ))}
                         </div>

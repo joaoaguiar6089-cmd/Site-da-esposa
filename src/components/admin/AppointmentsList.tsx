@@ -213,6 +213,18 @@ const AppointmentsList = () => {
     }
   };
 
+  const handleEditAppointment = (appointment: Appointment) => {
+    // Instead of redirecting to the public page, we'll use the admin calendar edit functionality
+    // For now, we'll show a toast message directing to the calendar section
+    toast({
+      title: "Redirecionando...",
+      description: "Use a seção 'Calendário' para editar agendamentos com funcionalidade completa.",
+    });
+    
+    // Optionally, you could trigger a navigation to the calendar with the appointment selected
+    // navigate('/admin?tab=calendar&edit=' + appointment.id);
+  };
+
   const deleteAppointment = async (appointmentId: string) => {
     if (!confirm('Tem certeza que deseja excluir este agendamento?')) return;
 
@@ -418,7 +430,7 @@ const AppointmentsList = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => navigate(`/agendamento?edit=${appointment.id}`)}
+                        onClick={() => handleEditAppointment(appointment)}
                         className="flex items-center gap-1 flex-1"
                       >
                         Editar

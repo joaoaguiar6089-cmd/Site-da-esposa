@@ -286,11 +286,11 @@ const Header = () => {
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();
+                                            e.preventDefault();
                                             console.log('Clicked category:', category.name, 'ID:', category.id, 'Current state:', expandedMobileCategory);
-                                            setExpandedMobileCategory(
-                                              expandedMobileCategory === category.id ? null : category.id
-                                            );
-                                            console.log('Setting state to:', expandedMobileCategory === category.id ? null : category.id);
+                                            const newState = expandedMobileCategory === category.id ? 'procedimentos' : category.id;
+                                            setExpandedMobileCategory(newState);
+                                            console.log('Setting state to:', newState);
                                           }}
                                           className="flex items-center justify-between w-full px-4 py-3 text-left bg-white/70 text-gray-700 hover:bg-red-50/80 hover:text-red-700 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md border border-white/60 hover:border-red-200"
                                         >

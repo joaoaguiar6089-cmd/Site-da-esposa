@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ const AreaCliente = ({
   onBack,
   onClientUpdate 
 }: AreaClienteProps) => {
+  const [searchParams] = useSearchParams();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [filteredAppointments, setFilteredAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,12 +38,18 @@ const AreaCliente = ({
   const [editingAppointment, setEditingAppointment] = useState<string | null>(null);
   const [procedureResults, setProcedureResults] = useState<{ [key: string]: ProcedureResult[] }>({});
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const preSelectedProcedureId = searchParams.get('procedimento');
   const { toast } = useToast();
 
   useEffect(() => {
     setLocalClient(client);
     loadAppointments();
-  }, [client, client.id]);
+    
+    // Se há um procedimento pré-selecionado, abrir formulário de agendamento
+    if (preSelectedProcedureId) {
+      setShowNewAppointment(true);
+    }
+  }, [client, client.id, preSelectedProcedureId]);
 
   useEffect(() => {
     filterAppointments();
@@ -259,6 +267,7 @@ const AreaCliente = ({
         client={localClient}
         onAppointmentCreated={handleAppointmentCreated}
         onBack={() => setShowNewAppointment(false)}
+        preSelectedProcedureId={preSelectedProcedureId || undefined}
       />
     );
   }

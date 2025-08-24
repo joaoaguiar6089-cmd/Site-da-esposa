@@ -23,9 +23,10 @@ interface AgendamentoFormProps {
   onAppointmentCreated: () => void;
   onBack: () => void;
   editingId?: string;
+  preSelectedProcedureId?: string;
 }
 
-const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: AgendamentoFormProps) => {
+const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preSelectedProcedureId }: AgendamentoFormProps) => {
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [formData, setFormData] = useState({
     procedure_id: "",
@@ -63,7 +64,12 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId }: Ag
     if (editingId) {
       loadAppointmentData(editingId);
     }
-  }, [editingId]);
+    
+    // Pré-selecionar procedimento se fornecido
+    if (preSelectedProcedureId && !editingId) {
+      setFormData(prev => ({ ...prev, procedure_id: preSelectedProcedureId }));
+    }
+  }, [editingId, preSelectedProcedureId]);
 
   const loadAppointmentData = async (appointmentId: string) => {
     try {

@@ -11,6 +11,7 @@ interface ProcedureCardProps {
   duration?: string;
   sessions?: number;
   indication?: string;
+  procedureId?: string;
 }
 
 const ProcedureCard = ({ 
@@ -21,13 +22,14 @@ const ProcedureCard = ({
   benefits, 
   duration,
   sessions,
-  indication 
+  indication,
+  procedureId 
 }: ProcedureCardProps) => {
-  const whatsappLink = "https://wa.me/5597984387295";
-  
-  const handleWhatsApp = () => {
-    const message = `Olá! Gostaria de agendar uma consulta para ${title}. Poderia me fornecer mais informações?`;
-    window.open(`${whatsappLink}?text=${encodeURIComponent(message)}`, "_blank");
+  const handleAgendamento = () => {
+    const url = procedureId 
+      ? `/area-cliente?procedimento=${procedureId}`
+      : '/area-cliente';
+    window.location.href = url;
   };
 
   return (
@@ -88,7 +90,7 @@ const ProcedureCard = ({
           </div>
           
           <Button 
-            onClick={handleWhatsApp}
+            onClick={handleAgendamento}
             className="w-full" 
             variant="default"
           >

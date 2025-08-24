@@ -111,6 +111,7 @@ const CategoryProcedures = () => {
                   benefits={procedure.benefits || []}
                   sessions={procedure.sessions}
                   indication={procedure.indication || undefined}
+                  procedureId={procedure.id}
                 />
               ))}
             </div>

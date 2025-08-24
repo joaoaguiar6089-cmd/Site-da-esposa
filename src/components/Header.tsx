@@ -110,13 +110,13 @@ const Header = () => {
   ];
 
   return (
-    <header className="absolute top-0 left-0 right-0 z-50 bg-transparent">
+    <header className="absolute top-0 left-0 right-0 z-50 bg-gradient-to-b from-black/50 to-transparent">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           {/* Logo Elegante - Canto Esquerdo */}
           <div className="flex-shrink-0">
             <a href="/" className="flex flex-col">
-              <h1 className="text-2xl font-bold text-white drop-shadow-lg tracking-wide">
+              <h1 className="text-2xl font-bold text-red-500 drop-shadow-lg tracking-wide">
                 Dra. Karoline Ferreira
               </h1>
               <p className="text-sm text-white/90 drop-shadow-md font-light tracking-wider">
@@ -229,7 +229,7 @@ const Header = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                className="lg:hidden text-white hover:text-red-300 bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/30"
+                className="lg:hidden text-red-500 hover:text-red-700 bg-black/20 hover:bg-black/30 backdrop-blur-sm border border-red-500/50"
               >
                 <Menu className="h-6 w-6" />
               </Button>
@@ -272,23 +272,23 @@ const Header = () => {
                               <div className="ml-4 space-y-1 animate-in slide-in-from-left duration-300">
                                 {categories.map((category) => (
                                   <div key={category.id} className="space-y-1">
-                                    {category.subcategories && category.subcategories.length > 0 ? (
-                                      <div>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setExpandedMobileCategory(
-                                              expandedMobileCategory === category.id ? 'procedimentos' : category.id
-                                            );
-                                          }}
-                                          className="flex items-center justify-between w-full px-4 py-2 text-left text-gray-600 hover:bg-gray-50/80 hover:text-red-600 rounded-lg transition-all duration-300"
-                                        >
-                                          <span>{category.name}</span>
-                                          <ChevronRight className={`w-3 h-3 transform transition-all duration-300 ${
-                                            expandedMobileCategory === category.id ? 'rotate-90' : ''
-                                          }`} />
-                                        </button>
-                                      </div>
+                                     {category.subcategories && category.subcategories.length > 0 ? (
+                                       <div>
+                                         <button
+                                           onClick={(e) => {
+                                             e.stopPropagation();
+                                             setExpandedMobileCategory(
+                                               expandedMobileCategory === category.id ? null : category.id
+                                             );
+                                           }}
+                                           className="flex items-center justify-between w-full px-4 py-2 text-left text-gray-600 hover:bg-gray-50/80 hover:text-red-600 rounded-lg transition-all duration-300"
+                                         >
+                                           <span>{category.name}</span>
+                                           <ChevronRight className={`w-3 h-3 transform transition-all duration-300 ${
+                                             expandedMobileCategory === category.id ? 'rotate-90' : ''
+                                           }`} />
+                                         </button>
+                                       </div>
                                     ) : (
                                       <a
                                         href={`/categoria/${category.id}`}

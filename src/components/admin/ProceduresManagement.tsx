@@ -17,6 +17,12 @@ interface Category {
   name: string;
 }
 
+interface Subcategory {
+  id: string;
+  name: string;
+  category_id: string;
+}
+
 interface Procedure {
   id: string;
   name: string;
@@ -24,26 +30,39 @@ interface Procedure {
   duration: number;
   price: number | null;
   category_id: string | null;
+  subcategory_id: string | null;
   image_url: string | null;
   benefits: string[] | null;
   is_featured: boolean;
   sessions: number;
   indication: string | null;
   categories?: Category;
+  subcategories?: {
+    name: string;
+  };
 }
 
 const ProceduresManagement = () => {
   const [procedures, setProcedures] = useState<Procedure[]>([]);
+  const [filteredProcedures, setFilteredProcedures] = useState<Procedure[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProcedure, setEditingProcedure] = useState<Procedure | null>(null);
+  
+  // Filtros e pesquisa
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedSubcategory, setSelectedSubcategory] = useState("");
+  
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     duration: "60",
     price: "",
     category_id: "",
+    subcategory_id: "",
     image_url: "",
     benefits: [] as string[],
     is_featured: false,
@@ -63,15 +82,39 @@ const ProceduresManagement = () => {
           categories (
             id,
             name
+          ),
+          subcategories (
+            name
           )
         `)
         .order('name');
 
       if (error) throw error;
       setProcedures(data || []);
+      setFilteredProcedures(data || []);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar procedimentos",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadSubcategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('subcategories')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setSubcategories(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Erro ao carregar subcategorias",
         description: error.message,
         variant: "destructive",
       });
@@ -93,15 +136,41 @@ const ProceduresManagement = () => {
         description: error.message,
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
     loadCategories();
+    loadSubcategories();
     loadProcedures();
   }, []);
+
+  // Filtrar procedimentos
+  useEffect(() => {
+    let filtered = procedures;
+
+    if (searchTerm) {
+      filtered = filtered.filter(procedure =>
+        procedure.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        procedure.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    if (selectedCategory) {
+      filtered = filtered.filter(procedure => procedure.category_id === selectedCategory);
+    }
+
+    if (selectedSubcategory) {
+      filtered = filtered.filter(procedure => procedure.subcategory_id === selectedSubcategory);
+    }
+
+    setFilteredProcedures(filtered);
+  }, [procedures, searchTerm, selectedCategory, selectedSubcategory]);
+
+  // Filtrar subcategorias pela categoria selecionada
+  const availableSubcategories = selectedCategory 
+    ? subcategories.filter(sub => sub.category_id === selectedCategory)
+    : subcategories;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,6 +182,7 @@ const ProceduresManagement = () => {
         duration: parseInt(formData.duration),
         price: formData.price ? parseFloat(formData.price) : null,
         category_id: formData.category_id || null,
+        subcategory_id: formData.subcategory_id || null,
         image_url: formData.image_url || null,
         benefits: formData.benefits.length > 0 ? formData.benefits : null,
         is_featured: formData.is_featured,
@@ -145,7 +215,19 @@ const ProceduresManagement = () => {
         });
       }
 
-      setFormData({ name: "", description: "", duration: "60", price: "", category_id: "", image_url: "", benefits: [], is_featured: false, sessions: "1", indication: "" });
+      setFormData({ 
+        name: "", 
+        description: "", 
+        duration: "60", 
+        price: "", 
+        category_id: "", 
+        subcategory_id: "",
+        image_url: "", 
+        benefits: [], 
+        is_featured: false, 
+        sessions: "1", 
+        indication: "" 
+      });
       setEditingProcedure(null);
       setDialogOpen(false);
       loadProcedures();
@@ -166,6 +248,7 @@ const ProceduresManagement = () => {
       duration: procedure.duration.toString(),
       price: procedure.price?.toString() || "",
       category_id: procedure.category_id || "",
+      subcategory_id: procedure.subcategory_id || "",
       image_url: procedure.image_url || "",
       benefits: procedure.benefits || [],
       is_featured: procedure.is_featured,
@@ -202,7 +285,19 @@ const ProceduresManagement = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: "", description: "", duration: "60", price: "", category_id: "", image_url: "", benefits: [], is_featured: false, sessions: "1", indication: "" });
+    setFormData({ 
+      name: "", 
+      description: "", 
+      duration: "60", 
+      price: "", 
+      category_id: "", 
+      subcategory_id: "",
+      image_url: "", 
+      benefits: [], 
+      is_featured: false, 
+      sessions: "1", 
+      indication: "" 
+    });
     setEditingProcedure(null);
     setNewBenefit("");
   };
@@ -543,8 +638,87 @@ const ProceduresManagement = () => {
         </Dialog>
       </div>
 
+      {/* Filtros e Pesquisa */}
+      <Card className="p-4">
+        <div className="flex flex-col md:flex-row gap-4 items-end">
+          <div className="flex-1">
+            <Label htmlFor="search" className="text-sm font-medium">
+              Pesquisar Procedimentos
+            </Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+              <Input
+                id="search"
+                placeholder="Buscar por nome ou descrição..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
+          
+          <div className="flex gap-2">
+            <div className="min-w-[160px]">
+              <Label htmlFor="filter-category" className="text-sm font-medium">
+                Categoria
+              </Label>
+              <Select value={selectedCategory} onValueChange={(value) => {
+                setSelectedCategory(value);
+                setSelectedSubcategory(""); // Reset subcategory when category changes
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todas as categorias</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {selectedCategory && (
+              <div className="min-w-[160px]">
+                <Label htmlFor="filter-subcategory" className="text-sm font-medium">
+                  Subcategoria
+                </Label>
+                <Select value={selectedSubcategory} onValueChange={setSelectedSubcategory}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Todas as subcategorias</SelectItem>
+                    {availableSubcategories.map((subcategory) => (
+                      <SelectItem key={subcategory.id} value={subcategory.id}>
+                        {subcategory.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setSearchTerm("");
+                setSelectedCategory("");
+                setSelectedSubcategory("");
+              }}
+              className="mt-6"
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              Limpar
+            </Button>
+          </div>
+        </div>
+      </Card>
+
       <div className="grid gap-4">
-        {procedures.map((procedure) => (
+        {filteredProcedures.map((procedure) => (
           <Card key={procedure.id} className="p-4">
             <div className="flex gap-4">
               {procedure.image_url && (
@@ -574,6 +748,9 @@ const ProceduresManagement = () => {
                     </div>
                     {procedure.categories && (
                       <p className="text-sm text-primary font-medium">{procedure.categories.name}</p>
+                    )}
+                    {procedure.subcategories && (
+                      <p className="text-xs text-muted-foreground">{procedure.subcategories.name}</p>
                     )}
                     {procedure.description && (
                       <p className="text-sm text-muted-foreground mt-1">{procedure.description}</p>
@@ -640,6 +817,14 @@ const ProceduresManagement = () => {
           </Card>
         ))}
       </div>
+
+      {filteredProcedures.length === 0 && procedures.length > 0 && (
+        <Card className="p-8 text-center">
+          <p className="text-muted-foreground">
+            Nenhum procedimento encontrado com os filtros aplicados.
+          </p>
+        </Card>
+      )}
 
       {procedures.length === 0 && (
         <Card className="p-8 text-center">

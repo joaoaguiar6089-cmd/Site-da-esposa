@@ -221,6 +221,7 @@ export type Database = {
           name: string
           price: number | null
           sessions: number
+          subcategory_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -236,6 +237,7 @@ export type Database = {
           name: string
           price?: number | null
           sessions?: number
+          subcategory_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -251,6 +253,7 @@ export type Database = {
           name?: string
           price?: number | null
           sessions?: number
+          subcategory_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -259,6 +262,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "procedures_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
             referencedColumns: ["id"]
           },
         ]
@@ -406,6 +416,41 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      subcategories: {
+        Row: {
+          category_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subcategories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_templates: {
         Row: {

@@ -1,122 +1,226 @@
 import { Button } from "@/components/ui/button";
-import { Calendar, Instagram, MessageCircle, Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useState } from "react";
-import CategorySelect from "./CategorySelect";
+import { Menu, Instagram } from "lucide-react";
+import { useState, useEffect } from "react";
+import { NavigationMenu, NavigationMenuContent, NavigationMenuItem, NavigationMenuList, NavigationMenuTrigger } from "@/components/ui/navigation-menu";
+import { supabase } from "@/integrations/supabase/client";
+
+interface Category {
+  id: string;
+  name: string;
+  subcategories?: Subcategory[];
+}
+
+interface Subcategory {
+  id: string;
+  name: string;
+  category_id: string;
+}
 
 const Header = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const whatsappLink = "https://wa.me/5597984387295";
-  const instagramLink = "https://www.instagram.com/dra_karolineferreira?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==";
+  const [isOpen, setIsOpen] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    loadCategoriesWithSubcategories();
+  }, []);
+
+  const loadCategoriesWithSubcategories = async () => {
+    try {
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name');
+
+      if (categoriesError) throw categoriesError;
+
+      const { data: subcategoriesData, error: subcategoriesError } = await supabase
+        .from('subcategories')
+        .select('*')
+        .order('name');
+
+      if (subcategoriesError) throw subcategoriesError;
+
+      // Agrupar subcategorias por categoria
+      const categoriesWithSubs = categoriesData.map(category => ({
+        ...category,
+        subcategories: subcategoriesData.filter(sub => sub.category_id === category.id)
+      }));
+
+      setCategories(categoriesWithSubs);
+    } catch (error) {
+      console.error('Erro ao carregar categorias:', error);
+    }
+  };
+
+  const handleWhatsApp = () => {
+    window.open('https://wa.me/5511999999999', '_blank');
+  };
 
   return (
-    <header className="bg-white/95 backdrop-blur-sm shadow-soft sticky top-0 z-50">
-      <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-4">
-        <div className="flex items-center justify-between">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container mx-auto px-4">
+        <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <div className="flex flex-col cursor-pointer" onClick={() => window.location.href = "/"}>
-            <h1 className="text-xl sm:text-2xl font-bold text-primary hover:text-primary/80 transition-colors">
-              Dra. Karoline Ferreira
-            </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground">
-              Estética e Saúde Integrativa
-            </p>
+          <div className="flex items-center">
+            <a href="/" className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                <span className="text-primary-foreground font-bold text-sm">DK</span>
+              </div>
+              <span className="font-bold text-lg text-primary">Dra Karoline</span>
+            </a>
           </div>
-          
+
           {/* Desktop Navigation */}
-          <div className="hidden sm:flex items-center gap-3">
-            <CategorySelect />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.location.href = "/area-cliente"}
-              className="flex items-center gap-2"
-            >
-              <Calendar size={14} />
+          <NavigationMenu className="hidden md:flex">
+            <NavigationMenuList className="space-x-6">
+              <NavigationMenuItem>
+                <NavigationMenuTrigger className="bg-transparent hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-[active]:bg-accent/50 data-[state=open]:bg-accent/50">
+                  Procedimentos
+                </NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <div className="grid gap-3 p-6 md:w-[500px] lg:w-[600px] lg:grid-cols-2">
+                    {categories.map((category) => (
+                      <div key={category.id} className="space-y-2">
+                        <h3 className="font-medium text-sm text-primary border-b border-border pb-1">
+                          {category.name}
+                        </h3>
+                        <div className="space-y-1">
+                          {category.subcategories && category.subcategories.length > 0 ? (
+                            category.subcategories.map((subcategory) => (
+                              <a
+                                key={subcategory.id}
+                                href={`/categoria/${category.id}/subcategoria/${subcategory.id}`}
+                                className="block text-sm text-muted-foreground hover:text-primary transition-colors rounded p-1 hover:bg-accent"
+                              >
+                                {subcategory.name}
+                              </a>
+                            ))
+                          ) : (
+                            <a
+                              href={`/categoria/${category.id}`}
+                              className="block text-sm text-muted-foreground hover:text-primary transition-colors rounded p-1 hover:bg-accent"
+                            >
+                              Ver todos os procedimentos
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+            </NavigationMenuList>
+          </NavigationMenu>
+
+          {/* Desktop Actions */}
+          <div className="hidden md:flex items-center space-x-4">
+            <Button variant="ghost" onClick={() => window.location.href = '/area-cliente'}>
               Área do Cliente
             </Button>
+            
             <Button
-              variant="whatsapp"
+              variant="ghost"
               size="sm"
-              onClick={() => window.open(whatsappLink, "_blank")}
-              className="flex items-center gap-2"
+              onClick={handleWhatsApp}
+              className="text-green-600 hover:text-green-700 hover:bg-green-50"
             >
-              <MessageCircle size={14} />
               WhatsApp
             </Button>
+            
             <Button
-              variant="instagram"
+              variant="ghost"
               size="sm"
-              onClick={() => window.open(instagramLink, "_blank")}
-              className="flex items-center gap-2"
+              onClick={() => window.open('https://instagram.com/drakarolineferreira', '_blank')}
+              className="text-pink-600 hover:text-pink-700 hover:bg-pink-50"
             >
-              <Instagram size={14} />
-              Instagram
+              <Instagram className="w-4 h-4" />
             </Button>
           </div>
 
-          {/* Mobile Menu Button */}
-          <div className="sm:hidden">
-            <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Menu className="h-4 w-4" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-80">
-                <div className="mt-6 space-y-4">
-                  <div className="text-lg font-semibold text-primary mb-6">
-                    Menu
-                  </div>
-                  
-                  {/* Procedimentos */}
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-muted-foreground">Procedimentos</p>
-                    <CategorySelect />
-                  </div>
-                  
-                  {/* Agendar */}
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start gap-3 h-12"
+          {/* Mobile Menu */}
+          <Sheet open={isOpen} onOpenChange={setIsOpen}>
+            <SheetTrigger asChild className="md:hidden">
+              <Button variant="ghost" size="sm">
+                <Menu className="w-5 h-5" />
+                <span className="sr-only">Menu</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+              <nav className="flex flex-col space-y-4 mt-8">
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-primary text-lg border-b border-border pb-2">
+                    Procedimentos
+                  </h3>
+                  {categories.map((category) => (
+                    <div key={category.id} className="space-y-2 ml-4">
+                      <h4 className="font-medium text-sm text-foreground">
+                        {category.name}
+                      </h4>
+                      <div className="space-y-1 ml-4">
+                        {category.subcategories && category.subcategories.length > 0 ? (
+                          category.subcategories.map((subcategory) => (
+                            <a
+                              key={subcategory.id}
+                              href={`/categoria/${category.id}/subcategoria/${subcategory.id}`}
+                              className="block text-sm text-muted-foreground hover:text-primary transition-colors py-1"
+                              onClick={() => setIsOpen(false)}
+                            >
+                              {subcategory.name}
+                            </a>
+                          ))
+                        ) : (
+                          <a
+                            href={`/categoria/${category.id}`}
+                            className="block text-sm text-muted-foreground hover:text-primary transition-colors py-1"
+                            onClick={() => setIsOpen(false)}
+                          >
+                            Ver todos os procedimentos
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="border-t border-border pt-4 space-y-3">
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start text-left"
                     onClick={() => {
-                      window.location.href = "/area-cliente";
-                      setIsMenuOpen(false);
+                      window.location.href = '/area-cliente';
+                      setIsOpen(false);
                     }}
                   >
-                    <Calendar size={18} />
-                    <span className="text-base">Área do Cliente</span>
+                    Área do Cliente
                   </Button>
                   
-                  {/* WhatsApp */}
                   <Button
-                    variant="whatsapp"
-                    className="w-full justify-start gap-3 h-12"
+                    variant="ghost"
+                    className="w-full justify-start text-left text-green-600 hover:text-green-700"
                     onClick={() => {
-                      window.open(whatsappLink, "_blank");
-                      setIsMenuOpen(false);
+                      handleWhatsApp();
+                      setIsOpen(false);
                     }}
                   >
-                    <MessageCircle size={18} />
-                    <span className="text-base">WhatsApp</span>
+                    WhatsApp
                   </Button>
                   
-                  {/* Instagram */}
                   <Button
-                    variant="instagram"
-                    className="w-full justify-start gap-3 h-12"
+                    variant="ghost"
+                    className="w-full justify-start text-left text-pink-600 hover:text-pink-700"
                     onClick={() => {
-                      window.open(instagramLink, "_blank");
-                      setIsMenuOpen(false);
+                      window.open('https://instagram.com/drakarolineferreira', '_blank');
+                      setIsOpen(false);
                     }}
                   >
-                    <Instagram size={18} />
-                    <span className="text-base">Instagram</span>
+                    <Instagram className="w-4 h-4 mr-2" />
+                    Instagram
                   </Button>
                 </div>
-              </SheetContent>
-            </Sheet>
-          </div>
+              </nav>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
     </header>

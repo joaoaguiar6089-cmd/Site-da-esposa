@@ -66,6 +66,14 @@ const ClientManagement = () => {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [resultDescription, setResultDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
+  const [showEditAppointmentDialog, setShowEditAppointmentDialog] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
+  const [appointmentFormData, setAppointmentFormData] = useState({
+    appointment_date: "",
+    appointment_time: "",
+    notes: ""
+  });
   
   const [formData, setFormData] = useState({
     nome: "",
@@ -296,11 +304,13 @@ const ClientManagement = () => {
 
       if (insertError) throw insertError;
 
-      // Atualizar status do agendamento para "realizado"
-      await supabase
-        .from('appointments')
-        .update({ status: 'realizado' })
-        .eq('id', selectedAppointment.id);
+      // Atualizar status do agendamento para "realizado" apenas se não foi um upload adicional
+      if (selectedAppointment.status !== 'realizado') {
+        await supabase
+          .from('appointments')
+          .update({ status: 'realizado' })
+          .eq('id', selectedAppointment.id);
+      }
 
       toast({
         title: "Sucesso",
@@ -317,6 +327,83 @@ const ClientManagement = () => {
       toast({
         title: "Erro",
         description: error.message || "Erro ao salvar resultado.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (appointmentId: string, newStatus: string) => {
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: newStatus })
+        .eq('id', appointmentId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Status do procedimento atualizado com sucesso!",
+      });
+
+      loadAppointments();
+    } catch (error: any) {
+      console.error("Erro ao atualizar status:", error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao atualizar status.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditAppointment = (appointment: Appointment) => {
+    setEditingAppointment(appointment);
+    setAppointmentFormData({
+      appointment_date: appointment.appointment_date,
+      appointment_time: appointment.appointment_time,
+      notes: appointment.notes || ""
+    });
+    setShowEditAppointmentDialog(true);
+  };
+
+  const handleUpdateAppointment = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!editingAppointment) return;
+
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('appointments')
+        .update({
+          appointment_date: appointmentFormData.appointment_date,
+          appointment_time: appointmentFormData.appointment_time,
+          notes: appointmentFormData.notes
+        })
+        .eq('id', editingAppointment.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Agendamento atualizado com sucesso!",
+      });
+
+      setShowEditAppointmentDialog(false);
+      setEditingAppointment(null);
+      setAppointmentFormData({ appointment_date: "", appointment_time: "", notes: "" });
+      loadAppointments();
+    } catch (error: any) {
+      console.error("Erro ao atualizar agendamento:", error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao atualizar agendamento.",
         variant: "destructive",
       });
     } finally {
@@ -503,19 +590,48 @@ const ClientManagement = () => {
                         </div>
                         <div className="flex flex-col items-end gap-2">
                           {getStatusBadge(appointment.status)}
-                          {appointment.status === 'confirmado' && (
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedAppointment(appointment);
-                                setShowResultDialog(true);
-                              }}
-                            >
-                              <Camera className="w-4 h-4 mr-2" />
-                              Anexar Foto
-                            </Button>
-                          )}
+                          <div className="flex flex-col gap-1">
+                            {/* Botões de ação */}
+                            <div className="flex gap-1">
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleEditAppointment(appointment)}
+                                title="Editar agendamento"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Select
+                                value={appointment.status}
+                                onValueChange={(newStatus) => handleStatusChange(appointment.id, newStatus)}
+                              >
+                                <SelectTrigger className="w-24 h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="agendado">Agendado</SelectItem>
+                                  <SelectItem value="confirmado">Confirmado</SelectItem>
+                                  <SelectItem value="realizado">Realizado</SelectItem>
+                                  <SelectItem value="cancelado">Cancelado</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            {/* Botão para anexar fotos - disponível para confirmados e realizados */}
+                            {(appointment.status === 'confirmado' || appointment.status === 'realizado') && (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                className="w-full"
+                                onClick={() => {
+                                  setSelectedAppointment(appointment);
+                                  setShowResultDialog(true);
+                                }}
+                              >
+                                <Camera className="w-4 h-4 mr-2" />
+                                Anexar Foto
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
                       
@@ -743,6 +859,62 @@ const ClientManagement = () => {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para Editar Agendamento */}
+      <Dialog open={showEditAppointmentDialog} onOpenChange={setShowEditAppointmentDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Agendamento</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdateAppointment} className="space-y-4">
+            <div>
+              <Label htmlFor="appointment-date">Data</Label>
+              <Input
+                id="appointment-date"
+                type="date"
+                value={appointmentFormData.appointment_date}
+                onChange={(e) => setAppointmentFormData({...appointmentFormData, appointment_date: e.target.value})}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="appointment-time">Horário</Label>
+              <Input
+                id="appointment-time"
+                type="time"
+                value={appointmentFormData.appointment_time}
+                onChange={(e) => setAppointmentFormData({...appointmentFormData, appointment_time: e.target.value})}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="appointment-notes">Observações</Label>
+              <Textarea
+                id="appointment-notes"
+                value={appointmentFormData.notes}
+                onChange={(e) => setAppointmentFormData({...appointmentFormData, notes: e.target.value})}
+                placeholder="Observações do agendamento..."
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setShowEditAppointmentDialog(false);
+                  setEditingAppointment(null);
+                  setAppointmentFormData({ appointment_date: "", appointment_time: "", notes: "" });
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? "Salvando..." : "Salvar Alterações"}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

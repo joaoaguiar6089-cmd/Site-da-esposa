@@ -261,9 +261,12 @@ const Header = () => {
                         {item.hasDropdown ? (
                           <div className="space-y-2">
                             <button
-                              onClick={() => setExpandedMobileCategory(
-                                expandedMobileCategory === 'procedimentos' ? null : 'procedimentos'
-                              )}
+                              onClick={() => {
+                                console.log('Clicked procedimentos, current state:', expandedMobileCategory);
+                                setExpandedMobileCategory(
+                                  expandedMobileCategory === 'procedimentos' ? null : 'procedimentos'
+                                );
+                              }}
                               className="flex items-center justify-between w-full px-5 py-4 text-left bg-gradient-to-r from-white/80 to-red-50/60 text-gray-800 hover:from-red-50 hover:to-red-100/80 hover:text-red-700 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md border border-red-100/40 hover:border-red-200"
                             >
                               <span className="font-semibold text-lg">{item.name}</span>
@@ -283,9 +286,11 @@ const Header = () => {
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();
+                                            console.log('Clicked category:', category.name, 'ID:', category.id, 'Current state:', expandedMobileCategory);
                                             setExpandedMobileCategory(
                                               expandedMobileCategory === category.id ? null : category.id
                                             );
+                                            console.log('Setting state to:', expandedMobileCategory === category.id ? null : category.id);
                                           }}
                                           className="flex items-center justify-between w-full px-4 py-3 text-left bg-white/70 text-gray-700 hover:bg-red-50/80 hover:text-red-700 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md border border-white/60 hover:border-red-200"
                                         >

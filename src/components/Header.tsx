@@ -23,6 +23,9 @@ const Header = () => {
   const [showProcedimentos, setShowProcedimentos] = useState(false);
   const [expandedMobileCategory, setExpandedMobileCategory] = useState<string | null>(null);
   
+  // Detectar se estamos na página inicial
+  const isHomePage = window.location.pathname === '/';
+  
   // Refs para controlar o timeout do dropdown
   const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const submenuTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -110,7 +113,7 @@ const Header = () => {
   ];
 
   return (
-    <header className="absolute top-0 left-0 right-0 z-50 bg-transparent">
+    <header className={`absolute top-0 left-0 right-0 z-50 ${isHomePage ? 'bg-transparent' : 'bg-white/95 backdrop-blur-md shadow-lg'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           {/* Logo Elegante - Canto Esquerdo */}
@@ -119,7 +122,7 @@ const Header = () => {
               <h1 className="text-2xl font-bold bg-gradient-to-r from-red-400 to-red-600 bg-clip-text text-transparent drop-shadow-lg tracking-wide">
                 Dra. Karoline Ferreira
               </h1>
-              <p className="text-sm text-white/90 drop-shadow-md font-light tracking-wider">
+              <p className={`text-sm font-light tracking-wider ${isHomePage ? 'text-white/90 drop-shadow-md' : 'text-red-600/80'}`}>
                 Estética e Saúde Integrativa
               </p>
             </a>
@@ -136,7 +139,7 @@ const Header = () => {
               onMouseEnter={handleDropdownMouseEnter}
               onMouseLeave={handleDropdownMouseLeave}
             >
-              <button className="flex items-center space-x-1 text-white hover:text-red-300 font-medium transition-all duration-300 py-2 px-3 backdrop-blur-sm hover:backdrop-blur-md rounded-lg hover:bg-white/10">
+              <button className={`flex items-center space-x-1 font-medium transition-all duration-300 py-2 px-3 backdrop-blur-sm hover:backdrop-blur-md rounded-lg ${isHomePage ? 'text-white hover:text-red-300 hover:bg-white/10' : 'text-gray-700 hover:text-red-600 hover:bg-red-50'}`}>
                 <span className="drop-shadow-md">Procedimentos</span>
                 <ChevronDown className="w-4 h-4 drop-shadow-md" />
               </button>
@@ -201,7 +204,9 @@ const Header = () => {
             <Button
               variant="ghost"
               onClick={() => window.location.href = '/area-cliente'}
-              className="text-white hover:text-red-300 font-medium bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/30 hover:border-red-300/50 transition-all duration-300"
+              className={`font-medium backdrop-blur-sm transition-all duration-300 border ${isHomePage 
+                ? 'text-white hover:text-red-300 bg-white/10 hover:bg-white/20 border-white/30 hover:border-red-300/50' 
+                : 'text-gray-700 hover:text-red-600 bg-gray-50/50 hover:bg-red-50 border-gray-200 hover:border-red-300'}`}
             >
               <User className="w-4 h-4 mr-2" />
               Área do Cliente
@@ -229,7 +234,9 @@ const Header = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                className="lg:hidden text-white hover:text-red-300 bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/30"
+                className={`lg:hidden backdrop-blur-sm border transition-all duration-300 ${isHomePage 
+                  ? 'text-white hover:text-red-300 bg-white/10 hover:bg-white/20 border-white/30' 
+                  : 'text-gray-700 hover:text-red-600 bg-gray-50/50 hover:bg-red-50 border-gray-200'}`}
               >
                 <Menu className="h-6 w-6" />
               </Button>

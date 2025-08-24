@@ -65,7 +65,7 @@ const CategoryProcedures = () => {
     return (
       <div className="min-h-screen">
         <Header />
-        <div className="container mx-auto px-4 py-20">
+        <div className="container mx-auto px-4 py-20 pt-24">{/* pt-24 para compensar o header fixo */}
           <div className="text-center">Carregando...</div>
         </div>
         <Footer />
@@ -77,7 +77,7 @@ const CategoryProcedures = () => {
     <div className="min-h-screen">
       <Header />
       
-      <main className="py-20 bg-gradient-subtle">
+      <main className="py-20 pt-24 bg-gradient-subtle">{/* pt-24 para compensar o header fixo */}
         <div className="container mx-auto px-4">
           <div className="mb-8">
             <Link to="/">

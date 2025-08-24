@@ -85,7 +85,7 @@ const SubcategoryProcedures = () => {
     return (
       <div className="min-h-screen bg-background">
         <Header />
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-8 pt-24">{/* pt-24 para compensar o header fixo */}
           <div className="flex justify-center items-center min-h-[400px]">
             <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
           </div>
@@ -99,7 +99,7 @@ const SubcategoryProcedures = () => {
     <div className="min-h-screen bg-background">
       <Header />
       
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 pt-24">{/* pt-24 para compensar o header fixo */}
         <div className="mb-8">
           <Link to="/">
             <Button variant="outline" className="mb-4">

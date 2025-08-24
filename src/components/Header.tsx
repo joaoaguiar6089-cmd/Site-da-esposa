@@ -66,111 +66,85 @@ const Header = () => {
     <header className="absolute top-0 left-0 right-0 z-50 bg-transparent">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
-          {/* Logo Centralizada */}
-          <div className="flex-1 flex justify-start lg:justify-center">
-            <a href="/" className="flex items-center">
-              {/* Logo SVG Inline */}
-              <div className="w-12 h-12 flex items-center justify-center">
-                <svg viewBox="0 0 200 200" className="w-full h-full">
-                  {/* Silhueta da mulher em linha vermelha */}
-                  <path 
-                    d="M100 30 C85 30, 75 40, 75 55 C75 65, 80 70, 85 75 L90 80 C95 85, 100 90, 100 100 L100 120 C95 125, 90 130, 85 135 L80 140 C75 145, 70 150, 70 160 L70 170 C70 175, 75 180, 80 180 L120 180 C125 180, 130 175, 130 170 L130 160 C130 150, 125 145, 120 140 L115 135 C110 130, 105 125, 100 120 L100 100 C100 90, 105 85, 110 80 L115 75 C120 70, 125 65, 125 55 C125 40, 115 30, 100 30 Z" 
-                    fill="none" 
-                    stroke="#dc2626" 
-                    strokeWidth="2" 
-                    className="drop-shadow-sm"
-                  />
-                  {/* Linha decorativa na base */}
-                  <path 
-                    d="M60 180 Q100 185 140 180" 
-                    fill="none" 
-                    stroke="#dc2626" 
-                    strokeWidth="2"
-                    className="drop-shadow-sm"
-                  />
-                </svg>
-              </div>
+          {/* Logo Elegante - Canto Esquerdo */}
+          <div className="flex-shrink-0">
+            <a href="/" className="flex flex-col">
+              <h1 className="text-2xl font-bold text-white drop-shadow-lg tracking-wide">
+                Dra. Karoline Ferreira
+              </h1>
+              <p className="text-sm text-white/90 drop-shadow-md font-light tracking-wider">
+                Estética e Saúde Integrativa
+              </p>
             </a>
           </div>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center space-x-8 absolute left-1/2 transform -translate-x-1/2">
-            {navItems.map((item) => (
-              <div key={item.name} className="relative group">
-                {item.hasDropdown ? (
-                  <div 
-                    className="relative"
-                    onMouseEnter={() => setShowProcedimentos(true)}
-                    onMouseLeave={() => {
-                      setShowProcedimentos(false);
-                      setActiveCategory(null);
-                    }}
-                  >
-                    <button className="flex items-center space-x-1 text-white hover:text-red-300 font-medium transition-all duration-300 py-2 px-1 backdrop-blur-sm hover:backdrop-blur-md">
-                      <span className="drop-shadow-md">{item.name}</span>
-                      <ChevronDown className="w-4 h-4 drop-shadow-md" />
-                    </button>
-                    
-                    {/* Dropdown Menu */}
-                    {showProcedimentos && (
-                      <div className="absolute top-full left-0 w-80 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-4 mt-2">
-                        {categories.map((category) => (
-                          <div 
-                            key={category.id}
-                            className="relative"
-                            onMouseEnter={() => setActiveCategory(category.id)}
-                          >
+          {/* Spacer para empurrar navegação para direita */}
+          <div className="flex-1"></div>
+
+          {/* Desktop Navigation - Canto Direito */}
+          <div className="hidden lg:flex items-center space-x-6">
+            {/* Menu Procedimentos */}
+            <div 
+              className="relative"
+              onMouseEnter={() => setShowProcedimentos(true)}
+              onMouseLeave={() => {
+                setShowProcedimentos(false);
+                setActiveCategory(null);
+              }}
+            >
+              <button className="flex items-center space-x-1 text-white hover:text-red-300 font-medium transition-all duration-300 py-2 px-3 backdrop-blur-sm hover:backdrop-blur-md rounded-lg hover:bg-white/10">
+                <span className="drop-shadow-md">Procedimentos</span>
+                <ChevronDown className="w-4 h-4 drop-shadow-md" />
+              </button>
+              
+              {/* Dropdown Menu */}
+              {showProcedimentos && (
+                <div className="absolute top-full right-0 w-80 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-4 mt-2">
+                  {categories.map((category) => (
+                    <div 
+                      key={category.id}
+                      className="relative"
+                      onMouseEnter={() => setActiveCategory(category.id)}
+                    >
+                      <a
+                        href={`/categoria/${category.id}`}
+                        className="flex items-center justify-between px-6 py-3 text-gray-700 hover:bg-red-50/80 hover:text-red-600 transition-all duration-300 group"
+                      >
+                        <span className="font-medium">{category.name}</span>
+                        {category.subcategories && category.subcategories.length > 0 && (
+                          <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
+                        )}
+                      </a>
+                      
+                      {/* Subcategories Submenu */}
+                      {activeCategory === category.id && category.subcategories && category.subcategories.length > 0 && (
+                        <div className="absolute right-full top-0 w-72 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-3 mr-2">
+                          {category.subcategories.map((subcategory) => (
+                            <a
+                              key={subcategory.id}
+                              href={`/subcategoria/${subcategory.id}`}
+                              className="block px-6 py-2 text-gray-600 hover:bg-red-50/80 hover:text-red-600 transition-all duration-300 hover:translate-x-2"
+                            >
+                              {subcategory.name}
+                            </a>
+                          ))}
+                          <div className="border-t border-gray-100 mt-2 pt-2">
                             <a
                               href={`/categoria/${category.id}`}
-                              className="flex items-center justify-between px-6 py-3 text-gray-700 hover:bg-red-50/80 hover:text-red-600 transition-all duration-300 group"
+                              className="block px-6 py-2 text-red-600 font-medium hover:bg-red-50/80 transition-all duration-300 hover:translate-x-2"
                             >
-                              <span className="font-medium">{category.name}</span>
-                              {category.subcategories && category.subcategories.length > 0 && (
-                                <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-                              )}
+                              Ver todos os procedimentos
                             </a>
-                            
-                            {/* Subcategories Submenu */}
-                            {activeCategory === category.id && category.subcategories && category.subcategories.length > 0 && (
-                              <div className="absolute left-full top-0 w-72 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-3 ml-2">
-                                {category.subcategories.map((subcategory) => (
-                                  <a
-                                    key={subcategory.id}
-                                    href={`/subcategoria/${subcategory.id}`}
-                                    className="block px-6 py-2 text-gray-600 hover:bg-red-50/80 hover:text-red-600 transition-all duration-300 hover:translate-x-2"
-                                  >
-                                    {subcategory.name}
-                                  </a>
-                                ))}
-                                <div className="border-t border-gray-100 mt-2 pt-2">
-                                  <a
-                                    href={`/categoria/${category.id}`}
-                                    className="block px-6 py-2 text-red-600 font-medium hover:bg-red-50/80 transition-all duration-300 hover:translate-x-2"
-                                  >
-                                    Ver todos os procedimentos
-                                  </a>
-                                </div>
-                              </div>
-                            )}
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <a
-                    href={item.href}
-                    className="text-white hover:text-red-300 font-medium transition-all duration-300 py-2 px-1 backdrop-blur-sm hover:backdrop-blur-md drop-shadow-md hover:drop-shadow-lg"
-                  >
-                    {item.name}
-                  </a>
-                )}
-              </div>
-            ))}
-          </nav>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-          {/* Right Side Actions */}
-          <div className="hidden lg:flex items-center space-x-3 flex-1 justify-end">
+            {/* Botões de Ação */}
             <Button
               variant="ghost"
               onClick={() => window.location.href = '/agendamento'}
@@ -211,26 +185,13 @@ const Header = () => {
               <div className="flex flex-col h-full">
                 {/* Mobile Header */}
                 <div className="p-6 border-b border-gray-200/50">
-                  <a href="/" className="flex items-center space-x-3" onClick={() => setIsOpen(false)}>
-                    <div className="w-10 h-10 flex items-center justify-center">
-                      <svg viewBox="0 0 200 200" className="w-full h-full">
-                        <path 
-                          d="M100 30 C85 30, 75 40, 75 55 C75 65, 80 70, 85 75 L90 80 C95 85, 100 90, 100 100 L100 120 C95 125, 90 130, 85 135 L80 140 C75 145, 70 150, 70 160 L70 170 C70 175, 75 180, 80 180 L120 180 C125 180, 130 175, 130 170 L130 160 C130 150, 125 145, 120 140 L115 135 C110 130, 105 125, 100 120 L100 100 C100 90, 105 85, 110 80 L115 75 C120 70, 125 65, 125 55 C125 40, 115 30, 100 30 Z" 
-                          fill="none" 
-                          stroke="#dc2626" 
-                          strokeWidth="2"
-                        />
-                        <path 
-                          d="M60 180 Q100 185 140 180" 
-                          fill="none" 
-                          stroke="#dc2626" 
-                          strokeWidth="2"
-                        />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-sm text-red-600 font-bold">Estética e Saúde Integrativa</p>
-                    </div>
+                  <a href="/" className="flex flex-col" onClick={() => setIsOpen(false)}>
+                    <h1 className="text-lg font-bold text-gray-800 tracking-wide">
+                      Dra. Karoline Ferreira
+                    </h1>
+                    <p className="text-xs text-red-600 font-light tracking-wider">
+                      Estética e Saúde Integrativa
+                    </p>
                   </a>
                 </div>
 

@@ -116,7 +116,7 @@ const Header = () => {
           {/* Logo Elegante - Canto Esquerdo */}
           <div className="flex-shrink-0">
             <a href="/" className="flex flex-col">
-              <h1 className="text-2xl font-bold text-white drop-shadow-lg tracking-wide">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-red-400 to-red-600 bg-clip-text text-transparent drop-shadow-lg tracking-wide">
                 Dra. Karoline Ferreira
               </h1>
               <p className="text-sm text-white/90 drop-shadow-md font-light tracking-wider">
@@ -235,41 +235,47 @@ const Header = () => {
               </Button>
             </SheetTrigger>
             
-            <SheetContent side="left" className="w-80 p-0 bg-white/95 backdrop-blur-md">
-              <div className="flex flex-col h-full">
+            <SheetContent side="left" className="w-80 p-0 bg-gradient-to-br from-white via-red-50/20 to-red-100/30 backdrop-blur-md border-r border-red-100/50">
+              <div className="flex flex-col h-full relative overflow-hidden">
+                {/* Elegant background pattern */}
+                <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 via-transparent to-red-600/10 pointer-events-none"></div>
+                <div className="absolute top-0 right-0 w-32 h-32 bg-red-200/20 rounded-full blur-3xl pointer-events-none transform translate-x-16 -translate-y-16"></div>
+                
                 {/* Mobile Header */}
-                <div className="p-6 border-b border-gray-200/50">
+                <div className="p-6 border-b border-red-100/60 bg-gradient-to-r from-white/80 to-red-50/40 backdrop-blur-sm relative z-10">
                   <a href="/" className="flex flex-col" onClick={() => setIsOpen(false)}>
-                    <h1 className="text-lg font-bold text-gray-800 tracking-wide">
+                    <h1 className="text-xl font-bold text-gray-800 tracking-wide bg-gradient-to-r from-red-700 to-red-600 bg-clip-text text-transparent">
                       Dra. Karoline Ferreira
                     </h1>
-                    <p className="text-xs text-red-600 font-light tracking-wider">
+                    <p className="text-sm text-red-600/80 font-medium tracking-wider">
                       Estética e Saúde Integrativa
                     </p>
                   </a>
                 </div>
 
                 {/* Mobile Navigation */}
-                <div className="flex-1 overflow-y-auto py-6">
-                  <nav className="space-y-1 px-6">
+                <div className="flex-1 overflow-y-auto py-6 relative z-10">
+                  <nav className="space-y-2 px-6">
                     {navItems.map((item) => (
                       <div key={item.name}>
                         {item.hasDropdown ? (
-                          <div className="space-y-1">
+                          <div className="space-y-2">
                             <button
                               onClick={() => setExpandedMobileCategory(
                                 expandedMobileCategory === 'procedimentos' ? null : 'procedimentos'
                               )}
-                              className="flex items-center justify-between w-full px-4 py-3 text-left text-gray-700 hover:bg-red-50/80 hover:text-red-600 rounded-xl transition-all duration-300"
+                              className="flex items-center justify-between w-full px-5 py-4 text-left bg-gradient-to-r from-white/80 to-red-50/60 text-gray-800 hover:from-red-50 hover:to-red-100/80 hover:text-red-700 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md border border-red-100/40 hover:border-red-200"
                             >
-                              <span className="font-medium">{item.name}</span>
-                              <ChevronDown className={`w-4 h-4 transform transition-all duration-300 ${
-                                expandedMobileCategory === 'procedimentos' ? 'rotate-180' : ''
-                              }`} />
+                              <span className="font-semibold text-lg">{item.name}</span>
+                              <div className="p-1 rounded-full bg-red-100/50">
+                                <ChevronDown className={`w-4 h-4 transform transition-all duration-300 text-red-600 ${
+                                  expandedMobileCategory === 'procedimentos' ? 'rotate-180' : ''
+                                }`} />
+                              </div>
                             </button>
                             
                             {expandedMobileCategory === 'procedimentos' && (
-                              <div className="ml-4 space-y-1 animate-in slide-in-from-left duration-300">
+                              <div className="ml-3 space-y-2 animate-in slide-in-from-left duration-300 border-l-3 border-red-200/60 pl-4 bg-gradient-to-r from-white/40 to-transparent rounded-r-xl py-3">
                                 {categories.map((category) => (
                                   <div key={category.id} className="space-y-1">
                                     {category.subcategories && category.subcategories.length > 0 ? (
@@ -281,13 +287,48 @@ const Header = () => {
                                               expandedMobileCategory === category.id ? 'procedimentos' : category.id
                                             );
                                           }}
-                                          className="flex items-center justify-between w-full px-4 py-2 text-left text-gray-600 hover:bg-gray-50/80 hover:text-red-600 rounded-lg transition-all duration-300"
+                                          className="flex items-center justify-between w-full px-4 py-3 text-left bg-white/70 text-gray-700 hover:bg-red-50/80 hover:text-red-700 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md border border-white/60 hover:border-red-200"
                                         >
-                                          <span>{category.name}</span>
-                                          <ChevronRight className={`w-3 h-3 transform transition-all duration-300 ${
-                                            expandedMobileCategory === category.id ? 'rotate-90' : ''
-                                          }`} />
+                                          <span className="font-medium">{category.name}</span>
+                                          <div className="p-1 rounded-full bg-red-50">
+                                            <ChevronRight className={`w-3 h-3 transform transition-all duration-300 text-red-500 ${
+                                              expandedMobileCategory === category.id ? 'rotate-90' : ''
+                                            }`} />
+                                          </div>
                                         </button>
+                                        
+                                        {/* Subcategories */}
+                                        {expandedMobileCategory === category.id && (
+                                          <div className="ml-3 mt-2 space-y-1 animate-in slide-in-from-left duration-300 border-l-2 border-red-200/60 pl-3 bg-gradient-to-r from-red-50/30 to-transparent rounded-r-lg py-2">
+                                            <a
+                                              href={`/categoria/${category.id}`}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setIsOpen(false);
+                                                window.location.href = `/categoria/${category.id}`;
+                                              }}
+                                              className="flex items-center px-4 py-2 text-sm bg-gradient-to-r from-red-600 to-red-500 text-white font-semibold hover:from-red-700 hover:to-red-600 rounded-lg transition-all duration-300 hover:scale-[1.02] shadow-sm hover:shadow-lg"
+                                            >
+                                              <span className="mr-2">📋</span>
+                                              Todos os procedimentos
+                                            </a>
+                                            {category.subcategories.map((subcategory) => (
+                                              <a
+                                                key={subcategory.id}
+                                                href={`/subcategoria/${subcategory.id}`}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setIsOpen(false);
+                                                  window.location.href = `/subcategoria/${subcategory.id}`;
+                                                }}
+                                                className="block px-4 py-2 text-sm bg-white/80 text-gray-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/80 hover:border-red-200"
+                                              >
+                                                <span className="mr-2">•</span>
+                                                {subcategory.name}
+                                              </a>
+                                            ))}
+                                          </div>
+                                        )}
                                       </div>
                                     ) : (
                                       <a
@@ -297,39 +338,10 @@ const Header = () => {
                                           setIsOpen(false);
                                           window.location.href = `/categoria/${category.id}`;
                                         }}
-                                        className="block px-4 py-2 text-left text-gray-600 hover:bg-gray-50/80 hover:text-red-600 rounded-lg transition-all duration-300"
+                                        className="block px-4 py-3 text-left bg-white/70 text-gray-700 hover:bg-red-50/80 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/60 hover:border-red-200"
                                       >
-                                        <span>{category.name}</span>
+                                        <span className="font-medium">{category.name}</span>
                                       </a>
-                                    )}
-                                    {expandedMobileCategory === category.id && category.subcategories && category.subcategories.length > 0 && (
-                                      <div className="ml-4 space-y-1 animate-in slide-in-from-left duration-300 border-l-2 border-red-100 pl-4">
-                                        <a
-                                          href={`/categoria/${category.id}`}
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setIsOpen(false);
-                                            window.location.href = `/categoria/${category.id}`;
-                                          }}
-                                          className="block px-4 py-2 text-sm text-red-600 font-semibold hover:bg-red-50/80 rounded-lg transition-all duration-300 hover:translate-x-1 border border-red-200 bg-red-50/50"
-                                        >
-                                          📋 Todos os procedimentos
-                                        </a>
-                                        {category.subcategories.map((subcategory) => (
-                                          <a
-                                            key={subcategory.id}
-                                            href={`/subcategoria/${subcategory.id}`}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setIsOpen(false);
-                                              window.location.href = `/subcategoria/${subcategory.id}`;
-                                            }}
-                                            className="block px-4 py-2 text-sm text-gray-500 hover:bg-red-50/80 hover:text-red-600 rounded-lg transition-all duration-300 hover:translate-x-1"
-                                          >
-                                            {subcategory.name}
-                                          </a>
-                                        ))}
-                                      </div>
                                     )}
                                   </div>
                                 ))}
@@ -340,7 +352,7 @@ const Header = () => {
                           <a
                             href={item.href}
                             onClick={() => setIsOpen(false)}
-                            className="block px-4 py-3 text-gray-700 hover:bg-red-50/80 hover:text-red-600 rounded-xl transition-all duration-300 font-medium hover:translate-x-1"
+                            className="block px-5 py-4 bg-gradient-to-r from-white/80 to-red-50/60 text-gray-800 hover:from-red-50 hover:to-red-100/80 hover:text-red-700 rounded-xl transition-all duration-300 font-semibold hover:translate-x-1 shadow-sm hover:shadow-md border border-red-100/40 hover:border-red-200"
                           >
                             {item.name}
                           </a>
@@ -351,7 +363,7 @@ const Header = () => {
                 </div>
 
                 {/* Mobile Footer Actions */}
-                <div className="border-t border-gray-200/50 p-6 space-y-3">
+                <div className="border-t border-red-100/60 bg-gradient-to-r from-white/90 to-red-50/50 backdrop-blur-sm p-6 space-y-4 relative z-10">
                     <Button 
                       variant="outline" 
                       className="w-full justify-center hover:bg-red-50/80 hover:border-red-600 hover:text-red-600 transition-all duration-300"

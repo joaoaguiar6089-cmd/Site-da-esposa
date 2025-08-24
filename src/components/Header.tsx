@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, Instagram, ChevronDown, ChevronRight, User } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Category {
@@ -17,6 +18,7 @@ interface Subcategory {
 }
 
 const Header = () => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -112,14 +114,14 @@ const Header = () => {
         <div className="flex items-center justify-between h-20">
           {/* Logo Elegante - Canto Esquerdo */}
           <div className="flex-shrink-0">
-            <a href="/" className="flex flex-col">
+            <Link to="/" className="flex flex-col">
               <h1 className="text-2xl font-bold text-white drop-shadow-lg tracking-wide">
                 Dra. Karoline Ferreira
               </h1>
               <p className="text-sm text-white/90 drop-shadow-md font-light tracking-wider">
                 Estética e Saúde Integrativa
               </p>
-            </a>
+            </Link>
           </div>
 
           {/* Spacer para empurrar navegação para direita */}
@@ -152,15 +154,15 @@ const Header = () => {
                       onMouseEnter={() => handleSubmenuMouseEnter(category.id)}
                       onMouseLeave={handleSubmenuMouseLeave}
                     >
-                      <a
-                        href={`/categoria/${category.id}`}
+                      <Link
+                        to={`/categoria/${category.id}`}
                         className="flex items-center justify-between px-6 py-3 text-gray-700 hover:bg-red-50/80 hover:text-red-600 transition-all duration-300 group"
                       >
                         <span className="font-medium">{category.name}</span>
                         {category.subcategories && category.subcategories.length > 0 && (
                           <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
                         )}
-                      </a>
+                      </Link>
                       
                       {/* Subcategories Submenu */}
                       {activeCategory === category.id && category.subcategories && category.subcategories.length > 0 && (
@@ -170,21 +172,21 @@ const Header = () => {
                           onMouseLeave={handleSubmenuMouseLeave}
                         >
                           {category.subcategories.map((subcategory) => (
-                            <a
+                            <Link
                               key={subcategory.id}
-                              href={`/subcategoria/${subcategory.id}`}
+                              to={`/subcategoria/${subcategory.id}`}
                               className="block px-6 py-2 text-gray-600 hover:bg-red-50/80 hover:text-red-600 transition-all duration-300 hover:translate-x-2"
                             >
                               {subcategory.name}
-                            </a>
+                            </Link>
                           ))}
                           <div className="border-t border-gray-100 mt-2 pt-2">
-                            <a
-                              href={`/categoria/${category.id}`}
+                            <Link
+                              to={`/categoria/${category.id}`}
                               className="block px-6 py-2 text-red-600 font-medium hover:bg-red-50/80 transition-all duration-300 hover:translate-x-2"
                             >
                               Ver todos os procedimentos
-                            </a>
+                            </Link>
                           </div>
                         </div>
                       )}
@@ -197,7 +199,7 @@ const Header = () => {
             {/* Botões de Ação */}
             <Button
               variant="ghost"
-              onClick={() => window.location.href = '/area-cliente'}
+              onClick={() => navigate('/area-cliente')}
               className="text-white hover:text-red-300 font-medium bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/30 hover:border-red-300/50 transition-all duration-300"
             >
               <User className="w-4 h-4 mr-2" />
@@ -236,14 +238,14 @@ const Header = () => {
               <div className="flex flex-col h-full">
                 {/* Mobile Header */}
                 <div className="p-6 border-b border-gray-200/50">
-                  <a href="/" className="flex flex-col" onClick={() => setIsOpen(false)}>
+                  <Link to="/" className="flex flex-col" onClick={() => setIsOpen(false)}>
                     <h1 className="text-lg font-bold text-gray-800 tracking-wide">
                       Dra. Karoline Ferreira
                     </h1>
                     <p className="text-xs text-red-600 font-light tracking-wider">
                       Estética e Saúde Integrativa
                     </p>
-                  </a>
+                  </Link>
                 </div>
 
                 {/* Mobile Navigation */}
@@ -269,14 +271,14 @@ const Header = () => {
                               <div className="ml-4 space-y-1 animate-in slide-in-from-left duration-300">
                                 {categories.map((category) => (
                                   <div key={category.id} className="space-y-1">
-                                    <div className="flex items-center">
-                                      <a
-                                        href={`/categoria/${category.id}`}
-                                        onClick={() => setIsOpen(false)}
-                                        className="flex-1 px-4 py-2 text-left text-gray-600 hover:bg-gray-50/80 hover:text-red-600 rounded-lg transition-all duration-300"
-                                      >
-                                        <span>{category.name}</span>
-                                      </a>
+                                     <div className="flex items-center">
+                                       <Link
+                                         to={`/categoria/${category.id}`}
+                                         onClick={() => setIsOpen(false)}
+                                         className="flex-1 px-4 py-2 text-left text-gray-600 hover:bg-gray-50/80 hover:text-red-600 rounded-lg transition-all duration-300"
+                                       >
+                                         <span>{category.name}</span>
+                                       </Link>
                                       {category.subcategories && category.subcategories.length > 0 && (
                                         <button
                                           onClick={() => setExpandedMobileCategory(
@@ -292,25 +294,25 @@ const Header = () => {
                                     </div>
                                     
                                     {expandedMobileCategory === category.id && category.subcategories && category.subcategories.length > 0 && (
-                                      <div className="ml-4 space-y-1 animate-in slide-in-from-left duration-300">
-                                        {category.subcategories.map((subcategory) => (
-                                          <a
-                                            key={subcategory.id}
-                                            href={`/subcategoria/${subcategory.id}`}
-                                            onClick={() => setIsOpen(false)}
-                                            className="block px-4 py-2 text-sm text-gray-500 hover:bg-red-50/80 hover:text-red-600 rounded-lg transition-all duration-300 hover:translate-x-1"
-                                          >
-                                            {subcategory.name}
-                                          </a>
-                                        ))}
-                                        <a
-                                          href={`/categoria/${category.id}`}
-                                          onClick={() => setIsOpen(false)}
-                                          className="block px-4 py-2 text-sm text-red-600 font-medium hover:bg-red-50/80 rounded-lg transition-all duration-300 hover:translate-x-1"
-                                        >
-                                          Ver todos os procedimentos
-                                        </a>
-                                      </div>
+                                       <div className="ml-4 space-y-1 animate-in slide-in-from-left duration-300">
+                                         {category.subcategories.map((subcategory) => (
+                                           <Link
+                                             key={subcategory.id}
+                                             to={`/subcategoria/${subcategory.id}`}
+                                             onClick={() => setIsOpen(false)}
+                                             className="block px-4 py-2 text-sm text-gray-500 hover:bg-red-50/80 hover:text-red-600 rounded-lg transition-all duration-300 hover:translate-x-1"
+                                           >
+                                             {subcategory.name}
+                                           </Link>
+                                         ))}
+                                         <Link
+                                           to={`/categoria/${category.id}`}
+                                           onClick={() => setIsOpen(false)}
+                                           className="block px-4 py-2 text-sm text-red-600 font-medium hover:bg-red-50/80 rounded-lg transition-all duration-300 hover:translate-x-1"
+                                         >
+                                           Ver todos os procedimentos
+                                         </Link>
+                                       </div>
                                     )}
                                   </div>
                                 ))}
@@ -318,13 +320,13 @@ const Header = () => {
                             )}
                           </div>
                         ) : (
-                          <a
-                            href={item.href}
+                          <Link
+                            to={item.href}
                             onClick={() => setIsOpen(false)}
                             className="block px-4 py-3 text-gray-700 hover:bg-red-50/80 hover:text-red-600 rounded-xl transition-all duration-300 font-medium hover:translate-x-1"
                           >
                             {item.name}
-                          </a>
+                          </Link>
                         )}
                       </div>
                     ))}
@@ -337,7 +339,7 @@ const Header = () => {
                     variant="outline" 
                     className="w-full justify-center hover:bg-red-50/80 hover:border-red-600 hover:text-red-600 transition-all duration-300"
                     onClick={() => {
-                      window.location.href = '/area-cliente';
+                      navigate('/area-cliente');
                       setIsOpen(false);
                     }}
                   >

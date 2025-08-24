@@ -1,17 +1,17 @@
 import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "@/hooks/use-toast";
+import { Search, User, Calendar, Phone, Edit, Plus, ImageIcon, Download, Settings, X, Trash2, MessageCircle, Camera, Eye } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { supabase } from "@/integrations/supabase/client";
-import { User, Calendar, Plus, Edit, Camera, Settings, MessageCircle, Eye, Download } from "lucide-react";
 import { formatCPF, cleanCPF, isValidCPF } from "@/utils/cpfValidator";
 
 interface Client {
@@ -69,6 +69,7 @@ const ClientManagement = () => {
   const [showStatusDialog, setShowStatusDialog] = useState(false);
   const [showEditAppointmentDialog, setShowEditAppointmentDialog] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [appointmentFormData, setAppointmentFormData] = useState({
     appointment_date: "",
     appointment_time: "",
@@ -84,13 +85,71 @@ const ClientManagement = () => {
     cidade: ""
   });
 
-  
+  const { toast } = useToast();
 
   useEffect(() => {
     loadClients();
     loadAppointments();
     loadProcedureResults();
   }, []);
+
+  
+
+  // Função para fazer download da imagem
+  const downloadImage = async (imageUrl: string, fileName: string) => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName || 'resultado-procedimento.jpg';
+      document.body.appendChild(link);
+      link.click();
+      
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Erro ao fazer download:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao fazer download da imagem.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Função para excluir resultado
+  const deleteResult = async (resultId: string) => {
+    if (!confirm('Tem certeza que deseja excluir este resultado?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('procedure_results')
+        .delete()
+        .eq('id', resultId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Resultado excluído",
+        description: "O resultado do procedimento foi excluído com sucesso.",
+      });
+
+      loadProcedureResults(); // Recarregar lista
+      if (selectedClient) {
+        loadClients(); // Recarregar detalhes
+      }
+    } catch (error) {
+      console.error('Erro ao excluir resultado:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir resultado.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const loadClients = async () => {
     try {
@@ -640,39 +699,38 @@ const ClientManagement = () => {
                           <h5 className="text-sm font-semibold">Resultados:</h5>
                           {results.map((result) => (
                             <div key={result.id} className="flex items-center gap-2 p-2 bg-muted rounded">
-                              <div className="relative group">
-                                <img 
-                                  src={result.image_url} 
-                                  alt="Resultado" 
-                                  className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-75 transition-opacity"
-                                  onClick={() => window.open(result.image_url, '_blank')}
-                                />
-                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                  <Eye className="w-4 h-4 text-white" />
-                                </div>
-                              </div>
+                              <img
+                                src={result.image_url}
+                                alt="Resultado do procedimento"
+                                className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80"
+                                onClick={() => setPreviewImage(result.image_url)}
+                              />
                               <div className="flex-1">
                                 <p className="text-sm">{result.description || "Sem descrição"}</p>
                                 <p className="text-xs text-muted-foreground">
                                   {format(new Date(result.created_at), "dd/MM/yyyy 'às' HH:mm")}
                                 </p>
                               </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  const link = document.createElement('a');
-                                  link.href = result.image_url;
-                                  link.download = `resultado_${result.id}.jpg`;
-                                  document.body.appendChild(link);
-                                  link.click();
-                                  document.body.removeChild(link);
-                                }}
-                                className="shrink-0"
-                              >
-                                <Download className="w-3 h-3 mr-1" />
-                                Download
-                              </Button>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => downloadImage(result.image_url, `resultado-${result.id}.jpg`)}
+                                  className="h-8 w-8 p-0"
+                                  title="Baixar imagem"
+                                >
+                                  <Download className="w-3 h-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => deleteResult(result.id)}
+                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                  title="Excluir resultado"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -937,6 +995,34 @@ const ClientManagement = () => {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de pré-visualização de imagem */}
+      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle>Resultado do Procedimento</DialogTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPreviewImage(null)}
+                className="h-6 w-6 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+          {previewImage && (
+            <div className="flex justify-center">
+              <img
+                src={previewImage}
+                alt="Visualização do resultado"
+                className="max-w-full max-h-96 object-contain rounded border"
+              />
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

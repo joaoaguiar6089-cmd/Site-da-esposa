@@ -1,49 +1,36 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Calendar, Clock, User, Phone, Trash2, Search, MessageCircle, Filter } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar, Clock, User, Phone, Edit, Trash2, Search, MessageSquare, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-
-interface Professional {
-  id: string;
-  name: string;
-}
+import { format, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import AgendamentoForm from "@/components/agendamento/AgendamentoForm";
 
 interface Appointment {
   id: string;
   appointment_date: string;
   appointment_time: string;
   status: string;
-  notes: string;
-  professional_id: string | null;
-  client: {
+  notes?: string;
+  clients: {
+    id: string;
     nome: string;
     sobrenome: string;
-    cpf: string;
     celular: string;
+    cpf: string;
   };
-  procedure: {
+  procedures: {
     name: string;
-    price: number;
     duration: number;
+    price: number;
   };
-  professional?: {
-    id: string;
+  professionals?: {
     name: string;
   } | null;
 }
@@ -51,43 +38,49 @@ interface Appointment {
 const AppointmentsList = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [filteredAppointments, setFilteredAppointments] = useState<Appointment[]>([]);
-  const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('todos');
-  const [dateFilter, setDateFilter] = useState('todos');
-  const [professionalFilter, setProfessionalFilter] = useState('todos');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sendReminder, setSendReminder] = useState(false);
-  const [pendingStatusUpdate, setPendingStatusUpdate] = useState<{appointmentId: string, newStatus: string, appointment: Appointment} | null>(null);
-  const itemsPerPage = 6;
-  const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("todos");
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<string | null>(null);
+  const [showEditForm, setShowEditForm] = useState(false);
   const { toast } = useToast();
 
+  // Carregar todos os agendamentos
   const loadAppointments = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('appointments')
         .select(`
-          *,
-          clients!appointments_client_id_fkey(nome, sobrenome, cpf, celular),
-          procedures!appointments_procedure_id_fkey(name, price, duration),
-          professionals(id, name)
+          id,
+          appointment_date,
+          appointment_time,
+          status,
+          notes,
+          clients (
+            id,
+            nome,
+            sobrenome,
+            celular,
+            cpf
+          ),
+          procedures (
+            name,
+            duration,
+            price
+          ),
+          professionals (
+            name
+          )
         `)
-        .order('appointment_date', { ascending: true })
-        .order('appointment_time', { ascending: true });
+        .order('appointment_date')
+        .order('appointment_time');
 
       if (error) throw error;
 
-      const formattedData = data?.map(apt => ({
-        ...apt,
-        client: apt.clients,
-        procedure: apt.procedures,
-        professional: apt.professionals
-      })) || [];
-      
-      setAppointments(formattedData);
-      setFilteredAppointments(formattedData);
+      setAppointments(data || []);
     } catch (error) {
       console.error('Erro ao carregar agendamentos:', error);
       toast({
@@ -100,248 +93,216 @@ const AppointmentsList = () => {
     }
   };
 
-  const loadProfessionals = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('professionals')
-        .select('id, name')
-        .order('name');
-
-      if (error) throw error;
-      setProfessionals(data || []);
-    } catch (error) {
-      console.error('Erro ao carregar profissionais:', error);
-    }
-  };
-
+  // Filtrar agendamentos
   useEffect(() => {
-    loadAppointments();
-    loadProfessionals();
-  }, []);
-
-  useEffect(() => {
-    filterAppointments();
-  }, [statusFilter, dateFilter, professionalFilter, searchTerm, appointments]);
-
-  const filterAppointments = () => {
     let filtered = [...appointments];
 
-    // Filtro por status
-    if (statusFilter !== 'todos') {
+    if (statusFilter !== "todos") {
       filtered = filtered.filter(apt => apt.status === statusFilter);
     }
 
-    // Filtro por profissional
-    if (professionalFilter !== 'todos') {
-      if (professionalFilter === 'sem_profissional') {
-        filtered = filtered.filter(apt => !apt.professional_id);
-      } else {
-        filtered = filtered.filter(apt => apt.professional_id === professionalFilter);
-      }
-    }
-
-    // Filtro por data
-    const today = new Date().toISOString().split('T')[0];
-    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    
-    if (dateFilter === 'hoje') {
-      filtered = filtered.filter(apt => apt.appointment_date === today);
-    } else if (dateFilter === 'amanha') {
-      filtered = filtered.filter(apt => apt.appointment_date === tomorrow);
-    } else if (dateFilter === 'semana') {
-      const weekFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      filtered = filtered.filter(apt => apt.appointment_date >= today && apt.appointment_date <= weekFromNow);
-    }
-
-    // Filtro por busca
     if (searchTerm) {
       filtered = filtered.filter(apt => 
-        apt.client.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        apt.client.sobrenome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        apt.client.cpf.includes(searchTerm) ||
-        apt.client.celular.includes(searchTerm) ||
-        apt.procedure.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (apt.professional?.name && apt.professional.name.toLowerCase().includes(searchTerm.toLowerCase()))
+        apt.clients.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        apt.clients.sobrenome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        apt.clients.cpf.includes(searchTerm) ||
+        apt.clients.celular.includes(searchTerm) ||
+        apt.procedures.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
     setFilteredAppointments(filtered);
-    setCurrentPage(1);
+  }, [appointments, statusFilter, searchTerm]);
+
+  useEffect(() => {
+    loadAppointments();
+  }, []);
+
+  // Abrir detalhes do agendamento
+  const handleAppointmentClick = (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setDialogOpen(true);
   };
 
-  const handleStatusChange = (appointmentId: string, newStatus: string) => {
-    const appointment = appointments.find(apt => apt.id === appointmentId);
-    if (appointment) {
-      setPendingStatusUpdate({ appointmentId, newStatus, appointment });
+  // Abrir formulário de edição
+  const handleEditAppointment = () => {
+    if (selectedAppointment) {
+      setEditingAppointment(selectedAppointment.id);
+      setShowEditForm(true);
+      setDialogOpen(false);
     }
   };
 
-  const confirmStatusUpdate = async () => {
-    if (!pendingStatusUpdate) return;
+  // Fechar formulário de edição e voltar à lista
+  const handleCloseEditForm = () => {
+    setShowEditForm(false);
+    setEditingAppointment(null);
+    setSelectedAppointment(null);
+    loadAppointments(); // Recarregar dados após edição
+  };
 
+  // Callback para quando agendamento for atualizado
+  const handleAppointmentUpdated = () => {
+    toast({
+      title: "Agendamento atualizado",
+      description: "O agendamento foi atualizado com sucesso.",
+    });
+    handleCloseEditForm();
+  };
+
+  // Atualizar status do agendamento
+  const updateAppointmentStatus = async (id: string, newStatus: string) => {
     try {
       const { error } = await supabase
         .from('appointments')
-        .update({ status: pendingStatusUpdate.newStatus })
-        .eq('id', pendingStatusUpdate.appointmentId);
+        .update({ status: newStatus })
+        .eq('id', id);
 
       if (error) throw error;
 
-      // Enviar lembrete se solicitado
-      if (sendReminder) {
-        const appointment = pendingStatusUpdate.appointment;
-        const appointmentDetails = `📅 Data: ${new Date(appointment.appointment_date).toLocaleDateString('pt-BR')}\n⏰ Horário: ${appointment.appointment_time}\n💉 Procedimento: ${appointment.procedure.name}\n${appointment.professional ? `👩‍⚕️ Profissional: ${appointment.professional.name}` : ''}`;
-        sendWhatsApp(appointment.client.celular, appointment.client.nome, appointmentDetails);
-      }
-
       toast({
         title: "Status atualizado",
-        description: "Status do agendamento foi atualizado com sucesso.",
+        description: "Status do agendamento atualizado com sucesso.",
       });
 
       loadAppointments();
+      setDialogOpen(false);
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
       toast({
         title: "Erro",
-        description: "Erro ao atualizar status.",
+        description: "Erro ao atualizar status do agendamento.",
         variant: "destructive",
       });
-    } finally {
-      setPendingStatusUpdate(null);
-      setSendReminder(false);
     }
   };
 
-  const handleEditAppointment = (appointment: Appointment) => {
-    // Instead of redirecting to the public page, we'll use the admin calendar edit functionality
-    // For now, we'll show a toast message directing to the calendar section
-    toast({
-      title: "Redirecionando...",
-      description: "Use a seção 'Calendário' para editar agendamentos com funcionalidade completa.",
-    });
-    
-    // Optionally, you could trigger a navigation to the calendar with the appointment selected
-    // navigate('/admin?tab=calendar&edit=' + appointment.id);
-  };
-
-  const deleteAppointment = async (appointmentId: string) => {
-    if (!confirm('Tem certeza que deseja excluir este agendamento?')) return;
+  // Deletar agendamento
+  const deleteAppointment = async (id: string) => {
+    if (!confirm('Tem certeza que deseja deletar este agendamento?')) return;
 
     try {
       const { error } = await supabase
         .from('appointments')
         .delete()
-        .eq('id', appointmentId);
+        .eq('id', id);
 
       if (error) throw error;
 
       toast({
-        title: "Agendamento excluído",
-        description: "Agendamento foi excluído com sucesso.",
+        title: "Agendamento deletado",
+        description: "Agendamento foi removido com sucesso.",
       });
 
       loadAppointments();
+      setDialogOpen(false);
     } catch (error) {
-      console.error('Erro ao excluir agendamento:', error);
+      console.error('Erro ao deletar agendamento:', error);
       toast({
         title: "Erro",
-        description: "Erro ao excluir agendamento.",
+        description: "Erro ao deletar agendamento.",
         variant: "destructive",
       });
     }
   };
 
-  const sendWhatsApp = (phoneNumber: string, clientName: string, appointmentDetails?: string) => {
-    const message = `Olá ${clientName}! Este é um lembrete do seu agendamento na clínica da Dra. Karoline Ferreira.\n\n${appointmentDetails || ''}\n📍 Local: Av. Brasil, 63b, São Francisco - Tefé-AM\n🗺️ Ver localização: https://share.google/GBkRNRdCejpJYVANt\n\nEm caso de dúvidas, entre em contato conosco.`;
-    const whatsappUrl = `https://wa.me/55${phoneNumber.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
+  // Enviar WhatsApp
+  const sendWhatsApp = (phone: string, appointmentData: Appointment) => {
+    const message = `Olá! Este é um lembrete sobre seu agendamento:
+    
+📅 Data: ${format(parseISO(appointmentData.appointment_date), 'dd/MM/yyyy', { locale: ptBR })}
+⏰ Horário: ${appointmentData.appointment_time}
+💉 Procedimento: ${appointmentData.procedures.name}
+📍 Local: Dra. Karoline Ferreira - Estética e Saúde
+
+Aguardamos você!`;
+
+    const encodedMessage = encodeURIComponent(message);
+    const cleanPhone = phone.replace(/\D/g, '');
+    window.open(`https://wa.me/55${cleanPhone}?text=${encodedMessage}`, '_blank');
   };
 
+  // Badge de status
   const getStatusBadge = (status: string) => {
-    const variants = {
-      agendado: "default",
-      confirmado: "secondary",
-      realizado: "outline",
-      cancelado: "destructive",
-    } as const;
+    const statusConfig = {
+      'agendado': { label: 'Agendado', variant: 'default' as const },
+      'confirmado': { label: 'Confirmado', variant: 'secondary' as const },
+      'realizado': { label: 'Realizado', variant: 'default' as const },
+      'cancelado': { label: 'Cancelado', variant: 'destructive' as const },
+    };
 
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.agendado;
+    
     return (
-      <Badge variant={variants[status as keyof typeof variants] || "default"}>
-        {status}
+      <Badge variant={config.variant} className="text-xs">
+        {config.label}
       </Badge>
     );
   };
 
-  // Paginação
-  const totalPages = Math.ceil(filteredAppointments.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedAppointments = filteredAppointments.slice(startIndex, startIndex + itemsPerPage);
-
   if (loading) {
-    return <div className="text-center">Carregando agendamentos...</div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Carregando agendamentos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Se estiver no modo de edição, mostrar o formulário
+  if (showEditForm && selectedAppointment) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-bold">Editar Agendamento</h1>
+        </div>
+        
+        <div className="max-w-md mx-auto">
+          <AgendamentoForm
+            client={selectedAppointment.clients}
+            onAppointmentCreated={handleAppointmentUpdated}
+            onBack={handleCloseEditForm}
+            editingId={editingAppointment || undefined}
+          />
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground mb-2">Agendamentos</h2>
-        <p className="text-muted-foreground">Gerencie todos os agendamentos da clínica</p>
+      <div className="flex items-center gap-2">
+        <Calendar className="h-6 w-6 text-primary" />
+        <h1 className="text-2xl font-bold">Lista de Agendamentos</h1>
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-        <div className="flex flex-col sm:flex-row gap-3 flex-1">
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome, CPF ou procedimento..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="agendado">Agendado</SelectItem>
-              <SelectItem value="confirmado">Confirmado</SelectItem>
-              <SelectItem value="realizado">Realizado</SelectItem>
-              <SelectItem value="cancelado">Cancelado</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={professionalFilter} onValueChange={setProfessionalFilter}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Profissional" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos profissionais</SelectItem>
-              <SelectItem value="sem_profissional">Sem profissional</SelectItem>
-              {professionals.map((professional) => (
-                <SelectItem key={professional.id} value={professional.id}>
-                  {professional.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={dateFilter} onValueChange={setDateFilter}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Data" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todas</SelectItem>
-              <SelectItem value="hoje">Hoje</SelectItem>
-              <SelectItem value="amanha">Amanhã</SelectItem>
-              <SelectItem value="semana">Esta semana</SelectItem>
-            </SelectContent>
-          </Select>
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nome, CPF ou procedimento..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
         </div>
+        
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos</SelectItem>
+            <SelectItem value="agendado">Agendado</SelectItem>
+            <SelectItem value="confirmado">Confirmado</SelectItem>
+            <SelectItem value="realizado">Realizado</SelectItem>
+            <SelectItem value="cancelado">Cancelado</SelectItem>
+          </SelectContent>
+        </Select>
 
         <Button onClick={loadAppointments} variant="outline" className="flex items-center gap-2">
           <Filter className="w-4 h-4" />
@@ -350,110 +311,90 @@ const AppointmentsList = () => {
       </div>
 
       {/* Lista de agendamentos */}
-      <div className="grid gap-4">
-        {paginatedAppointments.length === 0 ? (
+      <div className="space-y-4">
+        {filteredAppointments.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center">
               <p>Nenhum agendamento encontrado.</p>
             </CardContent>
           </Card>
         ) : (
-          paginatedAppointments.map((appointment) => (
-            <Card key={appointment.id} className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <User className="w-5 h-5" />
-                      {appointment.client.nome} {appointment.client.sobrenome}
-                    </CardTitle>
-                    <div className="flex items-center gap-2 text-muted-foreground mt-1">
-                      <Phone className="w-4 h-4" />
-                      {appointment.client.celular}
+          filteredAppointments.map((appointment) => (
+            <Card key={appointment.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-2" onClick={() => handleAppointmentClick(appointment)}>
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-primary" />
+                      <span className="font-medium">
+                        {appointment.clients.nome} {appointment.clients.sobrenome}
+                      </span>
+                      {getStatusBadge(appointment.status)}
                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                    {getStatusBadge(appointment.status)}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <div className="lg:col-span-2">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Calendar className="w-4 h-4 text-primary" />
-                          <span>{new Date(appointment.appointment_date).toLocaleDateString('pt-BR')}</span>
-                        </div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Clock className="w-4 h-4 text-primary" />
-                          <span>{appointment.appointment_time}</span>
-                        </div>
+                    
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {format(parseISO(appointment.appointment_date), 'dd/MM/yyyy', { locale: ptBR })}
                       </div>
-                      <div>
-                        <div className="mb-2">
-                          <strong>Procedimento:</strong> {appointment.procedure.name}
-                        </div>
-                        <div className="mb-2">
-                          <strong>Valor:</strong> R$ {appointment.procedure.price?.toFixed(2)}
-                        </div>
-                        <div className="mb-2">
-                          <strong>Profissional:</strong> {appointment.professional?.name || 'Não atribuído'}
-                        </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {appointment.appointment_time}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Phone className="h-3 w-3" />
+                        {appointment.clients.celular}
                       </div>
                     </div>
+                    
+                    <p className="text-sm font-medium text-primary">
+                      {appointment.procedures.name}
+                    </p>
+                    
                     {appointment.notes && (
-                      <div className="mt-3 p-2 bg-muted rounded">
+                      <p className="text-sm text-muted-foreground">
                         <strong>Observações:</strong> {appointment.notes}
-                      </div>
+                      </p>
                     )}
                   </div>
                   
-                   <div className="flex flex-col gap-2">
-                    <Select
-                      value={appointment.status}
-                      onValueChange={(value) => handleStatusChange(appointment.id, value)}
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        sendWhatsApp(appointment.clients.celular, appointment);
+                      }}
+                      className="flex items-center gap-1"
                     >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="agendado">Agendado</SelectItem>
-                        <SelectItem value="confirmado">Confirmado</SelectItem>
-                        <SelectItem value="realizado">Realizado</SelectItem>
-                        <SelectItem value="cancelado">Cancelado</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <MessageSquare className="h-3 w-3" />
+                    </Button>
                     
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditAppointment(appointment)}
-                        className="flex items-center gap-1 flex-1"
-                      >
-                        Editar
-                      </Button>
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => sendWhatsApp(appointment.client.celular, appointment.client.nome)}
-                        className="flex items-center gap-1"
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                      </Button>
-                      
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => deleteAppointment(appointment.id)}
-                        className="flex items-center gap-1"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedAppointment(appointment);
+                        handleEditAppointment();
+                      }}
+                      className="flex items-center gap-1"
+                    >
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteAppointment(appointment.id);
+                      }}
+                      className="flex items-center gap-1"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -462,69 +403,129 @@ const AppointmentsList = () => {
         )}
       </div>
 
-      {/* Paginação */}
-      {totalPages > 1 && (
-        <div className="flex justify-center mt-6">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious 
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                />
-              </PaginationItem>
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const page = i + 1;
-                return (
-                  <PaginationItem key={page}>
-                    <PaginationLink
-                      onClick={() => setCurrentPage(page)}
-                      isActive={currentPage === page}
-                      className="cursor-pointer"
-                    >
-                      {page}
-                    </PaginationLink>
-                  </PaginationItem>
-                );
-              })}
-              <PaginationItem>
-                <PaginationNext 
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      )}
+      {/* Dialog de detalhes do agendamento */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Agendamento</DialogTitle>
+          </DialogHeader>
+          
+          {selectedAppointment && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <strong>Data:</strong>
+                  <p>{format(parseISO(selectedAppointment.appointment_date), 'dd/MM/yyyy', { locale: ptBR })}</p>
+                </div>
+                <div>
+                  <strong>Horário:</strong>
+                  <p>{selectedAppointment.appointment_time}</p>
+                </div>
+              </div>
 
-      {/* Modal de Confirmação de Status */}
-      <AlertDialog open={!!pendingStatusUpdate} onOpenChange={() => setPendingStatusUpdate(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Alterar Status do Agendamento</AlertDialogTitle>
-            <AlertDialogDescription>
-              Confirma a alteração de status para "{pendingStatusUpdate?.newStatus}"?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="flex items-center space-x-2 py-4">
-            <Checkbox 
-              id="send-reminder" 
-              checked={sendReminder}
-              onCheckedChange={(checked) => setSendReminder(checked === true)}
-            />
-            <label htmlFor="send-reminder" className="text-sm font-medium">
-              Enviar lembrete por WhatsApp
-            </label>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmStatusUpdate}>
-              Confirmar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              <div>
+                <strong>Cliente:</strong>
+                <p>{selectedAppointment.clients.nome} {selectedAppointment.clients.sobrenome}</p>
+                <p className="text-xs text-muted-foreground">
+                  {selectedAppointment.clients.celular}
+                </p>
+              </div>
+
+              <div>
+                <strong>Procedimento:</strong>
+                <p>{selectedAppointment.procedures.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {selectedAppointment.procedures.duration}min - R$ {selectedAppointment.procedures.price?.toFixed(2)}
+                </p>
+              </div>
+
+              {selectedAppointment.professionals && (
+                <div>
+                  <strong>Profissional:</strong>
+                  <p>{selectedAppointment.professionals.name}</p>
+                </div>
+              )}
+
+              {selectedAppointment.notes && (
+                <div>
+                  <strong>Observações:</strong>
+                  <p className="text-sm">{selectedAppointment.notes}</p>
+                </div>
+              )}
+
+              <div>
+                <strong>Status:</strong>
+                <div className="mt-1">
+                  {getStatusBadge(selectedAppointment.status)}
+                </div>
+              </div>
+
+              {/* Ações */}
+              <div className="flex flex-wrap gap-2 pt-4 border-t">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => sendWhatsApp(selectedAppointment.clients.celular, selectedAppointment)}
+                  className="flex items-center gap-1"
+                >
+                  <MessageSquare className="h-3 w-3" />
+                  WhatsApp
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleEditAppointment}
+                  className="flex items-center gap-1"
+                >
+                  <Edit className="h-3 w-3" />
+                  Editar
+                </Button>
+
+                {selectedAppointment.status !== 'confirmado' && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => updateAppointmentStatus(selectedAppointment.id, 'confirmado')}
+                  >
+                    Confirmar
+                  </Button>
+                )}
+
+                {selectedAppointment.status !== 'realizado' && (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={() => updateAppointmentStatus(selectedAppointment.id, 'realizado')}
+                  >
+                    Marcar como Realizado
+                  </Button>
+                )}
+
+                {selectedAppointment.status !== 'cancelado' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => updateAppointmentStatus(selectedAppointment.id, 'cancelado')}
+                  >
+                    Cancelar
+                  </Button>
+                )}
+
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => deleteAppointment(selectedAppointment.id)}
+                  className="flex items-center gap-1"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Deletar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

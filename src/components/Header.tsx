@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, Instagram, ChevronDown, ChevronRight, User } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Category {
@@ -18,7 +17,6 @@ interface Subcategory {
 }
 
 const Header = () => {
-  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -114,14 +112,14 @@ const Header = () => {
         <div className="flex items-center justify-between h-20">
           {/* Logo Elegante - Canto Esquerdo */}
           <div className="flex-shrink-0">
-            <Link to="/" className="flex flex-col">
-              <h1 className="text-2xl font-bold text-red-500 drop-shadow-lg tracking-wide">
+            <a href="/" className="flex flex-col">
+              <h1 className="text-2xl font-bold text-white drop-shadow-lg tracking-wide">
                 Dra. Karoline Ferreira
               </h1>
               <p className="text-sm text-white/90 drop-shadow-md font-light tracking-wider">
                 Estética e Saúde Integrativa
               </p>
-            </Link>
+            </a>
           </div>
 
           {/* Spacer para empurrar navegação para direita */}
@@ -154,39 +152,39 @@ const Header = () => {
                       onMouseEnter={() => handleSubmenuMouseEnter(category.id)}
                       onMouseLeave={handleSubmenuMouseLeave}
                     >
-                      <Link
-                        to={`/categoria/${category.id}`}
+                      <a
+                        href={`/categoria/${category.id}`}
                         className="flex items-center justify-between px-6 py-3 text-gray-700 hover:bg-red-50/80 hover:text-red-600 transition-all duration-300 group"
                       >
                         <span className="font-medium">{category.name}</span>
                         {category.subcategories && category.subcategories.length > 0 && (
                           <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
                         )}
-                      </Link>
+                      </a>
                       
                       {/* Subcategories Submenu */}
                       {activeCategory === category.id && category.subcategories && category.subcategories.length > 0 && (
                         <div 
-                          className="absolute left-full top-0 w-72 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-3 ml-2"
+                          className="absolute right-full top-0 w-72 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-3 mr-2"
                           onMouseEnter={() => handleSubmenuMouseEnter(category.id)}
                           onMouseLeave={handleSubmenuMouseLeave}
                         >
                           {category.subcategories.map((subcategory) => (
-                            <Link
+                            <a
                               key={subcategory.id}
-                              to={`/subcategoria/${subcategory.id}`}
+                              href={`/subcategoria/${subcategory.id}`}
                               className="block px-6 py-2 text-gray-600 hover:bg-red-50/80 hover:text-red-600 transition-all duration-300 hover:translate-x-2"
                             >
                               {subcategory.name}
-                            </Link>
+                            </a>
                           ))}
                           <div className="border-t border-gray-100 mt-2 pt-2">
-                            <Link
-                              to={`/categoria/${category.id}`}
+                            <a
+                              href={`/categoria/${category.id}`}
                               className="block px-6 py-2 text-red-600 font-medium hover:bg-red-50/80 transition-all duration-300 hover:translate-x-2"
                             >
                               Ver todos os procedimentos
-                            </Link>
+                            </a>
                           </div>
                         </div>
                       )}
@@ -199,7 +197,7 @@ const Header = () => {
             {/* Botões de Ação */}
             <Button
               variant="ghost"
-              onClick={() => navigate('/area-cliente')}
+              onClick={() => window.location.href = '/area-cliente'}
               className="text-white hover:text-red-300 font-medium bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/30 hover:border-red-300/50 transition-all duration-300"
             >
               <User className="w-4 h-4 mr-2" />
@@ -238,14 +236,14 @@ const Header = () => {
               <div className="flex flex-col h-full">
                 {/* Mobile Header */}
                 <div className="p-6 border-b border-gray-200/50">
-                  <Link to="/" className="flex flex-col" onClick={() => setIsOpen(false)}>
+                  <a href="/" className="flex flex-col" onClick={() => setIsOpen(false)}>
                     <h1 className="text-lg font-bold text-gray-800 tracking-wide">
                       Dra. Karoline Ferreira
                     </h1>
                     <p className="text-xs text-red-600 font-light tracking-wider">
                       Estética e Saúde Integrativa
                     </p>
-                  </Link>
+                  </a>
                 </div>
 
                 {/* Mobile Navigation */}
@@ -271,62 +269,78 @@ const Header = () => {
                               <div className="ml-4 space-y-1 animate-in slide-in-from-left duration-300">
                                 {categories.map((category) => (
                                   <div key={category.id} className="space-y-1">
-                                     <div className="flex items-center">
-                                       <Link
-                                         to={`/categoria/${category.id}`}
-                                         onClick={() => setIsOpen(false)}
-                                         className="flex-1 px-4 py-2 text-left text-gray-600 hover:bg-gray-50/80 hover:text-red-600 rounded-lg transition-all duration-300"
-                                       >
-                                         <span>{category.name}</span>
-                                       </Link>
-                                      {category.subcategories && category.subcategories.length > 0 && (
+                                    {category.subcategories && category.subcategories.length > 0 ? (
+                                      <div>
                                         <button
-                                          onClick={() => setExpandedMobileCategory(
-                                            expandedMobileCategory === category.id ? 'procedimentos' : category.id
-                                          )}
-                                          className="p-2 text-gray-400 hover:text-red-600 transition-all duration-300"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setExpandedMobileCategory(
+                                              expandedMobileCategory === category.id ? 'procedimentos' : category.id
+                                            );
+                                          }}
+                                          className="flex items-center justify-between w-full px-4 py-2 text-left text-gray-600 hover:bg-gray-50/80 hover:text-red-600 rounded-lg transition-all duration-300"
                                         >
+                                          <span>{category.name}</span>
                                           <ChevronRight className={`w-3 h-3 transform transition-all duration-300 ${
                                             expandedMobileCategory === category.id ? 'rotate-90' : ''
                                           }`} />
                                         </button>
-                                      )}
-                                    </div>
-                                    
-                                     {expandedMobileCategory === category.id && (
-                                        <div className="ml-4 space-y-1 animate-in slide-in-from-left duration-300">
-                                          <Link
-                                            to={`/categoria/${category.id}`}
-                                            onClick={() => setIsOpen(false)}
-                                            className="block px-4 py-2 text-sm text-red-600 font-medium hover:bg-red-50/80 rounded-lg transition-all duration-300 hover:translate-x-1"
+                                      </div>
+                                    ) : (
+                                      <a
+                                        href={`/categoria/${category.id}`}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setIsOpen(false);
+                                          window.location.href = `/categoria/${category.id}`;
+                                        }}
+                                        className="block px-4 py-2 text-left text-gray-600 hover:bg-gray-50/80 hover:text-red-600 rounded-lg transition-all duration-300"
+                                      >
+                                        <span>{category.name}</span>
+                                      </a>
+                                    )}
+                                    {expandedMobileCategory === category.id && category.subcategories && category.subcategories.length > 0 && (
+                                      <div className="ml-4 space-y-1 animate-in slide-in-from-left duration-300 border-l-2 border-red-100 pl-4">
+                                        <a
+                                          href={`/categoria/${category.id}`}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setIsOpen(false);
+                                            window.location.href = `/categoria/${category.id}`;
+                                          }}
+                                          className="block px-4 py-2 text-sm text-red-600 font-semibold hover:bg-red-50/80 rounded-lg transition-all duration-300 hover:translate-x-1 border border-red-200 bg-red-50/50"
+                                        >
+                                          📋 Todos os procedimentos
+                                        </a>
+                                        {category.subcategories.map((subcategory) => (
+                                          <a
+                                            key={subcategory.id}
+                                            href={`/subcategoria/${subcategory.id}`}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setIsOpen(false);
+                                              window.location.href = `/subcategoria/${subcategory.id}`;
+                                            }}
+                                            className="block px-4 py-2 text-sm text-gray-500 hover:bg-red-50/80 hover:text-red-600 rounded-lg transition-all duration-300 hover:translate-x-1"
                                           >
-                                            Todos os procedimentos
-                                          </Link>
-                                          {category.subcategories && category.subcategories.length > 0 && category.subcategories.map((subcategory) => (
-                                            <Link
-                                              key={subcategory.id}
-                                              to={`/subcategoria/${subcategory.id}`}
-                                              onClick={() => setIsOpen(false)}
-                                              className="block px-4 py-2 text-sm text-gray-500 hover:bg-red-50/80 hover:text-red-600 rounded-lg transition-all duration-300 hover:translate-x-1"
-                                            >
-                                              {subcategory.name}
-                                            </Link>
-                                          ))}
-                                        </div>
-                                     )}
+                                            {subcategory.name}
+                                          </a>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 ))}
                               </div>
                             )}
                           </div>
                         ) : (
-                          <Link
-                            to={item.href}
+                          <a
+                            href={item.href}
                             onClick={() => setIsOpen(false)}
                             className="block px-4 py-3 text-gray-700 hover:bg-red-50/80 hover:text-red-600 rounded-xl transition-all duration-300 font-medium hover:translate-x-1"
                           >
                             {item.name}
-                          </Link>
+                          </a>
                         )}
                       </div>
                     ))}
@@ -335,14 +349,15 @@ const Header = () => {
 
                 {/* Mobile Footer Actions */}
                 <div className="border-t border-gray-200/50 p-6 space-y-3">
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-center hover:bg-red-50/80 hover:border-red-600 hover:text-red-600 transition-all duration-300"
-                    onClick={() => {
-                      navigate('/area-cliente');
-                      setIsOpen(false);
-                    }}
-                  >
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-center hover:bg-red-50/80 hover:border-red-600 hover:text-red-600 transition-all duration-300"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsOpen(false);
+                        window.location.href = '/area-cliente';
+                      }}
+                    >
                     <User className="w-4 h-4 mr-2" />
                     Área do Cliente
                   </Button>

@@ -165,7 +165,7 @@ const Header = () => {
                       {/* Subcategories Submenu */}
                       {activeCategory === category.id && category.subcategories && category.subcategories.length > 0 && (
                         <div 
-                          className="absolute right-full top-0 w-72 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-3 mr-2"
+                          className="absolute left-full top-0 w-72 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-3 ml-2"
                           onMouseEnter={() => handleSubmenuMouseEnter(category.id)}
                           onMouseLeave={handleSubmenuMouseLeave}
                         >

@@ -86,12 +86,15 @@ const Header = () => {
     dropdownTimeoutRef.current = setTimeout(() => {
       setShowProcedimentos(false);
       setActiveCategory(null);
-    }, 150); // 150ms de delay antes de fechar
+    }, 300); // Aumentado para 300ms
   };
 
   const handleSubmenuMouseEnter = (categoryId: string) => {
     if (submenuTimeoutRef.current) {
       clearTimeout(submenuTimeoutRef.current);
+    }
+    if (dropdownTimeoutRef.current) {
+      clearTimeout(dropdownTimeoutRef.current);
     }
     setActiveCategory(categoryId);
   };
@@ -99,7 +102,7 @@ const Header = () => {
   const handleSubmenuMouseLeave = () => {
     submenuTimeoutRef.current = setTimeout(() => {
       setActiveCategory(null);
-    }, 150); // 150ms de delay antes de fechar
+    }, 300); // Aumentado para 300ms
   };
 
   const navItems = [
@@ -148,7 +151,7 @@ const Header = () => {
                   {categories.map((category) => (
                     <div 
                       key={category.id}
-                      className="relative"
+                      className="relative group"
                       onMouseEnter={() => handleSubmenuMouseEnter(category.id)}
                       onMouseLeave={handleSubmenuMouseLeave}
                     >
@@ -165,7 +168,7 @@ const Header = () => {
                       {/* Subcategories Submenu */}
                       {activeCategory === category.id && category.subcategories && category.subcategories.length > 0 && (
                         <div 
-                          className="absolute left-full top-0 w-72 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-3 ml-2"
+                          className="absolute left-full top-0 w-72 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-3 ml-1"
                           onMouseEnter={() => handleSubmenuMouseEnter(category.id)}
                           onMouseLeave={handleSubmenuMouseLeave}
                         >

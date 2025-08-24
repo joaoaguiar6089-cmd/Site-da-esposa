@@ -262,7 +262,6 @@ const Header = () => {
                           <div className="space-y-2">
                             <button
                               onClick={() => {
-                                console.log('Clicked procedimentos, current state:', expandedMobileCategory);
                                 setExpandedMobileCategory(
                                   expandedMobileCategory === 'procedimentos' ? null : 'procedimentos'
                                 );
@@ -287,10 +286,8 @@ const Header = () => {
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             e.preventDefault();
-                                            console.log('Clicked category:', category.name, 'ID:', category.id, 'Current state:', expandedMobileCategory);
                                             const newState = expandedMobileCategory === category.id ? 'procedimentos' : category.id;
                                             setExpandedMobileCategory(newState);
-                                            console.log('Setting state to:', newState);
                                           }}
                                           className="flex items-center justify-between w-full px-4 py-3 text-left bg-white/70 text-gray-700 hover:bg-red-50/80 hover:text-red-700 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md border border-white/60 hover:border-red-200"
                                         >
@@ -302,9 +299,9 @@ const Header = () => {
                                           </div>
                                         </button>
                                         
-                                        {/* Subcategories */}
-                                        {expandedMobileCategory === category.id && (
-                                          <div className="ml-3 mt-2 space-y-1 animate-in slide-in-from-left duration-300 border-l-2 border-red-200/60 pl-3 bg-gradient-to-r from-red-50/30 to-transparent rounded-r-lg py-2">
+                                         {/* Subcategories */}
+                                         {expandedMobileCategory === category.id && (
+                                           <div key={`subcategories-${category.id}`} className="ml-3 mt-2 space-y-1 animate-in slide-in-from-left duration-300 border-l-2 border-red-200/60 pl-3 bg-gradient-to-r from-red-50/30 to-transparent rounded-r-lg py-2">
                                             <a
                                               href={`/categoria/${category.id}`}
                                               onClick={(e) => {

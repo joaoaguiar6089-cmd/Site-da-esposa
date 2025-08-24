@@ -115,7 +115,7 @@ const Header = () => {
           {/* Logo Elegante - Canto Esquerdo */}
           <div className="flex-shrink-0">
             <Link to="/" className="flex flex-col">
-              <h1 className="text-2xl font-bold text-white drop-shadow-lg tracking-wide">
+              <h1 className="text-2xl font-bold text-red-500 drop-shadow-lg tracking-wide">
                 Dra. Karoline Ferreira
               </h1>
               <p className="text-sm text-white/90 drop-shadow-md font-light tracking-wider">
@@ -167,7 +167,7 @@ const Header = () => {
                       {/* Subcategories Submenu */}
                       {activeCategory === category.id && category.subcategories && category.subcategories.length > 0 && (
                         <div 
-                          className="absolute right-full top-0 w-72 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-3 mr-2"
+                          className="absolute left-full top-0 w-72 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-3 ml-2"
                           onMouseEnter={() => handleSubmenuMouseEnter(category.id)}
                           onMouseLeave={handleSubmenuMouseLeave}
                         >
@@ -293,27 +293,27 @@ const Header = () => {
                                       )}
                                     </div>
                                     
-                                    {expandedMobileCategory === category.id && category.subcategories && category.subcategories.length > 0 && (
-                                       <div className="ml-4 space-y-1 animate-in slide-in-from-left duration-300">
-                                         {category.subcategories.map((subcategory) => (
-                                           <Link
-                                             key={subcategory.id}
-                                             to={`/subcategoria/${subcategory.id}`}
-                                             onClick={() => setIsOpen(false)}
-                                             className="block px-4 py-2 text-sm text-gray-500 hover:bg-red-50/80 hover:text-red-600 rounded-lg transition-all duration-300 hover:translate-x-1"
-                                           >
-                                             {subcategory.name}
-                                           </Link>
-                                         ))}
-                                         <Link
-                                           to={`/categoria/${category.id}`}
-                                           onClick={() => setIsOpen(false)}
-                                           className="block px-4 py-2 text-sm text-red-600 font-medium hover:bg-red-50/80 rounded-lg transition-all duration-300 hover:translate-x-1"
-                                         >
-                                           Ver todos os procedimentos
-                                         </Link>
-                                       </div>
-                                    )}
+                                     {expandedMobileCategory === category.id && (
+                                        <div className="ml-4 space-y-1 animate-in slide-in-from-left duration-300">
+                                          <Link
+                                            to={`/categoria/${category.id}`}
+                                            onClick={() => setIsOpen(false)}
+                                            className="block px-4 py-2 text-sm text-red-600 font-medium hover:bg-red-50/80 rounded-lg transition-all duration-300 hover:translate-x-1"
+                                          >
+                                            Todos os procedimentos
+                                          </Link>
+                                          {category.subcategories && category.subcategories.length > 0 && category.subcategories.map((subcategory) => (
+                                            <Link
+                                              key={subcategory.id}
+                                              to={`/subcategoria/${subcategory.id}`}
+                                              onClick={() => setIsOpen(false)}
+                                              className="block px-4 py-2 text-sm text-gray-500 hover:bg-red-50/80 hover:text-red-600 rounded-lg transition-all duration-300 hover:translate-x-1"
+                                            >
+                                              {subcategory.name}
+                                            </Link>
+                                          ))}
+                                        </div>
+                                     )}
                                   </div>
                                 ))}
                               </div>

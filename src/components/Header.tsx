@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, Instagram, ChevronDown, ChevronRight } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Menu, Instagram, ChevronDown, ChevronRight, User } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Category {
@@ -22,9 +22,25 @@ const Header = () => {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [showProcedimentos, setShowProcedimentos] = useState(false);
   const [expandedMobileCategory, setExpandedMobileCategory] = useState<string | null>(null);
+  
+  // Refs para controlar o timeout do dropdown
+  const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const submenuTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     loadCategoriesWithSubcategories();
+  }, []);
+
+  // Limpar timeouts ao desmontar o componente
+  useEffect(() => {
+    return () => {
+      if (dropdownTimeoutRef.current) {
+        clearTimeout(dropdownTimeoutRef.current);
+      }
+      if (submenuTimeoutRef.current) {
+        clearTimeout(submenuTimeoutRef.current);
+      }
+    };
   }, []);
 
   const loadCategoriesWithSubcategories = async () => {
@@ -58,6 +74,34 @@ const Header = () => {
     window.open('https://wa.me/5511999999999', '_blank');
   };
 
+  // Funções para controlar o dropdown com delay
+  const handleDropdownMouseEnter = () => {
+    if (dropdownTimeoutRef.current) {
+      clearTimeout(dropdownTimeoutRef.current);
+    }
+    setShowProcedimentos(true);
+  };
+
+  const handleDropdownMouseLeave = () => {
+    dropdownTimeoutRef.current = setTimeout(() => {
+      setShowProcedimentos(false);
+      setActiveCategory(null);
+    }, 150); // 150ms de delay antes de fechar
+  };
+
+  const handleSubmenuMouseEnter = (categoryId: string) => {
+    if (submenuTimeoutRef.current) {
+      clearTimeout(submenuTimeoutRef.current);
+    }
+    setActiveCategory(categoryId);
+  };
+
+  const handleSubmenuMouseLeave = () => {
+    submenuTimeoutRef.current = setTimeout(() => {
+      setActiveCategory(null);
+    }, 150); // 150ms de delay antes de fechar
+  };
+
   const navItems = [
     { name: "Procedimentos", href: "#", hasDropdown: true }
   ];
@@ -86,11 +130,8 @@ const Header = () => {
             {/* Menu Procedimentos */}
             <div 
               className="relative"
-              onMouseEnter={() => setShowProcedimentos(true)}
-              onMouseLeave={() => {
-                setShowProcedimentos(false);
-                setActiveCategory(null);
-              }}
+              onMouseEnter={handleDropdownMouseEnter}
+              onMouseLeave={handleDropdownMouseLeave}
             >
               <button className="flex items-center space-x-1 text-white hover:text-red-300 font-medium transition-all duration-300 py-2 px-3 backdrop-blur-sm hover:backdrop-blur-md rounded-lg hover:bg-white/10">
                 <span className="drop-shadow-md">Procedimentos</span>
@@ -99,12 +140,17 @@ const Header = () => {
               
               {/* Dropdown Menu */}
               {showProcedimentos && (
-                <div className="absolute top-full right-0 w-80 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-4 mt-2">
+                <div 
+                  className="absolute top-full right-0 w-80 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-4 mt-2"
+                  onMouseEnter={handleDropdownMouseEnter}
+                  onMouseLeave={handleDropdownMouseLeave}
+                >
                   {categories.map((category) => (
                     <div 
                       key={category.id}
                       className="relative"
-                      onMouseEnter={() => setActiveCategory(category.id)}
+                      onMouseEnter={() => handleSubmenuMouseEnter(category.id)}
+                      onMouseLeave={handleSubmenuMouseLeave}
                     >
                       <a
                         href={`/categoria/${category.id}`}
@@ -118,7 +164,11 @@ const Header = () => {
                       
                       {/* Subcategories Submenu */}
                       {activeCategory === category.id && category.subcategories && category.subcategories.length > 0 && (
-                        <div className="absolute right-full top-0 w-72 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-3 mr-2">
+                        <div 
+                          className="absolute right-full top-0 w-72 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-3 mr-2"
+                          onMouseEnter={() => handleSubmenuMouseEnter(category.id)}
+                          onMouseLeave={handleSubmenuMouseLeave}
+                        >
                           {category.subcategories.map((subcategory) => (
                             <a
                               key={subcategory.id}
@@ -147,10 +197,11 @@ const Header = () => {
             {/* Botões de Ação */}
             <Button
               variant="ghost"
-              onClick={() => window.location.href = '/agendamento'}
+              onClick={() => window.location.href = '/area-cliente'}
               className="text-white hover:text-red-300 font-medium bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/30 hover:border-red-300/50 transition-all duration-300"
             >
-              Agendar
+              <User className="w-4 h-4 mr-2" />
+              Área do Cliente
             </Button>
             
             <Button
@@ -218,19 +269,27 @@ const Header = () => {
                               <div className="ml-4 space-y-1 animate-in slide-in-from-left duration-300">
                                 {categories.map((category) => (
                                   <div key={category.id} className="space-y-1">
-                                    <button
-                                      onClick={() => setExpandedMobileCategory(
-                                        expandedMobileCategory === category.id ? 'procedimentos' : category.id
-                                      )}
-                                      className="flex items-center justify-between w-full px-4 py-2 text-left text-gray-600 hover:bg-gray-50/80 hover:text-red-600 rounded-lg transition-all duration-300"
-                                    >
-                                      <span>{category.name}</span>
+                                    <div className="flex items-center">
+                                      <a
+                                        href={`/categoria/${category.id}`}
+                                        onClick={() => setIsOpen(false)}
+                                        className="flex-1 px-4 py-2 text-left text-gray-600 hover:bg-gray-50/80 hover:text-red-600 rounded-lg transition-all duration-300"
+                                      >
+                                        <span>{category.name}</span>
+                                      </a>
                                       {category.subcategories && category.subcategories.length > 0 && (
-                                        <ChevronRight className={`w-3 h-3 transform transition-all duration-300 ${
-                                          expandedMobileCategory === category.id ? 'rotate-90' : ''
-                                        }`} />
+                                        <button
+                                          onClick={() => setExpandedMobileCategory(
+                                            expandedMobileCategory === category.id ? 'procedimentos' : category.id
+                                          )}
+                                          className="p-2 text-gray-400 hover:text-red-600 transition-all duration-300"
+                                        >
+                                          <ChevronRight className={`w-3 h-3 transform transition-all duration-300 ${
+                                            expandedMobileCategory === category.id ? 'rotate-90' : ''
+                                          }`} />
+                                        </button>
                                       )}
-                                    </button>
+                                    </div>
                                     
                                     {expandedMobileCategory === category.id && category.subcategories && category.subcategories.length > 0 && (
                                       <div className="ml-4 space-y-1 animate-in slide-in-from-left duration-300">
@@ -278,11 +337,12 @@ const Header = () => {
                     variant="outline" 
                     className="w-full justify-center hover:bg-red-50/80 hover:border-red-600 hover:text-red-600 transition-all duration-300"
                     onClick={() => {
-                      window.location.href = '/agendamento';
+                      window.location.href = '/area-cliente';
                       setIsOpen(false);
                     }}
                   >
-                    Agendar
+                    <User className="w-4 h-4 mr-2" />
+                    Área do Cliente
                   </Button>
                   
                   <div className="flex space-x-3">

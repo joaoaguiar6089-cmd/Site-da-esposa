@@ -276,62 +276,25 @@ const Header = () => {
                               </div>
                             </button>
                             
+                            {/* Lista de Categorias */}
                             {expandedMobileCategory === 'procedimentos' && (
                               <div className="ml-3 space-y-2 animate-in slide-in-from-left duration-300 border-l-3 border-red-200/60 pl-4 bg-gradient-to-r from-white/40 to-transparent rounded-r-xl py-3">
                                 {categories.map((category) => (
                                   <div key={category.id} className="space-y-1">
                                     {category.subcategories && category.subcategories.length > 0 ? (
-                                      <div>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            e.preventDefault();
-                                            const newState = expandedMobileCategory === category.id ? 'procedimentos' : category.id;
-                                            setExpandedMobileCategory(newState);
-                                          }}
-                                          className="flex items-center justify-between w-full px-4 py-3 text-left bg-white/70 text-gray-700 hover:bg-red-50/80 hover:text-red-700 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md border border-white/60 hover:border-red-200"
-                                        >
-                                          <span className="font-medium">{category.name}</span>
-                                          <div className="p-1 rounded-full bg-red-50">
-                                            <ChevronRight className={`w-3 h-3 transform transition-all duration-300 text-red-500 ${
-                                              expandedMobileCategory === category.id ? 'rotate-90' : ''
-                                            }`} />
-                                          </div>
-                                        </button>
-                                        
-                                         {/* Subcategories */}
-                                         {expandedMobileCategory === category.id && (
-                                           <div key={`subcategories-${category.id}`} className="ml-3 mt-2 space-y-1 animate-in slide-in-from-left duration-300 border-l-2 border-red-200/60 pl-3 bg-gradient-to-r from-red-50/30 to-transparent rounded-r-lg py-2">
-                                            <a
-                                              href={`/categoria/${category.id}`}
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setIsOpen(false);
-                                                window.location.href = `/categoria/${category.id}`;
-                                              }}
-                                              className="flex items-center px-4 py-2 text-sm bg-gradient-to-r from-red-600 to-red-500 text-white font-semibold hover:from-red-700 hover:to-red-600 rounded-lg transition-all duration-300 hover:scale-[1.02] shadow-sm hover:shadow-lg"
-                                            >
-                                              <span className="mr-2">📋</span>
-                                              Todos os procedimentos
-                                            </a>
-                                            {category.subcategories.map((subcategory) => (
-                                              <a
-                                                key={subcategory.id}
-                                                href={`/subcategoria/${subcategory.id}`}
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  setIsOpen(false);
-                                                  window.location.href = `/subcategoria/${subcategory.id}`;
-                                                }}
-                                                className="block px-4 py-2 text-sm bg-white/80 text-gray-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/80 hover:border-red-200"
-                                              >
-                                                <span className="mr-2">•</span>
-                                                {subcategory.name}
-                                              </a>
-                                            ))}
-                                          </div>
-                                        )}
-                                      </div>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          e.preventDefault();
+                                          setExpandedMobileCategory(category.id);
+                                        }}
+                                        className="flex items-center justify-between w-full px-4 py-3 text-left bg-white/70 text-gray-700 hover:bg-red-50/80 hover:text-red-700 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md border border-white/60 hover:border-red-200"
+                                      >
+                                        <span className="font-medium">{category.name}</span>
+                                        <div className="p-1 rounded-full bg-red-50">
+                                          <ChevronRight className="w-3 h-3 text-red-500" />
+                                        </div>
+                                      </button>
                                     ) : (
                                       <a
                                         href={`/categoria/${category.id}`}
@@ -349,6 +312,62 @@ const Header = () => {
                                 ))}
                               </div>
                             )}
+
+                            {/* Lista de Subcategorias */}
+                            {categories.map((category) => (
+                              expandedMobileCategory === category.id && category.subcategories && category.subcategories.length > 0 && (
+                                <div key={`subcategories-${category.id}`} className="ml-3 space-y-2 animate-in slide-in-from-left duration-300 border-l-3 border-red-200/60 pl-4 bg-gradient-to-r from-white/40 to-transparent rounded-r-xl py-3">
+                                  {/* Botão Voltar */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      setExpandedMobileCategory('procedimentos');
+                                    }}
+                                    className="flex items-center px-4 py-2 text-sm text-red-600 hover:text-red-700 transition-all duration-300"
+                                  >
+                                    <ChevronRight className="w-4 h-4 mr-2 rotate-180" />
+                                    Voltar para categorias
+                                  </button>
+
+                                  {/* Título da categoria */}
+                                  <div className="px-4 py-2">
+                                    <h3 className="font-semibold text-gray-800">{category.name}</h3>
+                                  </div>
+
+                                  {/* Todos os procedimentos */}
+                                  <a
+                                    href={`/categoria/${category.id}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setIsOpen(false);
+                                      window.location.href = `/categoria/${category.id}`;
+                                    }}
+                                    className="flex items-center px-4 py-2 text-sm bg-gradient-to-r from-red-600 to-red-500 text-white font-semibold hover:from-red-700 hover:to-red-600 rounded-lg transition-all duration-300 hover:scale-[1.02] shadow-sm hover:shadow-lg mx-1"
+                                  >
+                                    <span className="mr-2">📋</span>
+                                    Todos os procedimentos
+                                  </a>
+
+                                  {/* Subcategorias */}
+                                  {category.subcategories.map((subcategory) => (
+                                    <a
+                                      key={subcategory.id}
+                                      href={`/subcategoria/${subcategory.id}`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsOpen(false);
+                                        window.location.href = `/subcategoria/${subcategory.id}`;
+                                      }}
+                                      className="block px-4 py-2 text-sm bg-white/80 text-gray-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/80 hover:border-red-200 mx-1"
+                                    >
+                                      <span className="mr-2">•</span>
+                                      {subcategory.name}
+                                    </a>
+                                  ))}
+                                </div>
+                              )
+                            ))}
                           </div>
                         ) : (
                           <a

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import LoginCPF from "@/components/agendamento/LoginCPF";
 import CadastroCliente from "@/components/agendamento/CadastroCliente";
 import AgendamentosCliente from "@/components/agendamento/AgendamentosCliente";
@@ -8,13 +9,20 @@ import type { Client } from "@/types/client";
 type ViewMode = 'cpf' | 'cadastro' | 'agendamentos' | 'novo-agendamento';
 
 const Agendamento = () => {
+  const [searchParams] = useSearchParams();
   const [currentView, setCurrentView] = useState<ViewMode>('cpf');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [pendingCPF, setPendingCPF] = useState<string>('');
+  const preSelectedProcedureId = searchParams.get('procedimento');
 
   const handleClientFound = (client: Client) => {
     setSelectedClient(client);
-    setCurrentView('agendamentos');
+    // Se há procedimento pré-selecionado, vai direto para novo agendamento
+    if (preSelectedProcedureId) {
+      setCurrentView('novo-agendamento');
+    } else {
+      setCurrentView('agendamentos');
+    }
   };
 
   const handleClientNotFound = (cpf: string) => {
@@ -24,7 +32,12 @@ const Agendamento = () => {
 
   const handleClientRegistered = (client: Client) => {
     setSelectedClient(client);
-    setCurrentView('agendamentos');
+    // Se há procedimento pré-selecionado, vai direto para novo agendamento
+    if (preSelectedProcedureId) {
+      setCurrentView('novo-agendamento');
+    } else {
+      setCurrentView('agendamentos');
+    }
   };
 
   const handleNewAppointment = () => {
@@ -83,14 +96,15 @@ const Agendamento = () => {
           />
         ) : null;
       
-      case 'novo-agendamento':
-        return selectedClient ? (
-          <AgendamentoForm
-            client={selectedClient}
-            onAppointmentCreated={handleAppointmentCreated}
-            onBack={handleBack}
-          />
-        ) : null;
+        case 'novo-agendamento':
+          return selectedClient ? (
+            <AgendamentoForm
+              client={selectedClient}
+              onAppointmentCreated={handleAppointmentCreated}
+              onBack={handleBack}
+              preSelectedProcedureId={preSelectedProcedureId || undefined}
+            />
+          ) : null;
       
       default:
         return null;

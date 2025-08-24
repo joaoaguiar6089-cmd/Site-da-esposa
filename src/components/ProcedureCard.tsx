@@ -27,8 +27,8 @@ const ProcedureCard = ({
 }: ProcedureCardProps) => {
   const handleAgendamento = () => {
     const url = procedureId 
-      ? `/area-cliente?procedimento=${procedureId}`
-      : '/area-cliente';
+      ? `/agendamento?procedimento=${procedureId}`
+      : '/agendamento';
     window.location.href = url;
   };
 

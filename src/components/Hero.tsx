@@ -74,7 +74,7 @@ const Hero = () => {
             <Button 
               variant="hero" 
               size="lg"
-              onClick={() => navigate('/area-cliente')}
+              onClick={() => navigate('/agendamento')}
             >
               Agendar Consulta
             </Button>

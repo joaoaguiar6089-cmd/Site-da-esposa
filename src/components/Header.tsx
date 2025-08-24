@@ -29,11 +29,11 @@ const Header = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.location.href = "/agendamento"}
+              onClick={() => window.location.href = "/area-cliente"}
               className="flex items-center gap-2"
             >
               <Calendar size={14} />
-              Agendar
+              Área do Cliente
             </Button>
             <Button
               variant="whatsapp"
@@ -80,12 +80,12 @@ const Header = () => {
                     variant="outline"
                     className="w-full justify-start gap-3 h-12"
                     onClick={() => {
-                      window.location.href = "/agendamento";
+                      window.location.href = "/area-cliente";
                       setIsMenuOpen(false);
                     }}
                   >
                     <Calendar size={18} />
-                    <span className="text-base">Agendar Consulta</span>
+                    <span className="text-base">Área do Cliente</span>
                   </Button>
                   
                   {/* WhatsApp */}

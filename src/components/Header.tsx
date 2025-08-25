@@ -78,6 +78,7 @@ const Header = () => {
 
   const handleWhatsApp = () => {
     // Changed to directly open WhatsApp Web for better desktop compatibility
+    // Reverted phone number to original
     window.open('https://web.whatsapp.com/send?phone=5511999999999', '_blank');
   };
 

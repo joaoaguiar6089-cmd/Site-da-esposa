@@ -4,8 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import ScheduleExceptions from "./ScheduleExceptions";
 
 interface ScheduleSettings {
   id: string;
@@ -153,82 +155,95 @@ const ScheduleSettings = () => {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Configurações de Horários</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="start_time">Horário de Início</Label>
-              <Input
-                id="start_time"
-                type="time"
-                value={settings.start_time}
-                onChange={(e) => setSettings({
-                  ...settings,
-                  start_time: e.target.value
-                })}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="end_time">Horário de Fim</Label>
-              <Input
-                id="end_time"
-                type="time"
-                value={settings.end_time}
-                onChange={(e) => setSettings({
-                  ...settings,
-                  end_time: e.target.value
-                })}
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="interval">Intervalo entre agendamentos (minutos)</Label>
-            <Input
-              id="interval"
-              type="number"
-              min="15"
-              max="120"
-              step="15"
-              value={settings.interval_minutes}
-              onChange={(e) => setSettings({
-                ...settings,
-                interval_minutes: parseInt(e.target.value) || 60
-              })}
-            />
-          </div>
-
-          <div>
-            <Label>Dias da semana disponíveis</Label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
-              {dayNames.map((day, index) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`day-${index}`}
-                    checked={settings.available_days.includes(index)}
-                    onCheckedChange={(checked) => handleDayToggle(index, checked as boolean)}
+      <Tabs defaultValue="general" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="general">Configurações Gerais</TabsTrigger>
+          <TabsTrigger value="exceptions">Exceções de Horários</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="general">
+          <Card>
+            <CardHeader>
+              <CardTitle>Configurações de Horários Padrão</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="start_time">Horário de Início</Label>
+                  <Input
+                    id="start_time"
+                    type="time"
+                    value={settings.start_time}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      start_time: e.target.value
+                    })}
                   />
-                  <Label htmlFor={`day-${index}`} className="text-sm">
-                    {day}
-                  </Label>
                 </div>
-              ))}
-            </div>
-          </div>
 
-          <Button 
-            onClick={handleSave} 
-            disabled={saving}
-            className="w-full md:w-auto"
-          >
-            {saving ? "Salvando..." : "Salvar Configurações"}
-          </Button>
-        </CardContent>
-      </Card>
+                <div>
+                  <Label htmlFor="end_time">Horário de Fim</Label>
+                  <Input
+                    id="end_time"
+                    type="time"
+                    value={settings.end_time}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      end_time: e.target.value
+                    })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="interval">Intervalo entre agendamentos (minutos)</Label>
+                <Input
+                  id="interval"
+                  type="number"
+                  min="15"
+                  max="120"
+                  step="15"
+                  value={settings.interval_minutes}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    interval_minutes: parseInt(e.target.value) || 60
+                  })}
+                />
+              </div>
+
+              <div>
+                <Label>Dias da semana disponíveis</Label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
+                  {dayNames.map((day, index) => (
+                    <div key={index} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`day-${index}`}
+                        checked={settings.available_days.includes(index)}
+                        onCheckedChange={(checked) => handleDayToggle(index, checked as boolean)}
+                      />
+                      <Label htmlFor={`day-${index}`} className="text-sm">
+                        {day}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Button 
+                onClick={handleSave} 
+                disabled={saving}
+                className="w-full md:w-auto"
+              >
+                {saving ? "Salvando..." : "Salvar Configurações"}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="exceptions">
+          <ScheduleExceptions />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

@@ -172,6 +172,33 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_settings: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          setting_key: string
+          setting_value: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          setting_key: string
+          setting_value: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          setting_key?: string
+          setting_value?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       procedure_results: {
         Row: {
           appointment_id: string
@@ -327,6 +354,45 @@ export type Database = {
           role?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      schedule_exceptions: {
+        Row: {
+          created_at: string
+          custom_end_time: string | null
+          custom_interval_minutes: number | null
+          custom_start_time: string | null
+          date_end: string | null
+          date_start: string
+          id: string
+          is_closed: boolean
+          reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          custom_end_time?: string | null
+          custom_interval_minutes?: number | null
+          custom_start_time?: string | null
+          date_end?: string | null
+          date_start: string
+          id?: string
+          is_closed?: boolean
+          reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          custom_end_time?: string | null
+          custom_interval_minutes?: number | null
+          custom_start_time?: string | null
+          date_end?: string | null
+          date_start?: string
+          id?: string
+          is_closed?: boolean
+          reason?: string | null
+          updated_at?: string
         }
         Relationships: []
       }

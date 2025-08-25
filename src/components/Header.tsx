@@ -1,8 +1,11 @@
+"use client"; // This directive marks the component as a Client Component, necessary for hooks and browser APIs
+
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, Instagram, ChevronDown, ChevronRight, User } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+// Corrected the import path for supabase to a relative path
+import { supabase } from "../integrations/supabase/client"; 
 
 interface Category {
   id: string;
@@ -24,7 +27,7 @@ const Header = () => {
   const [expandedMobileCategory, setExpandedMobileCategory] = useState<string | null>(null);
   
   // Detectar se estamos na página inicial
-  const isHomePage = window.location.pathname === '/';
+  const isHomePage = typeof window !== 'undefined' ? window.location.pathname === '/' : false;
   
   // Refs para controlar o timeout do dropdown
   const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -439,4 +442,3 @@ const Header = () => {
 };
 
 export default Header;
-```

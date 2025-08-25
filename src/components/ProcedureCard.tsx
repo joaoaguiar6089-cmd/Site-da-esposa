@@ -63,7 +63,7 @@ const ProcedureCard = ({
             )}
           </div>
         </div>
-        <CardDescription className="text-base leading-relaxed">
+        <CardDescription className="text-base leading-relaxed whitespace-pre-line">
           {description}
         </CardDescription>
       </CardHeader>

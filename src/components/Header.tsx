@@ -419,7 +419,7 @@ const Header = () => {
                     <Button
                       className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white hover:scale-105 transition-all duration-300"
                       onClick={() => {
-                        window.open('https://instagram.com/drakarolineferreira', '_blank');
+                        window.open('https://instagram.com/dra_karolineferreira', '_blank');
                         setIsOpen(false);
                       }}
                     >

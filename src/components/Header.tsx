@@ -74,16 +74,8 @@ const Header = () => {
   };
 
   const handleWhatsApp = () => {
-    // Detectar se é mobile ou desktop
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-      // Mobile: abrir app do WhatsApp
-      window.open('https://wa.me/5597984387295', '_blank');
-    } else {
-      // Desktop: abrir WhatsApp Web
-      window.open('https://web.whatsapp.com/send?phone=5597984387295', '_blank');
-    }
+    // Changed to directly open WhatsApp Web for better desktop compatibility
+    window.open('https://web.whatsapp.com/send?phone=5511999999999', '_blank');
   };
 
   // Funções para controlar o dropdown com delay
@@ -447,3 +439,4 @@ const Header = () => {
 };
 
 export default Header;
+```

@@ -167,7 +167,9 @@ const ProceduresManagement = () => {
     setFilteredProcedures(filtered);
   }, [procedures, searchTerm, selectedCategory, selectedSubcategory]);
 
-  // Filtrar subcategorias pela categoria selecionada
+  // Mapear valores "all" para estado vazio
+  const displaySelectedCategory = selectedCategory || "all";
+  const displaySelectedSubcategory = selectedSubcategory || "all";
   const availableSubcategories = selectedCategory 
     ? subcategories.filter(sub => sub.category_id === selectedCategory)
     : subcategories;
@@ -448,7 +450,7 @@ const ProceduresManagement = () => {
                 </div>
                 <div>
                   <Label htmlFor="category">Categoria</Label>
-                  <Select value={formData.category_id} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
+                  <Select value={formData.category_id} onValueChange={(value) => setFormData({ ...formData, category_id: value, subcategory_id: "" })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione uma categoria" />
                     </SelectTrigger>
@@ -462,6 +464,26 @@ const ProceduresManagement = () => {
                   </Select>
                 </div>
               </div>
+
+              {formData.category_id && (
+                <div>
+                  <Label htmlFor="subcategory">Subcategoria</Label>
+                  <Select value={formData.subcategory_id} onValueChange={(value) => setFormData({ ...formData, subcategory_id: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma subcategoria (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subcategories
+                        .filter(sub => sub.category_id === formData.category_id)
+                        .map((subcategory) => (
+                          <SelectItem key={subcategory.id} value={subcategory.id}>
+                            {subcategory.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div>
                 <Label htmlFor="description">Descrição</Label>
@@ -662,15 +684,15 @@ const ProceduresManagement = () => {
               <Label htmlFor="filter-category" className="text-sm font-medium">
                 Categoria
               </Label>
-              <Select value={selectedCategory} onValueChange={(value) => {
-                setSelectedCategory(value);
+              <Select value={displaySelectedCategory} onValueChange={(value) => {
+                setSelectedCategory(value === "all" ? "" : value);
                 setSelectedSubcategory(""); // Reset subcategory when category changes
               }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Todas" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas as categorias</SelectItem>
+                  <SelectItem value="all">Todas as categorias</SelectItem>
                   {categories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
@@ -685,12 +707,12 @@ const ProceduresManagement = () => {
                 <Label htmlFor="filter-subcategory" className="text-sm font-medium">
                   Subcategoria
                 </Label>
-                <Select value={selectedSubcategory} onValueChange={setSelectedSubcategory}>
+                <Select value={displaySelectedSubcategory} onValueChange={(value) => setSelectedSubcategory(value === "all" ? "" : value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Todas" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todas as subcategorias</SelectItem>
+                    <SelectItem value="all">Todas as subcategorias</SelectItem>
                     {availableSubcategories.map((subcategory) => (
                       <SelectItem key={subcategory.id} value={subcategory.id}>
                         {subcategory.name}

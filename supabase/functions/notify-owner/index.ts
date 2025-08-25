@@ -30,22 +30,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const ZAPI_INSTANCE_ID = Deno.env.get('ZAPI_INSTANCE_ID');
     const ZAPI_TOKEN = Deno.env.get('ZAPI_TOKEN');
-    
-    // Get notification settings from database
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    
-    const settingsResponse = await fetch(`${supabaseUrl}/rest/v1/notification_settings?select=*`, {
-      headers: {
-        'Authorization': `Bearer ${supabaseServiceKey}`,
-        'Content-Type': 'application/json',
-        'apikey': supabaseServiceKey
-      }
-    });
-    
-    const settings = await settingsResponse.json();
-    const ownerPhoneSetting = settings.find((s: any) => s.setting_key === 'owner_phone');
-    const OWNER_PHONE = ownerPhoneSetting ? ownerPhoneSetting.setting_value.replace(/^55/, '') : '97984387295';
+    const OWNER_PHONE = '92986149271'; // Número da proprietária (sem prefixo 55)
 
     if (!ZAPI_INSTANCE_ID || !ZAPI_TOKEN) {
       console.error('Z-API credentials not configured');
@@ -60,35 +45,45 @@ const handler = async (req: Request): Promise<Response> => {
       ownerPhone: OWNER_PHONE
     });
 
-    let templateKey = '';
+    let templateType = '';
     
     switch (type) {
       case 'agendamento':
-        templateKey = 'new_appointment_template';
+        templateType = 'agendamento_proprietaria';
         break;
       case 'alteracao':
-        templateKey = 'appointment_change_template';
+        templateType = 'alteracao_proprietaria';
         break;
       case 'cancelamento':
-        templateKey = 'appointment_cancel_template';
+        templateType = 'cancelamento_proprietaria';
         break;
     }
 
     const formattedDate = new Date(appointmentDate).toLocaleDateString('pt-BR');
     const notesText = notes ? `\n📝 Observações: ${notes}` : '';
 
-    // Get template from database
-    const templateSetting = settings.find((s: any) => s.setting_key === templateKey);
-    let message = templateSetting ? templateSetting.setting_value : `Notificação de ${type}: ${clientName} - ${procedureName}`;
+    // Get template and format message
+    const getTemplateResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/get-whatsapp-template`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+      },
+      body: JSON.stringify({
+        templateType,
+        variables: {
+          clientName,
+          clientPhone,
+          appointmentDate: formattedDate,
+          appointmentTime,
+          procedureName,
+          notes: notesText
+        }
+      }),
+    });
 
-    // Replace variables in template
-    message = message
-      .replace(/{clientName}/g, clientName)
-      .replace(/{clientPhone}/g, clientPhone)
-      .replace(/{appointmentDate}/g, formattedDate)
-      .replace(/{appointmentTime}/g, appointmentTime)
-      .replace(/{procedureName}/g, procedureName)
-      .replace(/{notes}/g, notesText);
+    const templateResult = await getTemplateResponse.json();
+    const message = templateResult.message || `Notificação de ${type}: ${clientName} - ${procedureName}`;
 
     const requestBody = {
       phone: OWNER_PHONE,

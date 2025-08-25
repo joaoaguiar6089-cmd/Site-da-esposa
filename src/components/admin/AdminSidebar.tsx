@@ -31,7 +31,6 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
     { id: "hero-image", label: "Imagem Hero", icon: Image },
     { id: "schedule", label: "Horários", icon: Clock },
     { id: "notifications", label: "Notificações", icon: MessageSquare },
-    { id: "notification-debug", label: "Debug Notificações", icon: MessageSquare },
     { id: "admins", label: "Administradores", icon: Shield },
     { id: "security", label: "Segurança", icon: Shield },
   ];

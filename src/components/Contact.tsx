@@ -1,8 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageCircle, Instagram, MapPin, Clock, Phone } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const Contact = () => {
+  const navigate = useNavigate();
   const whatsappLink = "https://wa.me/5597984387295";
   const instagramLink = "https://www.instagram.com/dra_karolineferreira?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==";
 
@@ -121,7 +123,7 @@ const Contact = () => {
               <Button
                 variant="elegant"
                 size="lg"
-                onClick={() => window.open(whatsappLink, "_blank")}
+                onClick={() => navigate("/agendamento")}
               >
                 Agendar Consulta Agora
               </Button>

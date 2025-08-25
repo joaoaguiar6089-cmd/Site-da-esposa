@@ -220,7 +220,7 @@ const Header = () => {
             </Button>
             
             <Button
-              onClick={() => window.open('https://instagram.com/drakarolineferreira', '_blank')}
+              onClick={() => window.open('https://instagram.com/dra_karolineferreira', '_blank')}
               className="bg-gradient-to-r from-purple-500/90 to-pink-500/90 hover:from-purple-600 hover:to-pink-600 text-white backdrop-blur-sm hover:scale-105 transition-all duration-300 shadow-lg"
             >
               <Instagram className="w-4 h-4 mr-2" />

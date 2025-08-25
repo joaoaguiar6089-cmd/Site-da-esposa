@@ -23,7 +23,7 @@ const ProcedureCard = ({
   duration,
   sessions,
   indication,
-  procedureId 
+  procedureId
 }: ProcedureCardProps) => {
   const handleAgendamento = () => {
     const url = procedureId 
@@ -63,6 +63,7 @@ const ProcedureCard = ({
             )}
           </div>
         </div>
+        {/* AQUI ESTÁ A ALTERAÇÃO: adicionando a classe "whitespace-pre-line" */}
         <CardDescription className="text-base leading-relaxed whitespace-pre-line">
           {description}
         </CardDescription>
@@ -73,7 +74,7 @@ const ProcedureCard = ({
           {indication && (
             <div>
               <h4 className="font-semibold text-sm text-primary mb-2">Indicado para:</h4>
-              <p className="text-sm text-muted-foreground">{indication}</p>
+              <p className="text-sm text-muted-foreground whitespace-pre-line">{indication}</p>
             </div>
           )}
           

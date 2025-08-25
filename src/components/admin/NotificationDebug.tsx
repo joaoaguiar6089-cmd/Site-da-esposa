@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Phone, CheckCircle, XCircle, MessageSquare, Edit, Copy, Info } from "lucide-react";
+import { Send, Phone, CheckCircle, XCircle, MessageSquare, Edit, Copy, Info, Settings } from "lucide-react";
 
 const NotificationDebug = () => {
   const [testPhone, setTestPhone] = useState("");
@@ -22,6 +22,11 @@ const NotificationDebug = () => {
   const [cursorPosition, setCursorPosition] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
+  
+  // Owner notification settings
+  const [ownerPhone, setOwnerPhone] = useState("97984387295");
+  const [ownerTemplate, setOwnerTemplate] = useState("");
+  const [isLoadingOwnerSettings, setIsLoadingOwnerSettings] = useState(false);
 
   // Variáveis disponíveis para os templates
   const availableVariables = [
@@ -35,6 +40,7 @@ const NotificationDebug = () => {
 
   useEffect(() => {
     loadTemplates();
+    loadOwnerSettings();
   }, []);
 
   const loadTemplates = async () => {
@@ -47,6 +53,34 @@ const NotificationDebug = () => {
       console.error('Erro ao carregar templates:', error);
     } else {
       setTemplates(data || []);
+    }
+  };
+
+  const loadOwnerSettings = async () => {
+    try {
+      // Load owner notification template
+      const { data: templateData } = await supabase
+        .from('whatsapp_templates')
+        .select('template_content')
+        .eq('template_type', 'agendamento_proprietaria')
+        .single();
+      
+      if (templateData) {
+        setOwnerTemplate(templateData.template_content);
+      }
+
+      // Load owner phone from site settings if exists
+      const { data: phoneData } = await supabase
+        .from('site_settings')
+        .select('setting_value')
+        .eq('setting_key', 'owner_phone')
+        .single();
+      
+      if (phoneData) {
+        setOwnerPhone(phoneData.setting_value);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar configurações da proprietária:', error);
     }
   };
 
@@ -202,12 +236,50 @@ const NotificationDebug = () => {
     return names[type] || type;
   };
 
+  const saveOwnerSettings = async () => {
+    setIsLoadingOwnerSettings(true);
+    try {
+      // Save owner notification template
+      const { error: templateError } = await supabase
+        .from('whatsapp_templates')
+        .update({ template_content: ownerTemplate })
+        .eq('template_type', 'agendamento_proprietaria');
+
+      if (templateError) throw templateError;
+
+      // Save or update owner phone setting
+      const { error: phoneError } = await supabase
+        .from('site_settings')
+        .upsert({
+          setting_key: 'owner_phone',
+          setting_value: ownerPhone
+        });
+
+      if (phoneError) throw phoneError;
+
+      toast({
+        title: "✅ Configurações salvas!",
+        description: "Template e telefone da proprietária atualizados com sucesso",
+      });
+
+    } catch (error: any) {
+      toast({
+        title: "❌ Erro ao salvar",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingOwnerSettings(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Tabs defaultValue="test" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="test">Teste de Mensagens</TabsTrigger>
           <TabsTrigger value="templates">Editar Templates</TabsTrigger>
+          <TabsTrigger value="owner">Notificações Proprietária</TabsTrigger>
         </TabsList>
         
         <TabsContent value="test">
@@ -390,6 +462,126 @@ const NotificationDebug = () => {
                   )}
                 </div>
               ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="owner">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Configurações de Notificação para Proprietária
+              </CardTitle>
+              <CardDescription>
+                Configure o template e número que receberá notificações de novos agendamentos
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              
+              {/* Template Editor */}
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="ownerTemplate">Template para Novos Agendamentos</Label>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Personalize a mensagem que será enviada quando um novo agendamento for criado
+                  </p>
+                </div>
+                
+                {/* Variables Panel */}
+                <Card className="bg-blue-50 border-blue-200">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Info className="h-4 w-4 text-blue-600" />
+                      Variáveis Disponíveis
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {availableVariables.map((variable) => (
+                        <div
+                          key={variable.name}
+                          className="flex items-center justify-between p-2 bg-white rounded border hover:bg-blue-50 transition-colors group cursor-pointer"
+                          onClick={() => {
+                            const cursorPos = ownerTemplate.length;
+                            setOwnerTemplate(prev => prev + `{${variable.name}}`);
+                          }}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <code className="text-sm font-mono text-blue-700">
+                              {`{${variable.name}}`}
+                            </code>
+                            <p className="text-xs text-gray-600 truncate">
+                              {variable.description}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost" 
+                            size="sm"
+                            className="opacity-0 group-hover:opacity-100 h-6 w-6 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              copyVariable(variable.name);
+                            }}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 text-xs text-blue-600 bg-blue-100 p-2 rounded">
+                      💡 <strong>Dica:</strong> Clique em uma variável para adicionar ao template
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Textarea
+                  id="ownerTemplate"
+                  value={ownerTemplate}
+                  onChange={(e) => setOwnerTemplate(e.target.value)}
+                  rows={8}
+                  className="font-mono text-sm"
+                  placeholder="Digite o template da mensagem para a proprietária...
+
+Exemplo:
+🔔 *Novo Agendamento Recebido*
+
+👤 *Cliente:* {clientName}
+📱 *Telefone:* {clientPhone}
+📅 *Data:* {appointmentDate}
+🕐 *Horário:* {appointmentTime}
+💉 *Procedimento:* {procedureName}
+{notes}"
+                />
+              </div>
+
+              {/* Phone Number Configuration */}
+              <div className="space-y-2">
+                <Label htmlFor="ownerPhone">Telefone da Proprietária</Label>
+                <p className="text-sm text-muted-foreground">
+                  Número que receberá as notificações de novos agendamentos (apenas números)
+                </p>
+                <Input
+                  id="ownerPhone"
+                  value={ownerPhone}
+                  onChange={(e) => setOwnerPhone(e.target.value.replace(/\D/g, ''))}
+                  placeholder="97984387295"
+                  maxLength={11}
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Formato: {ownerPhone ? formatPhone(ownerPhone) : "Digite o número"}
+                </p>
+              </div>
+
+              <Button 
+                onClick={saveOwnerSettings}
+                disabled={isLoadingOwnerSettings}
+                className="flex items-center gap-2"
+              >
+                <Settings className="h-4 w-4" />
+                {isLoadingOwnerSettings ? "Salvando..." : "Salvar Configurações"}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

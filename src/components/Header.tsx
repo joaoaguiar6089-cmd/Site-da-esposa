@@ -89,7 +89,7 @@ const Header = () => {
     dropdownTimeoutRef.current = setTimeout(() => {
       setShowProcedimentos(false);
       setActiveCategory(null);
-    }, 300); // Aumentado para 300ms
+    }, 200); // 200ms é um bom ponto de partida, mas pode ajustar.
   };
 
   const handleSubmenuMouseEnter = (categoryId: string) => {
@@ -100,12 +100,6 @@ const Header = () => {
       clearTimeout(dropdownTimeoutRef.current);
     }
     setActiveCategory(categoryId);
-  };
-
-  const handleSubmenuMouseLeave = () => {
-    submenuTimeoutRef.current = setTimeout(() => {
-      setActiveCategory(null);
-    }, 300); // Aumentado para 300ms
   };
 
   const navItems = [
@@ -133,8 +127,8 @@ const Header = () => {
 
           {/* Desktop Navigation - Canto Direito */}
           <div className="hidden lg:flex items-center space-x-6">
-            {/* Menu Procedimentos */}
-            <div 
+            {/* Contêiner Unificado para Dropdown Desktop */}
+            <div
               className="relative"
               onMouseEnter={handleDropdownMouseEnter}
               onMouseLeave={handleDropdownMouseLeave}
@@ -146,17 +140,15 @@ const Header = () => {
               
               {/* Dropdown Menu */}
               {showProcedimentos && (
-                <div 
+                <div
                   className="absolute top-full right-0 w-80 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-4 mt-2"
-                  onMouseEnter={handleDropdownMouseEnter}
-                  onMouseLeave={handleDropdownMouseLeave}
                 >
                   {categories.map((category) => (
-                    <div 
+                    <div
                       key={category.id}
                       className="relative group"
                       onMouseEnter={() => handleSubmenuMouseEnter(category.id)}
-                      onMouseLeave={handleSubmenuMouseLeave}
+                      onMouseLeave={() => setActiveCategory(null)}
                     >
                       <a
                         href={`/categoria/${category.id}`}
@@ -170,10 +162,10 @@ const Header = () => {
                       
                       {/* Subcategories Submenu */}
                       {activeCategory === category.id && category.subcategories && category.subcategories.length > 0 && (
-                        <div 
+                        <div
                           className="absolute left-full top-0 w-72 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-3 ml-1"
-                          onMouseEnter={() => handleSubmenuMouseEnter(category.id)}
-                          onMouseLeave={handleSubmenuMouseLeave}
+                          onMouseEnter={() => setActiveCategory(category.id)}
+                          onMouseLeave={() => setActiveCategory(null)}
                         >
                           {category.subcategories.map((subcategory) => (
                             <a

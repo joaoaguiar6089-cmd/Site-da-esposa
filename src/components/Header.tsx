@@ -1,11 +1,8 @@
-"use client"; // This directive marks the component as a Client Component, necessary for hooks and browser APIs
-
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, Instagram, ChevronDown, ChevronRight, User } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-// Corrected the import path for supabase to a relative path
-import { supabase } from "../integrations/supabase/client"; 
+import { supabase } from "@/integrations/supabase/client";
 
 interface Category {
   id: string;
@@ -27,7 +24,7 @@ const Header = () => {
   const [expandedMobileCategory, setExpandedMobileCategory] = useState<string | null>(null);
   
   // Detectar se estamos na página inicial
-  const isHomePage = typeof window !== 'undefined' ? window.location.pathname === '/' : false;
+  const isHomePage = window.location.pathname === '/';
   
   // Refs para controlar o timeout do dropdown
   const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -78,7 +75,6 @@ const Header = () => {
 
   const handleWhatsApp = () => {
     // Changed to directly open WhatsApp Web for better desktop compatibility
-    // Reverted phone number to original
     window.open('https://web.whatsapp.com/send?phone=5511999999999', '_blank');
   };
 
@@ -443,3 +439,4 @@ const Header = () => {
 };
 
 export default Header;
+```

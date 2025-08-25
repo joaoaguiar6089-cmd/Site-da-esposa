@@ -350,9 +350,9 @@ const Header = () => {
                                       setIsOpen(false);
                                       window.location.href = `/categoria/${category.id}`;
                                     }}
-                                    className="flex items-center px-4 py-2 text-sm bg-gradient-to-r from-red-600 to-red-500 text-white font-semibold hover:from-red-700 hover:to-red-600 rounded-lg transition-all duration-300 hover:scale-[1.02] shadow-sm hover:shadow-lg mx-1"
+                                    className="block px-4 py-2 text-sm bg-white/80 text-gray-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/80 hover:border-red-200 mx-1 font-medium"
                                   >
-                                    <span className="mr-2">📋</span>
+                                    <span className="mr-2">•</span>
                                     Todos os procedimentos
                                   </a>
 

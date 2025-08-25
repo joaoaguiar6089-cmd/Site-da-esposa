@@ -104,7 +104,49 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
 
   const generateTimeOptions = async () => {
     try {
-      // Buscar configurações de horários
+      // Verificar se a data tem exceções configuradas
+      if (formData.appointment_date) {
+        const { data: exceptions, error: exceptionsError } = await supabase
+          .from('schedule_exceptions')
+          .select('*')
+          .or(`and(date_start.lte.${formData.appointment_date},date_end.gte.${formData.appointment_date}),and(date_start.eq.${formData.appointment_date},date_end.is.null)`)
+          .order('date_start', { ascending: true });
+
+        if (exceptionsError) {
+          console.error('Erro ao buscar exceções:', exceptionsError);
+        }
+
+        // Se há exceção para essa data
+        if (exceptions && exceptions.length > 0) {
+          const exception = exceptions[0]; // Pega a primeira exceção válida
+          
+          // Se a clínica está fechada nesta data
+          if (exception.is_closed) {
+            return [];
+          }
+          
+          // Se há horários customizados, usar eles
+          if (exception.custom_start_time && exception.custom_end_time && exception.custom_interval_minutes) {
+            const times = [];
+            const [startHour, startMinute] = exception.custom_start_time.split(':').map(Number);
+            const [endHour, endMinute] = exception.custom_end_time.split(':').map(Number);
+            
+            const startTotalMinutes = startHour * 60 + startMinute;
+            const endTotalMinutes = endHour * 60 + endMinute;
+            
+            for (let minutes = startTotalMinutes; minutes < endTotalMinutes; minutes += exception.custom_interval_minutes) {
+              const hour = Math.floor(minutes / 60);
+              const minute = minutes % 60;
+              const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+              times.push(timeString);
+            }
+            
+            return times;
+          }
+        }
+      }
+
+      // Buscar configurações de horários padrão
       const { data: settings, error } = await supabase
         .from('schedule_settings')
         .select('start_time, end_time, interval_minutes, available_days')
@@ -134,7 +176,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         }
       }
 
-      // Gerar horários baseados nas configurações
+      // Gerar horários baseados nas configurações padrão
       const times = [];
       const [startHour, startMinute] = settings.start_time.split(':').map(Number);
       const [endHour, endMinute] = settings.end_time.split(':').map(Number);
@@ -239,6 +281,26 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         }
       }
       setAvailableTimes(fallbackTimes);
+    }
+  };
+
+  const isDateDisabled = async (date: string) => {
+    try {
+      const { data: exceptions, error } = await supabase
+        .from('schedule_exceptions')
+        .select('is_closed')
+        .or(`and(date_start.lte.${date},date_end.gte.${date}),and(date_start.eq.${date},date_end.is.null)`)
+        .eq('is_closed', true);
+
+      if (error) {
+        console.error('Erro ao verificar data:', error);
+        return false;
+      }
+
+      return exceptions && exceptions.length > 0;
+    } catch (error) {
+      console.error('Erro ao verificar data:', error);
+      return false;
     }
   };
 
@@ -522,8 +584,20 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
               type="date"
               min={getMinDate()}
               value={formData.appointment_date}
-              onChange={(e) => {
+              onChange={async (e) => {
                 const newDate = e.target.value;
+                
+                // Verificar se a data está bloqueada
+                const isDisabled = await isDateDisabled(newDate);
+                if (isDisabled) {
+                  toast({
+                    title: "Data indisponível",
+                    description: "A clínica estará fechada nesta data. Escolha outra data.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                
                 setFormData(prev => ({ ...prev, appointment_date: newDate, appointment_time: "" }));
                 loadAvailableTimes(newDate);
               }}

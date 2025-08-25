@@ -23,7 +23,7 @@ const ProcedureCard = ({
   duration,
   sessions,
   indication,
-  procedureId
+  procedureId 
 }: ProcedureCardProps) => {
   const handleAgendamento = () => {
     const url = procedureId 
@@ -41,8 +41,7 @@ const ProcedureCard = ({
           className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
         />
         <div className="absolute top-4 right-4">
-          {/* Badge do preço: um pouco maior e mais forte */}
-          <Badge className="text-sm font-bold bg-red-600 text-white px-3 py-1 rounded-full shadow-md">
+          <Badge variant="secondary" className="bg-white/90 text-primary font-semibold">
             {price}
           </Badge>
         </div>
@@ -52,9 +51,8 @@ const ProcedureCard = ({
         <div className="flex items-center justify-between">
           <CardTitle className="text-xl text-primary">{title}</CardTitle>
           <div className="flex gap-2">
-            {/* Badge de duração: agora é um quadrado e o texto está maior e centralizado */}
             {duration && (
-              <Badge variant="outline" className="text-sm font-bold w-16 h-8 flex items-center justify-center border-2 border-red-400 text-red-600 bg-red-50">
+              <Badge variant="outline" className="text-xs">
                 {duration}
               </Badge>
             )}
@@ -65,7 +63,7 @@ const ProcedureCard = ({
             )}
           </div>
         </div>
-        <CardDescription className="text-base leading-relaxed">
+        <CardDescription className="text-base leading-relaxed whitespace-pre-line">
           {description}
         </CardDescription>
       </CardHeader>

@@ -60,14 +60,18 @@ const handler = async (req: Request): Promise<Response> => {
         break;
     }
 
-    // Format date correctly - ensure it's treated as string to avoid timezone issues
+    // Format date correctly to avoid timezone issues
     let formattedDate;
     if (typeof appointmentDate === 'string' && appointmentDate.includes('-')) {
-      // Date is in YYYY-MM-DD format, split and reformat
-      const [year, month, day] = appointmentDate.split('-');
-      formattedDate = `${day}/${month}/${year}`;
+      // Date is in YYYY-MM-DD format, split and reformat to DD/MM/YYYY
+      const dateParts = appointmentDate.split('-');
+      if (dateParts.length === 3) {
+        const [year, month, day] = dateParts;
+        formattedDate = `${day}/${month}/${year}`;
+      } else {
+        formattedDate = appointmentDate;
+      }
     } else {
-      // Fallback for other formats
       formattedDate = appointmentDate;
     }
     
@@ -75,6 +79,7 @@ const handler = async (req: Request): Promise<Response> => {
       originalDate: appointmentDate, 
       formattedDate 
     });
+    
     const notesText = notes ? `\n📝 Observações: ${notes}` : '';
 
     // Get template and format message

@@ -27,6 +27,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('=== Owner Notification Function Called ===');
     console.log('Notification type:', type);
     console.log('Client details:', { clientName, clientPhone });
+    console.log('Raw appointmentDate received:', appointmentDate);
 
     const ZAPI_INSTANCE_ID = Deno.env.get('ZAPI_INSTANCE_ID');
     const ZAPI_TOKEN = Deno.env.get('ZAPI_TOKEN');
@@ -62,6 +63,11 @@ const handler = async (req: Request): Promise<Response> => {
     // Format date correctly to avoid timezone issues
     const dateComponents = appointmentDate.split('-');
     const formattedDate = `${dateComponents[2]}/${dateComponents[1]}/${dateComponents[0]}`;
+    console.log('Date formatting:', { 
+      originalDate: appointmentDate, 
+      dateComponents, 
+      formattedDate 
+    });
     const notesText = notes ? `\n📝 Observações: ${notes}` : '';
 
     // Get template and format message
@@ -85,7 +91,9 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     const templateResult = await getTemplateResponse.json();
+    console.log('Template result:', templateResult);
     const message = templateResult.message || `Notificação de ${type}: ${clientName} - ${procedureName}`;
+    console.log('Final message to send:', message);
 
     const requestBody = {
       phone: OWNER_PHONE,

@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Clock, User, Phone, Edit, Trash2, Search, MessageSquare, Filter } from "lucide-react";
+import { Calendar, Clock, User, Phone, Edit, Trash2, Search, MessageSquare, Filter, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import AgendamentoForm from "@/components/agendamento/AgendamentoForm";
+import NewAppointmentForm from "@/components/admin/NewAppointmentForm";
 
 interface Appointment {
   id: string;
@@ -45,6 +46,7 @@ const AppointmentsList = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<string | null>(null);
   const [showEditForm, setShowEditForm] = useState(false);
+  const [showNewAppointmentForm, setShowNewAppointmentForm] = useState(false);
   const { toast } = useToast();
 
   // Carregar todos os agendamentos
@@ -150,6 +152,12 @@ const AppointmentsList = () => {
     handleCloseEditForm();
   };
 
+  // Handlers para novo agendamento
+  const handleNewAppointmentSuccess = () => {
+    setShowNewAppointmentForm(false);
+    loadAppointments();
+  };
+
   // Atualizar status do agendamento
   const updateAppointmentStatus = async (id: string, newStatus: string) => {
     try {
@@ -251,6 +259,16 @@ Aguardamos você!`;
     );
   }
 
+  // Se estiver no modo de novo agendamento
+  if (showNewAppointmentForm) {
+    return (
+      <NewAppointmentForm
+        onBack={() => setShowNewAppointmentForm(false)}
+        onSuccess={handleNewAppointmentSuccess}
+      />
+    );
+  }
+
   // Se estiver no modo de edição, mostrar o formulário
   if (showEditForm && selectedAppointment) {
     return (
@@ -274,9 +292,18 @@ Aguardamos você!`;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <Calendar className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold">Lista de Agendamentos</h1>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-bold">Lista de Agendamentos</h1>
+        </div>
+        <Button 
+          onClick={() => setShowNewAppointmentForm(true)}
+          className="flex items-center gap-2"
+        >
+          <Plus className="h-4 w-4" />
+          Novo Agendamento
+        </Button>
       </div>
 
       {/* Filtros */}

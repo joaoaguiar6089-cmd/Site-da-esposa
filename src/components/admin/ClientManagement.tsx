@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatCPF, cleanCPF, isValidCPF } from "@/utils/cpfValidator";
+import NewAppointmentForm from "@/components/admin/NewAppointmentForm";
 
 interface Client {
   id: string;
@@ -70,6 +71,7 @@ const ClientManagement = () => {
   const [showEditAppointmentDialog, setShowEditAppointmentDialog] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [showNewAppointmentForm, setShowNewAppointmentForm] = useState(false);
   const [appointmentFormData, setAppointmentFormData] = useState({
     appointment_date: "",
     appointment_time: "",
@@ -504,14 +506,41 @@ const ClientManagement = () => {
     return procedureResults.filter(result => result.appointment_id === appointmentId);
   };
 
+  // Handlers para novo agendamento
+  const handleNewAppointmentSuccess = () => {
+    setShowNewAppointmentForm(false);
+    loadAppointments();
+    loadClients();
+  };
+
+  // Se estiver no modo de novo agendamento
+  if (showNewAppointmentForm) {
+    return (
+      <NewAppointmentForm
+        onBack={() => setShowNewAppointmentForm(false)}
+        onSuccess={handleNewAppointmentSuccess}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Gerenciamento de Clientes</h2>
-        <Button onClick={() => setShowClientForm(true)}>
-          <User className="w-4 h-4 mr-2" />
-          Novo Cliente
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={() => setShowNewAppointmentForm(true)}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Novo Agendamento
+          </Button>
+          <Button onClick={() => setShowClientForm(true)}>
+            <User className="w-4 h-4 mr-2" />
+            Novo Cliente
+          </Button>
+        </div>
       </div>
 
       {/* Filtros */}

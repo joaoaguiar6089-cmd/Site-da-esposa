@@ -4,13 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar as CalendarIcon, Clock, User, Phone, Edit, Trash2, MessageSquare } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, User, Phone, Edit, Trash2, MessageSquare, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { format, parseISO, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import AgendamentoForm from "@/components/agendamento/AgendamentoForm";
+import NewAppointmentForm from "@/components/admin/NewAppointmentForm";
 
 interface Appointment {
   id: string;
@@ -44,6 +45,7 @@ const AdminCalendar = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<string | null>(null);
   const [showEditForm, setShowEditForm] = useState(false);
+  const [showNewAppointmentForm, setShowNewAppointmentForm] = useState(false);
   const { toast } = useToast();
 
   // Carregar todos os agendamentos
@@ -140,6 +142,12 @@ const AdminCalendar = () => {
       description: "O agendamento foi atualizado com sucesso.",
     });
     handleCloseEditForm();
+  };
+
+  // Handlers para novo agendamento
+  const handleNewAppointmentSuccess = () => {
+    setShowNewAppointmentForm(false);
+    loadAppointments();
   };
 
   // Atualizar status do agendamento
@@ -244,6 +252,16 @@ Aguardamos você!`;
     );
   }
 
+  // Se estiver no modo de novo agendamento
+  if (showNewAppointmentForm) {
+    return (
+      <NewAppointmentForm
+        onBack={() => setShowNewAppointmentForm(false)}
+        onSuccess={handleNewAppointmentSuccess}
+      />
+    );
+  }
+
   // Se estiver no modo de edição, mostrar o formulário
   if (showEditForm && selectedAppointment) {
     return (
@@ -267,9 +285,18 @@ Aguardamos você!`;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <CalendarIcon className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold">Calendário de Agendamentos</h1>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <CalendarIcon className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-bold">Calendário de Agendamentos</h1>
+        </div>
+        <Button 
+          onClick={() => setShowNewAppointmentForm(true)}
+          className="flex items-center gap-2"
+        >
+          <Plus className="h-4 w-4" />
+          Novo Agendamento
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

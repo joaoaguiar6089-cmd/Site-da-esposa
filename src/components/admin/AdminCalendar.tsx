@@ -153,12 +153,70 @@ const AdminCalendar = () => {
   // Atualizar status do agendamento
   const updateAppointmentStatus = async (id: string, newStatus: string) => {
     try {
+      // Primeiro, buscar os dados do agendamento para notificações
+      const { data: appointmentData, error: fetchError } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          clients (*),
+          procedures (name, price, duration)
+        `)
+        .eq('id', id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
       const { error } = await supabase
         .from('appointments')
         .update({ status: newStatus })
         .eq('id', id);
 
       if (error) throw error;
+
+      // Se mudou para "confirmado", enviar notificação WhatsApp para o cliente
+      if (newStatus === 'confirmado' && appointmentData) {
+        try {
+          const formatDateToBrazil = (dateString: string) => {
+            if (!dateString) return '';
+            
+            try {
+              if (dateString.includes('-') && dateString.length === 10) {
+                const [year, month, day] = dateString.split('-');
+                if (year && month && day) {
+                  return `${day}/${month}/${year}`;
+                }
+              }
+              return dateString;
+            } catch (error) {
+              return dateString;
+            }
+          };
+
+          const { data: templateData } = await supabase.functions.invoke('get-whatsapp-template', {
+            body: {
+              templateType: 'confirmacao_cliente',
+              variables: {
+                clientName: appointmentData.clients.nome,
+                appointmentDate: formatDateToBrazil(appointmentData.appointment_date),
+                appointmentTime: appointmentData.appointment_time,
+                procedureName: appointmentData.procedures.name,
+                notes: appointmentData.notes ? `\n📝 Observações: ${appointmentData.notes}` : ''
+              }
+            }
+          });
+
+          await supabase.functions.invoke('send-whatsapp', {
+            body: {
+              to: appointmentData.clients.celular,
+              message: templateData?.message || `🩺 *Agendamento Confirmado*\n\nOlá ${appointmentData.clients.nome}!\n\nSeu agendamento foi confirmado:\n\n📅 Data: ${formatDateToBrazil(appointmentData.appointment_date)}\n⏰ Horário: ${appointmentData.appointment_time}\n💉 Procedimento: ${appointmentData.procedures.name}\n\n📍 Clínica Dra. Karoline Ferreira\nTefé-AM\n\n✨ Aguardamos você!`
+            }
+          });
+
+          console.log('Notificação de confirmação enviada para:', appointmentData.clients.celular);
+        } catch (notificationError) {
+          console.error('Erro ao enviar notificação de confirmação:', notificationError);
+        }
+      }
 
       toast({
         title: "Status atualizado",

@@ -435,46 +435,8 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
           console.error('Erro ao enviar para webhook n8n:', webhookError);
         }
         
-        // WhatsApp para cliente usando template
-        const templateType = editingId ? 'agendamento_atualizado_cliente' : 'agendamento_cliente';
-        const notesText = formData.notes ? `\n📝 Observações: ${formData.notes}` : '';
-        
-        const { data: templateData } = await supabase.functions.invoke('get-whatsapp-template', {
-          body: {
-            templateType,
-            variables: {
-              clientName: client.nome,
-              appointmentDate: formatDateToBrazil(formData.appointment_date),
-              appointmentTime: formData.appointment_time,
-              procedureName: selectedProc?.name || '',
-              notes: notesText
-            }
-          }
-        });
-        
-        // Use consistent Brazil date formatting
-        const formattedDate = formatDateToBrazil(formData.appointment_date);
-        
-        const clientMessage = templateData?.message || `🩺 *Agendamento ${editingId ? 'Atualizado' : 'Confirmado'}*\n\nOlá ${client.nome}!\n\nSeu agendamento foi ${editingId ? 'atualizado' : 'confirmado'}:\n\n📅 Data: ${formattedDate}\n⏰ Horário: ${formData.appointment_time}\n💉 Procedimento: ${selectedProc?.name}${notesText}\n📍 Local: Av. Brasil, 63b, São Francisco - Tefé-AM\n🗺️ Ver localização: https://share.google/GBkRNRdCejpJYVANt\n\nObrigado pela confiança! 🙏`;
-        
-        console.log('Enviando WhatsApp para:', client.celular, 'Mensagem:', clientMessage.substring(0, 100) + '...');
-        
-        try {
-          const { data: whatsappData, error: whatsappError } = await supabase.functions.invoke('send-whatsapp', {
-            body: {
-              to: client.celular,
-              message: clientMessage
-            }
-          });
-          
-          if (whatsappError) {
-            console.error('Erro específico WhatsApp:', whatsappError);
-          } else {
-            console.log('WhatsApp enviado com sucesso:', whatsappData);
-          }
-        } catch (whatsappException) {
-          console.error('Exceção ao enviar WhatsApp:', whatsappException);
-        }
+        // Cliente NÃO recebe notificação na criação (apenas quando status muda para "confirmado")
+        console.log('Agendamento criado com status "agendado" - cliente não receberá notificação ainda');
 
 
         // Notificar proprietária da clínica via WhatsApp e Email

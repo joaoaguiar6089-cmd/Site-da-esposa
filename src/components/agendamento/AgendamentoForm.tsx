@@ -4,9 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Calendar } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ArrowLeft, Calendar, Check, ChevronsUpDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import type { Client } from "@/types/client";
 
 interface Procedure {
@@ -101,6 +104,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
   };
 
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+  const [procedureSearchOpen, setProcedureSearchOpen] = useState(false);
 
   const generateTimeOptions = async () => {
     try {
@@ -238,11 +242,23 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
       const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
       const selectedDuration = selectedProcedure?.duration || 60;
 
-      // Filtrar horários considerando conflitos de duração
-      const available = allTimes.filter(time => {
+      // Filtrar horários considerando conflitos de duração e horário atual se for hoje
+      let available = allTimes.filter(time => {
         // Converter horário para minutos para facilitar cálculos
         const [hour, minute] = time.split(':').map(Number);
         const timeInMinutes = hour * 60 + minute;
+        
+        // Se for hoje, verificar se o horário é futuro
+        const today = new Date().toISOString().split('T')[0];
+        if (date === today) {
+          const now = new Date();
+          const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
+          
+          // Adicionar uma margem de pelo menos 30 minutos a partir do horário atual
+          if (timeInMinutes <= currentTimeInMinutes + 30) {
+            return false;
+          }
+        }
         
         // Verificar se este horário conflita com agendamentos existentes
         const hasConflict = appointments?.some(apt => {
@@ -305,9 +321,8 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
   };
 
   const getMinDate = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
+    const today = new Date();
+    return today.toISOString().split('T')[0];
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -541,32 +556,75 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
             <label htmlFor="procedure" className="text-sm font-medium">
               Procedimento *
             </label>
-            <Select
-              value={formData.procedure_id}
-              onValueChange={(value) => {
-                setFormData(prev => ({ ...prev, procedure_id: value }));
-                // Recarregar horários quando procedimento mudar
-                if (formData.appointment_date) {
-                  loadAvailableTimes(formData.appointment_date);
-                }
-              }}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Selecione um procedimento" />
-              </SelectTrigger>
-              <SelectContent>
-                {procedures.map((procedure) => (
-                  <SelectItem key={procedure.id} value={procedure.id}>
-                    <div>
-                      <div className="font-medium">{procedure.name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {procedure.duration}min - R$ {procedure.price?.toFixed(2)}
+            <Popover open={procedureSearchOpen} onOpenChange={setProcedureSearchOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={procedureSearchOpen}
+                  className="w-full justify-between mt-1"
+                >
+                  {formData.procedure_id ? (
+                    <div className="text-left">
+                      <div className="font-medium">
+                        {procedures.find(p => p.id === formData.procedure_id)?.name}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {procedures.find(p => p.id === formData.procedure_id)?.duration}min - R$ {procedures.find(p => p.id === formData.procedure_id)?.price?.toFixed(2)}
                       </div>
                     </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                  ) : (
+                    "Selecione um procedimento..."
+                  )}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" style={{ width: 'var(--radix-popover-trigger-width)' }}>
+                <Command>
+                  <CommandInput placeholder="Buscar procedimento..." className="h-9" />
+                  <CommandList>
+                    <CommandEmpty>Nenhum procedimento encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      {procedures.map((procedure) => (
+                        <CommandItem
+                          key={procedure.id}
+                          value={`${procedure.name} ${procedure.description || ''}`}
+                          onSelect={() => {
+                            setFormData(prev => ({ ...prev, procedure_id: procedure.id, appointment_time: "" }));
+                            setProcedureSearchOpen(false);
+                            
+                            // Recarregar horários se uma data já estiver selecionada
+                            if (formData.appointment_date) {
+                              loadAvailableTimes(formData.appointment_date);
+                            }
+                          }}
+                        >
+                          <div className="flex flex-col w-full">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium">{procedure.name}</span>
+                              <Check
+                                className={cn(
+                                  "ml-2 h-4 w-4",
+                                  formData.procedure_id === procedure.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {procedure.duration}min - R$ {procedure.price?.toFixed(2)}
+                            </div>
+                            {procedure.description && (
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {procedure.description}
+                              </div>
+                            )}
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             {selectedProcedure && (
               <p className="text-sm text-muted-foreground mt-1">
                 {selectedProcedure.description}

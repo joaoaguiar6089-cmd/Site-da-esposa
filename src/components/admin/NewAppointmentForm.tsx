@@ -17,7 +17,7 @@ interface NewAppointmentFormProps {
   onSuccess: () => void;
 }
 
-type Step = 'select-client' | 'register-client' | 'register-phone' | 'appointment';
+type Step = 'select-client' | 'register-new-client' | 'appointment';
 
 const NewAppointmentForm = ({ onBack, onSuccess }: NewAppointmentFormProps) => {
   const [step, setStep] = useState<Step>('select-client');
@@ -26,7 +26,12 @@ const NewAppointmentForm = ({ onBack, onSuccess }: NewAppointmentFormProps) => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
-  const [phoneForRegistration, setPhoneForRegistration] = useState("");
+  const [newClientData, setNewClientData] = useState({
+    nome: "",
+    sobrenome: "",
+    celular: "",
+    cpf: ""
+  });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -75,12 +80,8 @@ const NewAppointmentForm = ({ onBack, onSuccess }: NewAppointmentFormProps) => {
     setStep('appointment');
   };
 
-  const handleNewClientByCPF = () => {
-    setStep('register-client');
-  };
-
-  const handleNewClientByPhone = () => {
-    setStep('register-phone');
+  const handleNewClient = () => {
+    setStep('register-new-client');
   };
 
   const handleClientRegistered = (client: Client) => {
@@ -104,31 +105,89 @@ const NewAppointmentForm = ({ onBack, onSuccess }: NewAppointmentFormProps) => {
     return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
   };
 
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatPhone(e.target.value);
-    setPhoneForRegistration(formatted);
+  const handleNewClientInputChange = (field: string, value: string) => {
+    if (field === 'celular') {
+      value = formatPhone(value);
+    } else if (field === 'cpf') {
+      value = formatCPF(value);
+    }
+    
+    setNewClientData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
-  const isValidPhone = (phone: string) => {
-    const numbers = phone.replace(/\D/g, '');
-    return numbers.length >= 10;
+  const isValidNewClientForm = () => {
+    const { nome, sobrenome, celular } = newClientData;
+    const phoneNumbers = celular.replace(/\D/g, '');
+    return nome.trim() && sobrenome.trim() && phoneNumbers.length >= 10;
   };
 
-  const handlePhoneSubmit = () => {
-    if (!isValidPhone(phoneForRegistration)) {
+  const handleNewClientSubmit = async () => {
+    if (!isValidNewClientForm()) {
       toast({
-        title: "Telefone inválido",
-        description: "Por favor, insira um telefone válido.",
+        title: "Dados incompletos",
+        description: "Por favor, preencha todos os campos obrigatórios.",
         variant: "destructive",
       });
       return;
     }
-    
-    // Aqui vamos para o componente de cadastro com telefone
-    // O CadastroClientePhone vai lidar com o cadastro completo
+
+    try {
+      setLoading(true);
+      
+      // Limpar e validar CPF se fornecido
+      let cpfToSave = cleanCPF(newClientData.cpf);
+      if (cpfToSave && !isValidCPF(cpfToSave)) {
+        toast({
+          title: "CPF inválido",
+          description: "Por favor, insira um CPF válido ou deixe em branco.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Se CPF não foi fornecido, gerar um temporário
+      if (!cpfToSave) {
+        cpfToSave = `temp_${Date.now()}`;
+      }
+
+      const clientData = {
+        nome: newClientData.nome.trim(),
+        sobrenome: newClientData.sobrenome.trim(),
+        celular: newClientData.celular,
+        cpf: cpfToSave
+      };
+
+      const { data, error } = await supabase
+        .from('clients')
+        .insert(clientData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Cliente cadastrado",
+        description: "Cliente cadastrado com sucesso!",
+      });
+
+      setSelectedClient(data);
+      setStep('appointment');
+    } catch (error) {
+      console.error('Erro ao cadastrar cliente:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao cadastrar cliente. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (step === 'register-phone') {
+  if (step === 'register-new-client') {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-2">
@@ -138,51 +197,77 @@ const NewAppointmentForm = ({ onBack, onSuccess }: NewAppointmentFormProps) => {
           <h1 className="text-2xl font-bold">Cadastrar Novo Cliente</h1>
         </div>
 
-        {phoneForRegistration && isValidPhone(phoneForRegistration) ? (
-          <CadastroClientePhone
-            phone={phoneForRegistration}
-            onClientRegistered={handleClientRegistered}
-            onBack={() => setStep('select-client')}
-          />
-        ) : (
-          <Card className="max-w-md mx-auto">
-            <CardHeader>
-              <CardTitle>Informar Telefone</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="phone">Telefone do Cliente *</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="(00) 00000-0000"
-                  value={phoneForRegistration}
-                  onChange={handlePhoneChange}
-                  maxLength={15}
-                />
-              </div>
-              
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setStep('select-client')}
-                  className="flex-1"
-                >
-                  Voltar
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handlePhoneSubmit}
-                  disabled={!isValidPhone(phoneForRegistration)}
-                  className="flex-1"
-                >
-                  Continuar
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        <Card className="max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle>Dados do Cliente</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="nome">Nome *</Label>
+              <Input
+                id="nome"
+                type="text"
+                placeholder="Nome do cliente"
+                value={newClientData.nome}
+                onChange={(e) => handleNewClientInputChange('nome', e.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="sobrenome">Sobrenome *</Label>
+              <Input
+                id="sobrenome"
+                type="text"
+                placeholder="Sobrenome do cliente"
+                value={newClientData.sobrenome}
+                onChange={(e) => handleNewClientInputChange('sobrenome', e.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="celular">Celular *</Label>
+              <Input
+                id="celular"
+                type="tel"
+                placeholder="(00) 00000-0000"
+                value={newClientData.celular}
+                onChange={(e) => handleNewClientInputChange('celular', e.target.value)}
+                maxLength={15}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="cpf">CPF (opcional)</Label>
+              <Input
+                id="cpf"
+                type="text"
+                placeholder="000.000.000-00"
+                value={newClientData.cpf}
+                onChange={(e) => handleNewClientInputChange('cpf', e.target.value)}
+                maxLength={14}
+              />
+            </div>
+            
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep('select-client')}
+                className="flex-1"
+              >
+                Voltar
+              </Button>
+              <Button
+                type="button"
+                onClick={handleNewClientSubmit}
+                disabled={!isValidNewClientForm() || loading}
+                className="flex-1"
+              >
+                {loading ? "Cadastrando..." : "Cadastrar"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -233,23 +318,15 @@ const NewAppointmentForm = ({ onBack, onSuccess }: NewAppointmentFormProps) => {
             />
           </div>
 
-          {/* Botões para novo cliente */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-4 border-b">
+          {/* Botão para novo cliente */}
+          <div className="pb-4 border-b">
             <Button
               variant="outline"
-              onClick={handleNewClientByPhone}
-              className="flex items-center gap-2"
+              onClick={handleNewClient}
+              className="flex items-center gap-2 w-full"
             >
               <Plus className="h-4 w-4" />
-              Novo Cliente (Telefone)
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleNewClientByCPF}
-              className="flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Novo Cliente (CPF)
+              NOVO CLIENTE
             </Button>
           </div>
 

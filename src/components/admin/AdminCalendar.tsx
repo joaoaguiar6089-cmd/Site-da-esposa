@@ -311,6 +311,7 @@ Aguardamos você!`;
               selected={selectedDate}
               onSelect={(date) => date && setSelectedDate(date)}
               className="rounded-md border w-full"
+              locale={ptBR}
               modifiers={{
                 hasAppointments: (date) => hasAppointments(date)
               }}

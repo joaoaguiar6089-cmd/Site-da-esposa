@@ -59,7 +59,9 @@ const handler = async (req: Request): Promise<Response> => {
         break;
     }
 
-    const formattedDate = new Date(appointmentDate).toLocaleDateString('pt-BR');
+    // Format date correctly to avoid timezone issues
+    const dateComponents = appointmentDate.split('-');
+    const formattedDate = `${dateComponents[2]}/${dateComponents[1]}/${dateComponents[0]}`;
     const notesText = notes ? `\n📝 Observações: ${notes}` : '';
 
     // Get template and format message

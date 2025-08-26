@@ -439,25 +439,23 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         console.log('Agendamento criado com status "agendado" - cliente não receberá notificação ainda');
 
 
-        // Notificar proprietária da clínica via WhatsApp e Email
+        // Notificar proprietária da clínica via WhatsApp
         try {
-          console.log('Dados sendo enviados para notify-owner:', {
+          const ownerNotifyData = {
+            type: editingId ? 'alteracao' : 'agendamento',
+            clientName: `${client.nome} ${client.sobrenome}`,
+            clientPhone: client.celular,
             appointmentDate: formData.appointment_date,
             appointmentTime: formData.appointment_time,
-            clientName: `${client.nome} ${client.sobrenome}`
-          });
+            procedureName: selectedProc?.name || '',
+            professionalName: null,
+            notes: formData.notes
+          };
+          
+          console.log('Dados completos sendo enviados para notify-owner:', ownerNotifyData);
           
           const ownerNotifyResult = await supabase.functions.invoke('notify-owner', {
-            body: {
-              type: editingId ? 'alteracao' : 'agendamento',
-              clientName: `${client.nome} ${client.sobrenome}`,
-              clientPhone: client.celular,
-              appointmentDate: formData.appointment_date,
-              appointmentTime: formData.appointment_time,
-              procedureName: selectedProc?.name || '',
-              professionalName: null,
-              notes: formData.notes
-            }
+            body: ownerNotifyData
           });
 
           console.log('Resultado da notificação para proprietária:', ownerNotifyResult);

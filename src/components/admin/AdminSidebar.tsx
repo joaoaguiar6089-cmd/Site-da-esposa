@@ -29,7 +29,7 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
     { id: "categories", label: "Categorias", icon: Tag },
     { id: "procedures", label: "Procedimentos", icon: Stethoscope },
     { id: "promotions", label: "Promoções", icon: Badge },
-    { id: "hero-image", label: "Imagem Hero", icon: Image },
+    { id: "hero-image", label: "Imagem Principal", icon: Image },
     { id: "schedule", label: "Horários", icon: Clock },
     { id: "notifications", label: "Notificações", icon: MessageSquare },
     { id: "admins", label: "Administradores", icon: Shield },

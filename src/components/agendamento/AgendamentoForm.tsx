@@ -10,6 +10,7 @@ import { ArrowLeft, Calendar, Check, ChevronsUpDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { formatDateToBrazil, getCurrentDateBrazil } from '@/utils/dateUtils';
 import type { Client } from "@/types/client";
 
 interface Procedure {
@@ -443,7 +444,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
             templateType,
             variables: {
               clientName: client.nome,
-              appointmentDate: new Date(formData.appointment_date).toLocaleDateString('pt-BR'),
+              appointmentDate: formatDateToBrazil(formData.appointment_date),
               appointmentTime: formData.appointment_time,
               procedureName: selectedProc?.name || '',
               notes: notesText
@@ -451,9 +452,8 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
           }
         });
         
-        // Format date correctly to avoid timezone issues
-        const dateComponents = formData.appointment_date.split('-');
-        const formattedDate = `${dateComponents[2]}/${dateComponents[1]}/${dateComponents[0]}`;
+        // Use consistent Brazil date formatting
+        const formattedDate = formatDateToBrazil(formData.appointment_date);
         
         const clientMessage = templateData?.message || `🩺 *Agendamento ${editingId ? 'Atualizado' : 'Confirmado'}*\n\nOlá ${client.nome}!\n\nSeu agendamento foi ${editingId ? 'atualizado' : 'confirmado'}:\n\n📅 Data: ${formattedDate}\n⏰ Horário: ${formData.appointment_time}\n💉 Procedimento: ${selectedProc?.name}${notesText}\n📍 Local: Av. Brasil, 63b, São Francisco - Tefé-AM\n🗺️ Ver localização: https://share.google/GBkRNRdCejpJYVANt\n\nObrigado pela confiança! 🙏`;
         

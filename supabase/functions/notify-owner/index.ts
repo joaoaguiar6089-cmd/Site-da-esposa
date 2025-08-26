@@ -60,20 +60,26 @@ const handler = async (req: Request): Promise<Response> => {
         break;
     }
 
-    // Format date correctly to avoid timezone issues
-    let formattedDate;
-    if (typeof appointmentDate === 'string' && appointmentDate.includes('-')) {
-      // Date is in YYYY-MM-DD format, split and reformat to DD/MM/YYYY
-      const dateParts = appointmentDate.split('-');
-      if (dateParts.length === 3) {
-        const [year, month, day] = dateParts;
-        formattedDate = `${day}/${month}/${year}`;
-      } else {
-        formattedDate = appointmentDate;
+    // Format date consistently to Brazilian format (DD/MM/YYYY)
+    const formatDateToBrazil = (dateString: string): string => {
+      if (!dateString) return '';
+      
+      try {
+        // If date is in YYYY-MM-DD format, convert to DD/MM/YYYY
+        if (dateString.includes('-') && dateString.length === 10) {
+          const [year, month, day] = dateString.split('-');
+          if (year && month && day) {
+            return `${day}/${month}/${year}`;
+          }
+        }
+        return dateString;
+      } catch (error) {
+        console.error('Error formatting date:', error);
+        return dateString;
       }
-    } else {
-      formattedDate = appointmentDate;
-    }
+    };
+    
+    const formattedDate = formatDateToBrazil(appointmentDate);
     
     console.log('Date formatting:', { 
       originalDate: appointmentDate, 

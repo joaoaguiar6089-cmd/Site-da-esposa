@@ -163,7 +163,7 @@ const handler = async (req: Request): Promise<Response> => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Client-Token': ZAPI_TOKEN
+        'Client-Token': 'Fa3cbd2c46f99489eb361d6ccd87960efS' // Token de segurança Z-API (mesmo usado em send-whatsapp)
       },
       body: JSON.stringify(zapiRequestBody)
     });

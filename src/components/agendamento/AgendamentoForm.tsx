@@ -447,7 +447,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
             clientName: `${client.nome} ${client.sobrenome}`
           });
           
-          const ownerNotifyPromise = supabase.functions.invoke('notify-owner', {
+          const ownerNotifyResult = await supabase.functions.invoke('notify-owner', {
             body: {
               type: editingId ? 'alteracao' : 'agendamento',
               clientName: `${client.nome} ${client.sobrenome}`,
@@ -460,13 +460,15 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
             }
           });
 
+          console.log('Resultado da notificação para proprietária:', ownerNotifyResult);
+
           console.log('Dados sendo enviados para notify-admins:', {
             appointmentDate: formData.appointment_date,
             appointmentTime: formData.appointment_time,
             clientName: `${client.nome} ${client.sobrenome}`
           });
 
-          const emailNotifyPromise = supabase.functions.invoke('notify-admins', {
+          const emailNotifyResult = await supabase.functions.invoke('notify-admins', {
             body: {
               type: editingId ? 'alteracao' : 'agendamento',
               clientName: `${client.nome} ${client.sobrenome}`,
@@ -478,7 +480,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
             }
           });
 
-          await Promise.allSettled([ownerNotifyPromise, emailNotifyPromise]);
+          console.log('Resultado da notificação para admins:', emailNotifyResult);
         } catch (ownerNotificationError) {
           console.error('Erro ao notificar proprietária:', ownerNotificationError);
         }

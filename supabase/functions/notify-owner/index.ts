@@ -31,7 +31,17 @@ const handler = async (req: Request): Promise<Response> => {
 
     const ZAPI_INSTANCE_ID = Deno.env.get('ZAPI_INSTANCE_ID');
     const ZAPI_TOKEN = Deno.env.get('ZAPI_TOKEN');
-    const OWNER_PHONE = '92986149271'; // Número da proprietária (sem prefixo 55)
+    
+    // Get owner phone from database settings
+    const ownerPhoneResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/rest/v1/notification_settings?setting_key=eq.owner_phone&select=setting_value`, {
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        'apikey': Deno.env.get('SUPABASE_ANON_KEY') || '',
+      },
+    });
+    
+    const ownerPhoneData = await ownerPhoneResponse.json();
+    const OWNER_PHONE = ownerPhoneData?.[0]?.setting_value || '5597984387295'; // Fallback para o número da proprietária
 
     if (!ZAPI_INSTANCE_ID || !ZAPI_TOKEN) {
       console.error('Z-API credentials not configured');

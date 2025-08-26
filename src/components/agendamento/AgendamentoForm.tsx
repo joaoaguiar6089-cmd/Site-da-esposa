@@ -479,6 +479,12 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
 
         // Notificar proprietária da clínica via WhatsApp e Email
         try {
+          console.log('Dados sendo enviados para notify-owner:', {
+            appointmentDate: formData.appointment_date,
+            appointmentTime: formData.appointment_time,
+            clientName: `${client.nome} ${client.sobrenome}`
+          });
+          
           const ownerNotifyPromise = supabase.functions.invoke('notify-owner', {
             body: {
               type: editingId ? 'alteracao' : 'agendamento',
@@ -490,6 +496,12 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
               professionalName: null,
               notes: formData.notes
             }
+          });
+
+          console.log('Dados sendo enviados para notify-admins:', {
+            appointmentDate: formData.appointment_date,
+            appointmentTime: formData.appointment_time,
+            clientName: `${client.nome} ${client.sobrenome}`
           });
 
           const emailNotifyPromise = supabase.functions.invoke('notify-admins', {

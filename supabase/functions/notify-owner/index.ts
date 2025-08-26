@@ -27,7 +27,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('=== Owner Notification Function Called ===');
     console.log('Notification type:', type);
     console.log('Client details:', { clientName, clientPhone });
-    console.log('Raw appointmentDate received:', appointmentDate);
+    console.log('Raw appointmentDate received:', appointmentDate); // Adicionei este log para depuração
 
     const ZAPI_INSTANCE_ID = Deno.env.get('ZAPI_INSTANCE_ID');
     const ZAPI_TOKEN = Deno.env.get('ZAPI_TOKEN');

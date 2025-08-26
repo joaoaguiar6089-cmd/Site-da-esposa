@@ -451,7 +451,11 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
           }
         });
         
-        const clientMessage = templateData?.message || `🩺 *Agendamento ${editingId ? 'Atualizado' : 'Confirmado'}*\n\nOlá ${client.nome}!\n\nSeu agendamento foi ${editingId ? 'atualizado' : 'confirmado'}:\n\n📅 Data: ${new Date(formData.appointment_date).toLocaleDateString('pt-BR')}\n⏰ Horário: ${formData.appointment_time}\n💉 Procedimento: ${selectedProc?.name}${notesText}\n📍 Local: Av. Brasil, 63b, São Francisco - Tefé-AM\n🗺️ Ver localização: https://share.google/GBkRNRdCejpJYVANt\n\nObrigado pela confiança! 🙏`;
+        // Format date correctly to avoid timezone issues
+        const dateComponents = formData.appointment_date.split('-');
+        const formattedDate = `${dateComponents[2]}/${dateComponents[1]}/${dateComponents[0]}`;
+        
+        const clientMessage = templateData?.message || `🩺 *Agendamento ${editingId ? 'Atualizado' : 'Confirmado'}*\n\nOlá ${client.nome}!\n\nSeu agendamento foi ${editingId ? 'atualizado' : 'confirmado'}:\n\n📅 Data: ${formattedDate}\n⏰ Horário: ${formData.appointment_time}\n💉 Procedimento: ${selectedProc?.name}${notesText}\n📍 Local: Av. Brasil, 63b, São Francisco - Tefé-AM\n🗺️ Ver localização: https://share.google/GBkRNRdCejpJYVANt\n\nObrigado pela confiança! 🙏`;
         
         console.log('Enviando WhatsApp para:', client.celular, 'Mensagem:', clientMessage.substring(0, 100) + '...');
         

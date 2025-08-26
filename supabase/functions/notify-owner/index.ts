@@ -60,26 +60,19 @@ const handler = async (req: Request): Promise<Response> => {
         break;
     }
 
-    // Debug: Log raw date received
-    console.log('=== DEBUGGING DATE ISSUE ===');
-    console.log('Raw appointmentDate type:', typeof appointmentDate);
-    console.log('Raw appointmentDate value:', appointmentDate);
-    console.log('Raw appointmentDate as JSON:', JSON.stringify(appointmentDate));
-    
-    // Check if it's already a Date object or string
-    let dateString = appointmentDate;
-    if (appointmentDate instanceof Date) {
-      console.log('appointmentDate is a Date object, converting to ISO string');
-      dateString = appointmentDate.toISOString().split('T')[0];
+    // Format date correctly - ensure it's treated as string to avoid timezone issues
+    let formattedDate;
+    if (typeof appointmentDate === 'string' && appointmentDate.includes('-')) {
+      // Date is in YYYY-MM-DD format, split and reformat
+      const [year, month, day] = appointmentDate.split('-');
+      formattedDate = `${day}/${month}/${year}`;
+    } else {
+      // Fallback for other formats
+      formattedDate = appointmentDate;
     }
     
-    // Format date correctly to avoid timezone issues
-    const dateComponents = dateString.split('-');
-    const formattedDate = `${dateComponents[2]}/${dateComponents[1]}/${dateComponents[0]}`;
-    console.log('Date formatting detailed:', { 
-      originalDate: appointmentDate,
-      dateString: dateString,
-      dateComponents, 
+    console.log('Date formatting:', { 
+      originalDate: appointmentDate, 
       formattedDate 
     });
     const notesText = notes ? `\n📝 Observações: ${notes}` : '';

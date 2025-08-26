@@ -402,7 +402,10 @@ Aguardamos você!`;
                 {dayAppointments.map((appointment) => (
                   <div
                     key={appointment.id}
-                    className="p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                    className={cn(
+                      "p-3 border rounded-lg cursor-pointer transition-colors",
+                      appointment.status === 'confirmado' ? "bg-green-500 text-white hover:bg-green-600" : "hover:bg-muted/50"
+                    )}
                     onClick={() => handleAppointmentClick(appointment)}
                   >
                     <div className="flex items-center justify-between mb-2">
@@ -414,7 +417,7 @@ Aguardamos você!`;
                     <p className="text-sm font-medium">
                       {appointment.clients.nome} {appointment.clients.sobrenome}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs">
                       {appointment.procedures.name}
                     </p>
                   </div>

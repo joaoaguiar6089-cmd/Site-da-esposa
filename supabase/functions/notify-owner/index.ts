@@ -22,17 +22,30 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { type, clientName, clientPhone, appointmentDate, appointmentTime, procedureName, professionalName, notes }: NotificationRequest = await req.json();
+    console.log('=== Owner Notification Function Started ===');
+    
+    const requestBody = await req.json();
+    console.log('Request body received:', requestBody);
+    
+    const { type, clientName, clientPhone, appointmentDate, appointmentTime, procedureName, professionalName, notes }: NotificationRequest = requestBody;
 
     console.log('=== Owner Notification Function Called ===');
     console.log('Notification type:', type);
     console.log('Client details:', { clientName, clientPhone });
-    console.log('Raw appointmentDate received:', appointmentDate); // Adicionei este log para depuração
+    console.log('Raw appointmentDate received:', appointmentDate);
 
     const ZAPI_INSTANCE_ID = Deno.env.get('ZAPI_INSTANCE_ID');
     const ZAPI_TOKEN = Deno.env.get('ZAPI_TOKEN');
     
+    console.log('Environment variables check:', {
+      hasInstanceId: !!ZAPI_INSTANCE_ID,
+      hasToken: !!ZAPI_TOKEN,
+      supabaseUrl: !!Deno.env.get('SUPABASE_URL'),
+      supabaseKey: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    });
+    
     // Get owner phone from database settings
+    console.log('Fetching owner phone from database...');
     const ownerPhoneResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/rest/v1/notification_settings?setting_key=eq.owner_phone&select=setting_value`, {
       headers: {
         'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
@@ -40,8 +53,18 @@ const handler = async (req: Request): Promise<Response> => {
       },
     });
     
+    console.log('Owner phone response status:', ownerPhoneResponse.status);
+    
+    if (!ownerPhoneResponse.ok) {
+      console.error('Failed to fetch owner phone:', await ownerPhoneResponse.text());
+      throw new Error(`Failed to fetch owner phone: ${ownerPhoneResponse.status}`);
+    }
+    
     const ownerPhoneData = await ownerPhoneResponse.json();
+    console.log('Owner phone data:', ownerPhoneData);
+    
     const OWNER_PHONE = ownerPhoneData?.[0]?.setting_value || '5597984387295'; // Fallback para o número da proprietária
+    console.log('Owner phone to use:', OWNER_PHONE);
 
     if (!ZAPI_INSTANCE_ID || !ZAPI_TOKEN) {
       console.error('Z-API credentials not configured');
@@ -123,7 +146,7 @@ const handler = async (req: Request): Promise<Response> => {
     const message = templateResult.message || `Notificação de ${type}: ${clientName} - ${procedureName}`;
     console.log('Final message to send:', message);
 
-    const requestBody = {
+    const zapiRequestBody = {
       phone: OWNER_PHONE,
       message: message
     };
@@ -132,7 +155,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Sending Z-API request:', {
       url,
-      body: requestBody,
+      body: zapiRequestBody,
       headers: { 'Content-Type': 'application/json', 'Client-Token': '[REDACTED]' }
     });
 
@@ -142,7 +165,7 @@ const handler = async (req: Request): Promise<Response> => {
         'Content-Type': 'application/json',
         'Client-Token': ZAPI_TOKEN
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(zapiRequestBody)
     });
 
     const data = await response.json();

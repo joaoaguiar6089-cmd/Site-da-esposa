@@ -755,8 +755,8 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
               Voltar
             </Button>
             
-            {/* Botão de cancelar - apenas para agendamentos confirmados */}
-            {editingId && currentAppointment?.status === 'confirmado' && (
+            {/* Botão de cancelar - para agendamentos confirmados e agendados */}
+            {editingId && (currentAppointment?.status === 'confirmado' || currentAppointment?.status === 'agendado') && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button

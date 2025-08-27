@@ -526,7 +526,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
 
       if (error) throw error;
 
-      // Se o status anterior era "confirmado", notificar a proprietária
+      // Se o status anterior era "confirmado", notificar a proprietária e o cliente
       if (currentAppointment.status === 'confirmado') {
         try {
           const cancelNotifyData = {
@@ -545,6 +545,33 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
           });
         } catch (notificationError) {
           console.error('Erro ao notificar proprietária sobre cancelamento:', notificationError);
+        }
+
+        // Notificar o cliente via WhatsApp
+        try {
+          const clientMessage = `❌ *Agendamento Cancelado*
+
+Olá ${client.nome}!
+
+Seu agendamento foi cancelado:
+
+📅 Data: ${formatDateToBrazil(currentAppointment.appointment_date)}
+⏰ Horário: ${currentAppointment.appointment_time}
+💉 Procedimento: ${currentAppointment.procedures?.name || ''}
+
+📍 Clínica Dra. Karoline Ferreira
+Tefé-AM
+
+Para reagendar, entre em contato conosco.`;
+
+          await supabase.functions.invoke('send-whatsapp', {
+            body: {
+              phone: client.celular,
+              message: clientMessage
+            }
+          });
+        } catch (clientNotificationError) {
+          console.error('Erro ao notificar cliente sobre cancelamento:', clientNotificationError);
         }
       }
 

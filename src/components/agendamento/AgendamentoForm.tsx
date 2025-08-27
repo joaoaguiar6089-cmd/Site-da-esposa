@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ArrowLeft, Calendar, Check, ChevronsUpDown } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { ArrowLeft, Calendar, Check, ChevronsUpDown, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,8 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
   });
   const [loading, setLoading] = useState(false);
   const [loadingProcedures, setLoadingProcedures] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
+  const [currentAppointment, setCurrentAppointment] = useState<any>(null);
   const { toast } = useToast();
 
   const loadProcedures = async () => {
@@ -79,12 +82,16 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
     try {
       const { data, error } = await supabase
         .from('appointments')
-        .select('*')
+        .select(`
+          *,
+          procedures!appointments_procedure_id_fkey(name, duration, price)
+        `)
         .eq('id', appointmentId)
         .single();
 
       if (error) throw error;
 
+      setCurrentAppointment(data);
       setFormData({
         procedure_id: data.procedure_id || "",
         appointment_date: data.appointment_date,
@@ -505,6 +512,60 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
     }
   };
 
+  const handleCancelAppointment = async () => {
+    if (!editingId || !currentAppointment) return;
+    
+    setCancelling(true);
+    
+    try {
+      // Cancelar o agendamento
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'cancelado' })
+        .eq('id', editingId);
+
+      if (error) throw error;
+
+      // Se o status anterior era "confirmado", notificar a proprietária
+      if (currentAppointment.status === 'confirmado') {
+        try {
+          const cancelNotifyData = {
+            type: 'cancelamento',
+            clientName: `${client.nome} ${client.sobrenome}`,
+            clientPhone: client.celular,
+            appointmentDate: currentAppointment.appointment_date,
+            appointmentTime: currentAppointment.appointment_time,
+            procedureName: currentAppointment.procedures?.name || '',
+            professionalName: null,
+            notes: currentAppointment.notes || ''
+          };
+
+          await supabase.functions.invoke('notify-owner', {
+            body: cancelNotifyData
+          });
+        } catch (notificationError) {
+          console.error('Erro ao notificar proprietária sobre cancelamento:', notificationError);
+        }
+      }
+
+      toast({
+        title: "Agendamento cancelado",
+        description: "Seu agendamento foi cancelado com sucesso.",
+      });
+
+      onAppointmentCreated();
+    } catch (error) {
+      console.error('Erro ao cancelar agendamento:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao cancelar agendamento. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
 
   if (loadingProcedures) {
@@ -693,6 +754,42 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
               <ArrowLeft className="w-4 h-4" />
               Voltar
             </Button>
+            
+            {/* Botão de cancelar - apenas para agendamentos confirmados */}
+            {editingId && currentAppointment?.status === 'confirmado' && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={cancelling}
+                    className="flex items-center gap-2"
+                  >
+                    <X className="w-4 h-4" />
+                    Cancelar Agendamento
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Cancelar Agendamento</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Tem certeza que deseja cancelar este agendamento? Esta ação não pode ser desfeita e a proprietária será notificada.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Manter Agendamento</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleCancelAppointment}
+                      disabled={cancelling}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      {cancelling ? "Cancelando..." : "Confirmar Cancelamento"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+
             <Button
               type="submit"
               disabled={loading}

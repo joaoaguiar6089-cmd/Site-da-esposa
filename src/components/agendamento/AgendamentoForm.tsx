@@ -11,7 +11,7 @@ import { ArrowLeft, Calendar, Check, ChevronsUpDown, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { formatDateToBrazil, getCurrentDateBrazil } from '@/utils/dateUtils';
+import { formatDateToBrazil, getCurrentDateBrazil, getCurrentDateTimeBrazil } from '@/utils/dateUtils';
 import type { Client } from "@/types/client";
 
 interface Procedure {
@@ -178,9 +178,11 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         return times;
       }
 
-      // Verificar se o dia selecionado está disponível
+      // Verificar se o dia selecionado está disponível (considerando fuso brasileiro)
       if (formData.appointment_date) {
-        const selectedDate = new Date(formData.appointment_date + 'T00:00:00');
+        // Criar data no fuso brasileiro para evitar problemas de timezone
+        const [year, month, day] = formData.appointment_date.split('-').map(Number);
+        const selectedDate = new Date(year, month - 1, day);
         const dayOfWeek = selectedDate.getDay();
         
         if (!settings.available_days.includes(dayOfWeek)) {
@@ -256,11 +258,11 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         const [hour, minute] = time.split(':').map(Number);
         const timeInMinutes = hour * 60 + minute;
         
-        // Se for hoje, verificar se o horário é futuro
-        const today = new Date().toISOString().split('T')[0];
+        // Se for hoje, verificar se o horário é futuro (considerando fuso brasileiro)
+        const today = getCurrentDateBrazil();
         if (date === today) {
-          const now = new Date();
-          const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
+          const nowBrazil = getCurrentDateTimeBrazil();
+          const currentTimeInMinutes = nowBrazil.getHours() * 60 + nowBrazil.getMinutes();
           
           // Adicionar uma margem de pelo menos 30 minutos a partir do horário atual
           if (timeInMinutes <= currentTimeInMinutes + 30) {
@@ -329,8 +331,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
   };
 
   const getMinDate = () => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
+    return getCurrentDateBrazil();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

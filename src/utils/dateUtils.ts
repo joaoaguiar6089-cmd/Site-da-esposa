@@ -71,6 +71,17 @@ export function getCurrentDateTimeBrazil(): Date {
 }
 
 /**
+ * Get tomorrow's date in Brazil timezone formatted as YYYY-MM-DD
+ */
+export function getTomorrowDateBrazil(): string {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const brazilDate = toBrazilTimezone(tomorrow);
+  return format(brazilDate, 'yyyy-MM-dd');
+}
+
+/**
  * Ensure a date string is treated as Brazil date and formatted correctly
  */
 export function ensureBrazilDateFormat(dateString: string): string {

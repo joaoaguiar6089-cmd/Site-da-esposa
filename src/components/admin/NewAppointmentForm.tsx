@@ -15,11 +15,12 @@ import type { Client } from "@/types/client";
 interface NewAppointmentFormProps {
   onBack: () => void;
   onSuccess: () => void;
+  selectedDate?: Date;
 }
 
 type Step = 'select-client' | 'register-new-client' | 'appointment';
 
-const NewAppointmentForm = ({ onBack, onSuccess }: NewAppointmentFormProps) => {
+const NewAppointmentForm = ({ onBack, onSuccess, selectedDate }: NewAppointmentFormProps) => {
   const [step, setStep] = useState<Step>('select-client');
   const [clients, setClients] = useState<Client[]>([]);
   const [filteredClients, setFilteredClients] = useState<Client[]>([]);
@@ -287,6 +288,7 @@ const NewAppointmentForm = ({ onBack, onSuccess }: NewAppointmentFormProps) => {
             client={selectedClient}
             onAppointmentCreated={handleAppointmentCreated}
             onBack={() => setStep('select-client')}
+            selectedDate={selectedDate}
           />
         </div>
       </div>

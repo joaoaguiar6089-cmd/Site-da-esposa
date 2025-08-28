@@ -316,6 +316,7 @@ Aguardamos você!`;
       <NewAppointmentForm
         onBack={() => setShowNewAppointmentForm(false)}
         onSuccess={handleNewAppointmentSuccess}
+        selectedDate={selectedDate}
       />
     );
   }

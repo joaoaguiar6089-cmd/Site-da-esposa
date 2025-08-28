@@ -29,10 +29,9 @@ interface AgendamentoFormProps {
   onBack: () => void;
   editingId?: string;
   preSelectedProcedureId?: string;
-  selectedDate?: Date;
 }
 
-const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preSelectedProcedureId, selectedDate }: AgendamentoFormProps) => {
+const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preSelectedProcedureId }: AgendamentoFormProps) => {
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [formData, setFormData] = useState({
     procedure_id: "",
@@ -77,15 +76,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
     if (preSelectedProcedureId && !editingId) {
       setFormData(prev => ({ ...prev, procedure_id: preSelectedProcedureId }));
     }
-    
-    // Auto-preencher data se fornecida e não estiver editando
-    if (selectedDate && !editingId) {
-      const dateString = selectedDate.toISOString().split('T')[0];
-      setFormData(prev => ({ ...prev, appointment_date: dateString }));
-      // Carregar horários disponíveis para a data pré-selecionada
-      loadAvailableTimes(dateString);
-    }
-  }, [editingId, preSelectedProcedureId, selectedDate]);
+  }, [editingId, preSelectedProcedureId]);
 
   const loadAppointmentData = async (appointmentId: string) => {
     try {

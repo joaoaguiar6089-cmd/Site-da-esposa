@@ -166,6 +166,10 @@ const AdminCalendar = () => {
 
       if (fetchError) throw fetchError;
 
+      // Verificar se era confirmado e está sendo cancelado
+      const wasConfirmed = appointmentData?.status === 'confirmado';
+      const isCanceling = newStatus === 'cancelado';
+
       const { error } = await supabase
         .from('appointments')
         .update({ status: newStatus })
@@ -215,6 +219,50 @@ const AdminCalendar = () => {
           console.log('Notificação de confirmação enviada para:', appointmentData.clients.celular);
         } catch (notificationError) {
           console.error('Erro ao enviar notificação de confirmação:', notificationError);
+        }
+      }
+
+      // Se era confirmado e está sendo cancelado, enviar notificação de cancelamento para o cliente
+      if (wasConfirmed && isCanceling && appointmentData) {
+        try {
+          const formatDateToBrazil = (dateString: string) => {
+            if (!dateString) return '';
+            
+            try {
+              if (dateString.includes('-') && dateString.length === 10) {
+                const [year, month, day] = dateString.split('-');
+                if (year && month && day) {
+                  return `${day}/${month}/${year}`;
+                }
+              }
+              return dateString;
+            } catch (error) {
+              return dateString;
+            }
+          };
+
+          const { data: templateData } = await supabase.functions.invoke('get-whatsapp-template', {
+            body: {
+              templateType: 'cancelamento_cliente',
+              variables: {
+                clientName: appointmentData.clients.nome,
+                appointmentDate: formatDateToBrazil(appointmentData.appointment_date),
+                appointmentTime: appointmentData.appointment_time,
+                procedureName: appointmentData.procedures.name
+              }
+            }
+          });
+
+          await supabase.functions.invoke('send-whatsapp', {
+            body: {
+              to: appointmentData.clients.celular,
+              message: templateData?.message || `❌ *Agendamento Cancelado*\n\nOlá ${appointmentData.clients.nome}!\n\nInformamos que seu agendamento foi cancelado:\n\n📅 Data: ${formatDateToBrazil(appointmentData.appointment_date)}\n⏰ Horário: ${appointmentData.appointment_time}\n💉 Procedimento: ${appointmentData.procedures.name}\n\n📞 Para reagendar, entre em contato conosco.\n\n🏥 Clínica Dra. Karoline Ferreira\nTefé-AM`
+            }
+          });
+
+          console.log('Notificação de cancelamento enviada para:', appointmentData.clients.celular);
+        } catch (notificationError) {
+          console.error('Erro ao enviar notificação de cancelamento:', notificationError);
         }
       }
 
@@ -316,6 +364,7 @@ Aguardamos você!`;
       <NewAppointmentForm
         onBack={() => setShowNewAppointmentForm(false)}
         onSuccess={handleNewAppointmentSuccess}
+        selectedDate={selectedDate}
       />
     );
   }

@@ -29,9 +29,10 @@ interface AgendamentoFormProps {
   onBack: () => void;
   editingId?: string;
   preSelectedProcedureId?: string;
+  selectedDate?: Date;
 }
 
-const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preSelectedProcedureId }: AgendamentoFormProps) => {
+const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preSelectedProcedureId, selectedDate }: AgendamentoFormProps) => {
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [formData, setFormData] = useState({
     procedure_id: "",
@@ -70,13 +71,19 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
     // Carregar dados se estiver editando
     if (editingId) {
       loadAppointmentData(editingId);
+    } else {
+      // Pré-preencher data se fornecida (do calendário administrativo)
+      if (selectedDate) {
+        const dateString = selectedDate.toISOString().split('T')[0];
+        setFormData(prev => ({ ...prev, appointment_date: dateString }));
+      }
+      
+      // Pré-selecionar procedimento se fornecido
+      if (preSelectedProcedureId) {
+        setFormData(prev => ({ ...prev, procedure_id: preSelectedProcedureId }));
+      }
     }
-    
-    // Pré-selecionar procedimento se fornecido
-    if (preSelectedProcedureId && !editingId) {
-      setFormData(prev => ({ ...prev, procedure_id: preSelectedProcedureId }));
-    }
-  }, [editingId, preSelectedProcedureId]);
+  }, [editingId, preSelectedProcedureId, selectedDate]);
 
   const loadAppointmentData = async (appointmentId: string) => {
     try {

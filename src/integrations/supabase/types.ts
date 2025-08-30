@@ -698,6 +698,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      safe_check_cpf_exists: {
+        Args: { cpf_param: string }
+        Returns: boolean
+      }
       update_client_phone: {
         Args:
           | { p_client_id: string; p_cpf: string; p_phone: string }

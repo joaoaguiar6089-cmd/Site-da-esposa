@@ -682,6 +682,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_public_site_setting: {
+        Args: { setting_key_param: string }
+        Returns: string
+      }
       is_active_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean

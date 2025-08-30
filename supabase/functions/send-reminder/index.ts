@@ -16,19 +16,43 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Calcular data de amanhã para buscar agendamentos que precisam de lembrete
+    console.log('Starting automatic reminder function...');
+
+    // Get reminder settings
+    const { data: reminderSettings, error: settingsError } = await supabase
+      .from('reminder_settings')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (settingsError || !reminderSettings) {
+      console.log('No active reminder settings found or error:', settingsError);
+      return new Response(JSON.stringify({ message: 'No active reminder settings found' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('Reminder settings loaded:', { 
+      time: reminderSettings.reminder_time, 
+      active: reminderSettings.is_active 
+    });
+
+    // Calculate tomorrow's date in Brazil timezone
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
     console.log('Checking appointments for date:', tomorrowStr);
 
-    // Buscar agendamentos de amanhã que ainda estão agendados
+    // Get appointments for tomorrow that are scheduled
     const { data: appointments, error } = await supabase
       .from('appointments')
       .select(`
         *,
-        clients!appointments_client_id_fkey(nome, sobrenome, celular),
+        clients!appointments_client_id_fkey(nome, sobrenome, celular, cpf),
         procedures!appointments_procedure_id_fkey(name, duration)
       `)
       .eq('appointment_date', tomorrowStr)
@@ -48,12 +72,13 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    const WHATSAPP_API_TOKEN = Deno.env.get('WHATSAPP_API_TOKEN');
-    const WHATSAPP_PHONE_ID = Deno.env.get('WHATSAPP_PHONE_ID');
+    // Check if we have WhatsApp credentials
+    const ZAPI_INSTANCE_ID = Deno.env.get('ZAPI_INSTANCE_ID');
+    const ZAPI_TOKEN = Deno.env.get('ZAPI_TOKEN');
 
-    if (!WHATSAPP_API_TOKEN || !WHATSAPP_PHONE_ID) {
-      console.error('WhatsApp credentials not configured');
-      throw new Error('WhatsApp API credentials not configured');
+    if (!ZAPI_INSTANCE_ID || !ZAPI_TOKEN) {
+      console.error('Z-API credentials not configured');
+      throw new Error('Z-API credentials not configured');
     }
 
     const results = [];
@@ -67,21 +92,29 @@ const handler = async (req: Request): Promise<Response> => {
         const cleanPhone = client.celular.replace(/\D/g, '');
         const phoneNumber = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
 
-        const appointmentUrl = `https://ejqsaloqrczyfiqljcym.supabase.co/agendamento?cpf=${encodeURIComponent(client.cpf)}`;
+        // Format date for display
+        const formattedDate = new Date(appointment.appointment_date).toLocaleDateString('pt-BR');
         
-        const message = `🔔 *Lembrete de Consulta*\n\nOlá ${client.nome}!\n\nEste é um lembrete de que você tem um agendamento AMANHÃ:\n\n📅 Data: ${new Date(appointment.appointment_date).toLocaleDateString('pt-BR')}\n⏰ Horário: ${appointment.appointment_time}\n💉 Procedimento: ${procedure.name}\n\n📍 Local: Tefé-AM - Av. Brasil, 63b\n\n🔗 *Gerencie seu agendamento:*\n${appointmentUrl}\n\n✅ Confirmar agendamento\n📝 Solicitar alteração\n❌ Cancelar agendamento\n\nObrigado! 🙏`;
+        // Replace variables in template
+        let message = reminderSettings.template_content;
+        message = message.replace(/{clientName}/g, client.nome);
+        message = message.replace(/{clientPhone}/g, client.celular);
+        message = message.replace(/{appointmentDate}/g, formattedDate);
+        message = message.replace(/{appointmentTime}/g, appointment.appointment_time);
+        message = message.replace(/{procedureName}/g, procedure.name);
+        message = message.replace(/{notes}/g, appointment.notes || '');
 
-        const response = await fetch(`https://graph.facebook.com/v17.0/${WHATSAPP_PHONE_ID}/messages`, {
+        console.log(`Sending reminder to ${client.nome} (${client.celular})`);
+
+        // Send WhatsApp message using Z-API
+        const response = await fetch(`https://api.z-api.io/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_TOKEN}/send-text`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${WHATSAPP_API_TOKEN}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            to: phoneNumber,
-            type: 'text',
-            text: { body: message }
+            phone: phoneNumber,
+            message: message
           }),
         });
 
@@ -93,7 +126,8 @@ const handler = async (req: Request): Promise<Response> => {
             success: true, 
             client: client.nome, 
             phone: client.celular,
-            appointment_id: appointment.id 
+            appointment_id: appointment.id,
+            message_id: data.messageId || data.id
           });
         } else {
           console.error(`Failed to send reminder to ${client.nome}:`, data);

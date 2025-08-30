@@ -390,6 +390,33 @@ export type Database = {
         }
         Relationships: []
       }
+      reminder_settings: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          reminder_time: string
+          template_content: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          reminder_time?: string
+          template_content?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          reminder_time?: string
+          template_content?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       schedule_exceptions: {
         Row: {
           created_at: string

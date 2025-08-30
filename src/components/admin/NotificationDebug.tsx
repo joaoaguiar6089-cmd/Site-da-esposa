@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Phone, CheckCircle, XCircle, MessageSquare, Edit, Copy, Info, Settings } from "lucide-react";
+import { Send, Phone, CheckCircle, XCircle, MessageSquare, Edit, Copy, Info, Settings, Clock, AlertCircle } from "lucide-react";
 
 const NotificationDebug = () => {
   const [testPhone, setTestPhone] = useState("");
@@ -28,6 +28,12 @@ const NotificationDebug = () => {
   const [ownerTemplate, setOwnerTemplate] = useState("");
   const [isLoadingOwnerSettings, setIsLoadingOwnerSettings] = useState(false);
 
+  // Reminder settings
+  const [reminderTime, setReminderTime] = useState("18:00");
+  const [reminderActive, setReminderActive] = useState(true);
+  const [reminderTemplate, setReminderTemplate] = useState("");
+  const [isLoadingReminderSettings, setIsLoadingReminderSettings] = useState(false);
+
   // Variáveis disponíveis para os templates
   const availableVariables = [
     { name: "clientName", description: "Nome do cliente" },
@@ -41,6 +47,7 @@ const NotificationDebug = () => {
   useEffect(() => {
     loadTemplates();
     loadOwnerSettings();
+    loadReminderSettings();
   }, []);
 
   const loadTemplates = async () => {
@@ -81,6 +88,80 @@ const NotificationDebug = () => {
       }
     } catch (error) {
       console.error('Erro ao carregar configurações da proprietária:', error);
+    }
+  };
+
+  const loadReminderSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('reminder_settings')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Erro ao carregar configurações de lembrete:', error);
+        return;
+      }
+
+      if (data) {
+        setReminderTime(data.reminder_time?.substring(0, 5) || '18:00');
+        setReminderActive(data.is_active ?? true);
+        setReminderTemplate(data.template_content || '');
+      }
+    } catch (error) {
+      console.error('Erro ao carregar configurações de lembrete:', error);
+    }
+  };
+
+  const saveReminderSettings = async () => {
+    setIsLoadingReminderSettings(true);
+    try {
+      // First check if any settings exist
+      const { data: existingData } = await supabase
+        .from('reminder_settings')
+        .select('id')
+        .limit(1)
+        .single();
+
+      const settingsData = {
+        reminder_time: reminderTime + ':00',
+        is_active: reminderActive,
+        template_content: reminderTemplate
+      };
+
+      let error;
+      if (existingData) {
+        // Update existing settings
+        const updateResult = await supabase
+          .from('reminder_settings')
+          .update(settingsData)
+          .eq('id', existingData.id);
+        error = updateResult.error;
+      } else {
+        // Create new settings
+        const insertResult = await supabase
+          .from('reminder_settings')
+          .insert(settingsData);
+        error = insertResult.error;
+      }
+
+      if (error) throw error;
+
+      toast({
+        title: "✅ Configurações salvas!",
+        description: "Configurações de lembrete automático atualizadas com sucesso",
+      });
+
+    } catch (error: any) {
+      toast({
+        title: "❌ Erro ao salvar",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingReminderSettings(false);
     }
   };
 
@@ -276,10 +357,11 @@ const NotificationDebug = () => {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="test" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="test">Teste de Mensagens</TabsTrigger>
           <TabsTrigger value="templates">Editar Templates</TabsTrigger>
           <TabsTrigger value="owner">Notificações Proprietária</TabsTrigger>
+          <TabsTrigger value="reminders">Lembretes Automáticos</TabsTrigger>
         </TabsList>
         
         <TabsContent value="test">
@@ -581,6 +663,167 @@ Exemplo:
               >
                 <Settings className="h-4 w-4" />
                 {isLoadingOwnerSettings ? "Salvando..." : "Salvar Configurações"}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reminders">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Configuração de Lembretes Automáticos
+              </CardTitle>
+              <CardDescription>
+                Configure o horário e template para envio automático de lembretes no dia anterior aos agendamentos
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              
+              {/* Status e Horário */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reminderActive">Status do Sistema</Label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="reminderActive"
+                      checked={reminderActive}
+                      onChange={(e) => setReminderActive(e.target.checked)}
+                      className="rounded"
+                    />
+                    <Label htmlFor="reminderActive" className="font-normal">
+                      {reminderActive ? "Lembretes Ativados" : "Lembretes Desativados"}
+                    </Label>
+                    {reminderActive ? (
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-red-600" />
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="reminderTime">Horário de Envio</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Hora em que os lembretes serão enviados no dia anterior
+                  </p>
+                  <Input
+                    type="time"
+                    id="reminderTime"
+                    value={reminderTime}
+                    onChange={(e) => setReminderTime(e.target.value)}
+                    className="font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Alerta de Informação */}
+              <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-blue-800 mb-1">Como funciona o sistema de lembretes:</p>
+                    <ul className="space-y-1 text-blue-700">
+                      <li>• Os lembretes são enviados automaticamente no dia anterior aos agendamentos</li>
+                      <li>• Todos os clientes com agendamento no dia seguinte recebem o lembrete</li>
+                      <li>• O horário configurado é usado para determinar quando enviar as mensagens</li>
+                      <li>• O sistema evita duplicatas enviando apenas uma mensagem por cliente/dia</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Template Editor */}
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="reminderTemplate">Template da Mensagem de Lembrete</Label>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Personalize a mensagem que será enviada como lembrete aos clientes
+                  </p>
+                </div>
+                
+                {/* Variables Panel */}
+                <Card className="bg-blue-50 border-blue-200">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Info className="h-4 w-4 text-blue-600" />
+                      Variáveis Disponíveis para Lembretes
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {availableVariables.map((variable) => (
+                        <div
+                          key={variable.name}
+                          className="flex items-center justify-between p-2 bg-white rounded border hover:bg-blue-50 transition-colors group cursor-pointer"
+                          onClick={() => {
+                            setReminderTemplate(prev => prev + `{${variable.name}}`);
+                          }}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <code className="text-sm font-mono text-blue-700">
+                              {`{${variable.name}}`}
+                            </code>
+                            <p className="text-xs text-gray-600 truncate">
+                              {variable.description}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost" 
+                            size="sm"
+                            className="opacity-0 group-hover:opacity-100 h-6 w-6 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              copyVariable(variable.name);
+                            }}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 text-xs text-blue-600 bg-blue-100 p-2 rounded">
+                      💡 <strong>Dica:</strong> Clique em uma variável para adicionar ao template
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Textarea
+                  id="reminderTemplate"
+                  value={reminderTemplate}
+                  onChange={(e) => setReminderTemplate(e.target.value)}
+                  rows={10}
+                  className="font-mono text-sm"
+                  placeholder="Digite o template da mensagem de lembrete...
+
+Exemplo:
+🔔 *Lembrete de Consulta* 
+
+Olá {clientName}! 
+
+Este é um lembrete de que você tem um agendamento AMANHÃ:
+
+📅 Data: {appointmentDate}
+⏰ Horário: {appointmentTime}
+💉 Procedimento: {procedureName}
+
+📍 Local: Clínica Dra. Karoline - Tefé/AM
+
+Para confirmar, alterar ou cancelar seu agendamento, acesse nossa área do cliente.
+
+Obrigado! 🙏"
+                />
+              </div>
+
+              <Button 
+                onClick={saveReminderSettings}
+                disabled={isLoadingReminderSettings}
+                className="flex items-center gap-2"
+              >
+                <Clock className="h-4 w-4" />
+                {isLoadingReminderSettings ? "Salvando..." : "Salvar Configurações de Lembrete"}
               </Button>
             </CardContent>
           </Card>

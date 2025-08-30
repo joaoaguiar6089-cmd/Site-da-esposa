@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Search, Plus, User } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatCPF, cleanCPF, isValidCPF } from "@/utils/cpfValidator";
@@ -33,6 +34,7 @@ const NewAppointmentForm = ({ onBack, onSuccess, selectedDate }: NewAppointmentF
     celular: "",
     cpf: ""
   });
+  const [sendNotification, setSendNotification] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -283,12 +285,29 @@ const NewAppointmentForm = ({ onBack, onSuccess, selectedDate }: NewAppointmentF
           <h1 className="text-2xl font-bold">Novo Agendamento</h1>
         </div>
 
-        <div className="max-w-md mx-auto">
+        <div className="max-w-md mx-auto space-y-4">
+          {/* Opção para notificar cliente */}
+          <div className="flex items-center space-x-2 p-3 bg-muted/50 rounded-lg">
+            <Checkbox 
+              id="send-notification" 
+              checked={sendNotification}
+              onCheckedChange={(checked) => setSendNotification(checked === true)}
+            />
+            <label 
+              htmlFor="send-notification" 
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Enviar notificação WhatsApp para o cliente
+            </label>
+          </div>
+          
           <AgendamentoForm
             client={selectedClient}
             onAppointmentCreated={handleAppointmentCreated}
             onBack={() => setStep('select-client')}
             selectedDate={selectedDate}
+            adminMode={true}
+            sendNotification={sendNotification}
           />
         </div>
       </div>

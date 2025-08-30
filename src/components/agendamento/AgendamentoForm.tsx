@@ -30,9 +30,11 @@ interface AgendamentoFormProps {
   editingId?: string;
   preSelectedProcedureId?: string;
   selectedDate?: Date;
+  adminMode?: boolean;
+  sendNotification?: boolean;
 }
 
-const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preSelectedProcedureId, selectedDate }: AgendamentoFormProps) => {
+const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preSelectedProcedureId, selectedDate, adminMode = false, sendNotification = true }: AgendamentoFormProps) => {
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [formData, setFormData] = useState({
     procedure_id: "",
@@ -450,8 +452,38 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
           console.error('Erro ao enviar para webhook n8n:', webhookError);
         }
         
-        // Cliente NÃO recebe notificação na criação (apenas quando status muda para "confirmado")
-        console.log('Agendamento criado com status "agendado" - cliente não receberá notificação ainda');
+        // Enviar notificação WhatsApp para cliente
+        if (!editingId && (!adminMode || sendNotification)) { // Cliente sempre recebe, admin só se marcar opção
+          try {
+            // Buscar template de confirmação
+            const { data: template } = await supabase
+              .from('whatsapp_templates')
+              .select('template_content')
+              .eq('template_type', 'appointment_confirmation')
+              .single();
+
+            if (template) {
+              const formattedDate = formatDateToBrazil(formData.appointment_date);
+              const message = template.template_content
+                .replace('{cliente_nome}', `${client.nome} ${client.sobrenome}`)
+                .replace('{data}', formattedDate)
+                .replace('{horario}', formData.appointment_time)
+                .replace('{procedimento}', selectedProc?.name || '')
+                .replace('{profissional}', 'Dra. Karoline');
+
+              await supabase.functions.invoke('send-whatsapp', {
+                body: {
+                  to: client.celular,
+                  message: message
+                }
+              });
+              
+              console.log('Notificação de confirmação enviada para cliente');
+            }
+          } catch (notificationError) {
+            console.error('Erro ao enviar notificação para cliente:', notificationError);
+          }
+        }
 
 
         // Notificar proprietária da clínica via WhatsApp
@@ -574,7 +606,7 @@ Para reagendar, entre em contato conosco.`;
 
           await supabase.functions.invoke('send-whatsapp', {
             body: {
-              phone: client.celular,
+              to: client.celular,
               message: clientMessage
             }
           });

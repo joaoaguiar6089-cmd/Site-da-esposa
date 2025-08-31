@@ -717,6 +717,10 @@ export type Database = {
         Args: { cpf_param: string }
         Returns: boolean
       }
+      send_daily_reminders: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       update_client_phone: {
         Args:
           | { p_client_id: string; p_cpf: string; p_phone: string }

@@ -37,9 +37,15 @@ interface Appointment {
   } | null;
 }
 
+interface Professional {
+  id: string;
+  name: string;
+}
+
 const AppointmentsList = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [filteredAppointments, setFilteredAppointments] = useState<Appointment[]>([]);
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
@@ -48,6 +54,8 @@ const AppointmentsList = () => {
   const [editingAppointment, setEditingAppointment] = useState<string | null>(null);
   const [showEditForm, setShowEditForm] = useState(false);
   const [showNewAppointmentForm, setShowNewAppointmentForm] = useState(false);
+  const [confirmingAppointment, setConfirmingAppointment] = useState<Appointment | null>(null);
+  const [selectedProfessional, setSelectedProfessional] = useState("");
   const { toast } = useToast();
 
   // Carregar todos os agendamentos
@@ -96,6 +104,21 @@ const AppointmentsList = () => {
     }
   };
 
+  // Carregar profissionais
+  const loadProfessionals = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('professionals')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+      setProfessionals(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar profissionais:', error);
+    }
+  };
+
   // Filtrar agendamentos
   useEffect(() => {
     let filtered = [...appointments];
@@ -119,6 +142,7 @@ const AppointmentsList = () => {
 
   useEffect(() => {
     loadAppointments();
+    loadProfessionals();
   }, []);
 
   // Abrir detalhes do agendamento
@@ -159,7 +183,102 @@ const AppointmentsList = () => {
     loadAppointments();
   };
 
-  // Atualizar status do agendamento
+  // Iniciar processo de confirmação
+  const startConfirmationProcess = (appointment: Appointment) => {
+    if (appointment.status === 'agendado') {
+      setConfirmingAppointment(appointment);
+      setSelectedProfessional("");
+    } else {
+      updateAppointmentStatus(appointment.id, 'confirmado');
+    }
+  };
+
+  // Confirmar agendamento com profissional
+  const confirmAppointmentWithProfessional = async () => {
+    if (!confirmingAppointment || !selectedProfessional) {
+      toast({
+        title: "Erro",
+        description: "Selecione um profissional para confirmar o agendamento.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Atualizar agendamento com profissional
+      const { error } = await supabase
+        .from('appointments')
+        .update({ 
+          status: 'confirmado',
+          professional_id: selectedProfessional 
+        })
+        .eq('id', confirmingAppointment.id);
+
+      if (error) throw error;
+
+      // Buscar dados atualizados para notificação
+      const { data: appointmentData, error: fetchError } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          clients (*),
+          procedures (name, price, duration),
+          professionals (name)
+        `)
+        .eq('id', confirmingAppointment.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Enviar notificação WhatsApp com informação do profissional
+      try {
+        const professionalName = appointmentData.professionals?.name || 'Profissional não informado';
+        
+        const message = `🩺 *Agendamento Confirmado*
+
+Olá ${appointmentData.clients.nome}!
+
+Seu agendamento foi confirmado:
+
+📅 Data: ${formatDateToBrazil(appointmentData.appointment_date)}
+⏰ Horário: ${appointmentData.appointment_time}
+💉 Procedimento: ${appointmentData.procedures.name}
+👩‍⚕️ Profissional: ${professionalName}
+
+📍 Clínica Dra. Karoline Ferreira
+Tefé-AM
+
+✨ Aguardamos você!`;
+
+        await supabase.functions.invoke('send-whatsapp', {
+          body: {
+            to: appointmentData.clients.celular,
+            message: message
+          }
+        });
+
+        console.log('Notificação de confirmação enviada com informação do profissional');
+      } catch (notificationError) {
+        console.error('Erro ao enviar notificação de confirmação:', notificationError);
+      }
+
+      toast({
+        title: "Agendamento confirmado",
+        description: `Agendamento confirmado com ${professionals.find(p => p.id === selectedProfessional)?.name}`,
+      });
+
+      setConfirmingAppointment(null);
+      setSelectedProfessional("");
+      loadAppointments();
+    } catch (error) {
+      console.error('Erro ao confirmar agendamento:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao confirmar agendamento.",
+        variant: "destructive",
+      });
+    }
+  };
   const updateAppointmentStatus = async (id: string, newStatus: string) => {
     try {
       // Primeiro, buscar os dados do agendamento para notificações
@@ -556,7 +675,7 @@ Aguardamos você!`;
                   <Button
                     size="sm"
                     variant="secondary"
-                    onClick={() => updateAppointmentStatus(selectedAppointment.id, 'confirmado')}
+                    onClick={() => startConfirmationProcess(selectedAppointment)}
                   >
                     Confirmar
                   </Button>
@@ -590,6 +709,62 @@ Aguardamos você!`;
                 >
                   <Trash2 className="h-3 w-3" />
                   Deletar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de seleção de profissional para confirmação */}
+      <Dialog open={!!confirmingAppointment} onOpenChange={() => setConfirmingAppointment(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirmar Agendamento</DialogTitle>
+          </DialogHeader>
+          
+          {confirmingAppointment && (
+            <div className="space-y-4">
+              <div className="text-sm">
+                <p><strong>Cliente:</strong> {confirmingAppointment.clients.nome} {confirmingAppointment.clients.sobrenome}</p>
+                <p><strong>Procedimento:</strong> {confirmingAppointment.procedures.name}</p>
+                <p><strong>Data:</strong> {format(parseISO(confirmingAppointment.appointment_date), 'dd/MM/yyyy', { locale: ptBR })}</p>
+                <p><strong>Horário:</strong> {confirmingAppointment.appointment_time}</p>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium">Selecione o Profissional *</label>
+                <Select
+                  value={selectedProfessional}
+                  onValueChange={setSelectedProfessional}
+                >
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Escolha um profissional" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {professionals.map((professional) => (
+                      <SelectItem key={professional.id} value={professional.id}>
+                        {professional.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setConfirmingAppointment(null)}
+                  className="flex-1"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={confirmAppointmentWithProfessional}
+                  disabled={!selectedProfessional}
+                  className="flex-1"
+                >
+                  Confirmar Agendamento
                 </Button>
               </div>
             </div>

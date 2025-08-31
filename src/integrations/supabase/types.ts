@@ -365,6 +365,7 @@ export type Database = {
           id: string
           image_url: string
           is_active: boolean
+          procedure_id: string | null
           title: string
           updated_at: string
         }
@@ -375,6 +376,7 @@ export type Database = {
           id?: string
           image_url: string
           is_active?: boolean
+          procedure_id?: string | null
           title: string
           updated_at?: string
         }
@@ -385,10 +387,19 @@ export type Database = {
           id?: string
           image_url?: string
           is_active?: boolean
+          procedure_id?: string | null
           title?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "promotions_procedure_id_fkey"
+            columns: ["procedure_id"]
+            isOneToOne: false
+            referencedRelation: "procedures"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       reminder_settings: {
         Row: {
@@ -636,6 +647,10 @@ export type Database = {
         Args: { user_id_param: string }
         Returns: boolean
       }
+      check_and_send_reminders: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       check_appointment_conflict: {
         Args: {
           p_appointment_date: string
@@ -705,6 +720,10 @@ export type Database = {
       safe_check_cpf_exists: {
         Args: { cpf_param: string }
         Returns: boolean
+      }
+      send_daily_reminders: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       update_client_phone: {
         Args:

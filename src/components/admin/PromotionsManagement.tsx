@@ -20,12 +20,19 @@ interface Promotion {
   image_url: string;
   is_active: boolean;
   display_order: number;
+  procedure_id?: string;
   created_at: string;
+}
+
+interface Procedure {
+  id: string;
+  name: string;
 }
 
 export default function PromotionsManagement() {
   const { toast } = useToast();
   const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
@@ -36,7 +43,8 @@ export default function PromotionsManagement() {
     description: "",
     image_url: "",
     is_active: true,
-    display_order: 1
+    display_order: 1,
+    procedure_id: ""
   });
 
   const fetchPromotions = async () => {
@@ -60,8 +68,23 @@ export default function PromotionsManagement() {
     }
   };
 
+  const fetchProcedures = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("procedures")
+        .select("id, name")
+        .order("name");
+
+      if (error) throw error;
+      setProcedures(data || []);
+    } catch (error) {
+      console.error("Erro ao buscar procedimentos:", error);
+    }
+  };
+
   useEffect(() => {
     fetchPromotions();
+    fetchProcedures();
   }, []);
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,11 +137,16 @@ export default function PromotionsManagement() {
       return;
     }
 
+    const submitData = {
+      ...formData,
+      procedure_id: formData.procedure_id || null
+    };
+
     try {
       if (editingPromotion) {
         const { error } = await supabase
           .from("promotions")
-          .update(formData)
+          .update(submitData)
           .eq("id", editingPromotion.id);
 
         if (error) throw error;
@@ -130,7 +158,7 @@ export default function PromotionsManagement() {
       } else {
         const { error } = await supabase
           .from("promotions")
-          .insert([formData]);
+          .insert([submitData]);
 
         if (error) throw error;
         
@@ -160,7 +188,8 @@ export default function PromotionsManagement() {
       description: promotion.description,
       image_url: promotion.image_url,
       is_active: promotion.is_active,
-      display_order: promotion.display_order
+      display_order: promotion.display_order,
+      procedure_id: promotion.procedure_id || ""
     });
     setIsDialogOpen(true);
   };
@@ -198,7 +227,8 @@ export default function PromotionsManagement() {
       description: "",
       image_url: "",
       is_active: true,
-      display_order: 1
+      display_order: 1,
+      procedure_id: ""
     });
     setEditingPromotion(null);
   };
@@ -273,6 +303,29 @@ export default function PromotionsManagement() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="procedure">Procedimento (Opcional)</Label>
+                <Select
+                  value={formData.procedure_id}
+                  onValueChange={(value) => setFormData({ ...formData, procedure_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um procedimento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Nenhum procedimento</SelectItem>
+                    {procedures.map((procedure) => (
+                      <SelectItem key={procedure.id} value={procedure.id}>
+                        {procedure.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Se selecionado, ao clicar em "Agendar Agora" o procedimento será pré-selecionado
+                </p>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="description">Descrição *</Label>
                 <Textarea
                   id="description"
@@ -342,6 +395,7 @@ export default function PromotionsManagement() {
                 <TableHead>Imagem</TableHead>
                 <TableHead>Título</TableHead>
                 <TableHead>Descrição</TableHead>
+                <TableHead>Procedimento</TableHead>
                 <TableHead>Ordem</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Ações</TableHead>
@@ -359,6 +413,15 @@ export default function PromotionsManagement() {
                   </TableCell>
                   <TableCell className="font-medium">{promotion.title}</TableCell>
                   <TableCell className="max-w-xs truncate">{promotion.description}</TableCell>
+                  <TableCell>
+                    {promotion.procedure_id ? (
+                      <Badge variant="outline">
+                        {procedures.find(p => p.id === promotion.procedure_id)?.name || 'Procedimento'}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">Nenhum</span>
+                    )}
+                  </TableCell>
                   <TableCell>{promotion.display_order}º</TableCell>
                   <TableCell>
                     <Badge variant={promotion.is_active ? "default" : "secondary"}>
@@ -387,7 +450,7 @@ export default function PromotionsManagement() {
               ))}
               {promotions.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     Nenhuma promoção cadastrada
                   </TableCell>
                 </TableRow>

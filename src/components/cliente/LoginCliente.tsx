@@ -70,6 +70,16 @@ const LoginCliente = ({ onClientFound, onClientNotFound, onBack }: LoginClienteP
     }
 
     const cleanPhone = phone.replace(/\D/g, '');
+    
+    // Debug log para identificar diferenças entre mobile/desktop
+    console.log('🔍 Debug Login Cliente:', {
+      originalPhone: phone,
+      cleanPhone: cleanPhone,
+      phoneLength: cleanPhone.length,
+      userAgent: navigator.userAgent,
+      isMobile: /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    });
+    
     setLoading(true);
     
     try {
@@ -80,6 +90,8 @@ const LoginCliente = ({ onClientFound, onClientNotFound, onBack }: LoginClienteP
         .maybeSingle();
 
       if (error) throw error;
+
+      console.log('🔍 Resultado da busca:', { client, searchPhone: cleanPhone });
 
       if (client) {
         setExistingClient(client);

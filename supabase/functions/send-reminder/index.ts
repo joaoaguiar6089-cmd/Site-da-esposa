@@ -18,7 +18,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Starting automatic reminder function...');
 
-    // Get reminder settings
+    // Buscar configurações de lembrete
     const { data: reminderSettings, error: settingsError } = await supabase
       .from('reminder_settings')
       .select('*')
@@ -40,14 +40,32 @@ const handler = async (req: Request): Promise<Response> => {
       active: reminderSettings.is_active 
     });
 
-    // Calculate tomorrow's date in Brazil timezone
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    // --- Verificar horário atual ---
+    const now = new Date();
+    // Ajustar para fuso horário de Brasília (UTC-3)
+    now.setHours(now.getHours() - 3);
 
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+
+    const [reminderHour, reminderMinute] = reminderSettings.reminder_time.split(':').map(Number);
+
+    if (currentHour !== reminderHour || currentMinute < reminderMinute) {
+      console.log(`Ainda não é hora de enviar os lembretes. Agora: ${currentHour}:${currentMinute}, Configurado: ${reminderHour}:${reminderMinute}`);
+      return new Response(JSON.stringify({ message: 'Horário ainda não alcançado' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Calcular data de amanhã (em formato YYYY-MM-DD)
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
     console.log('Checking appointments for date:', tomorrowStr);
 
-    // Get appointments for tomorrow that are scheduled or confirmed
+    // Buscar agendamentos
     const { data: appointments, error } = await supabase
       .from('appointments')
       .select(`
@@ -72,7 +90,7 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // Check if we have WhatsApp credentials
+    // Credenciais Z-API
     const ZAPI_INSTANCE_ID = Deno.env.get('ZAPI_INSTANCE_ID');
     const ZAPI_TOKEN = Deno.env.get('ZAPI_TOKEN');
 
@@ -83,19 +101,20 @@ const handler = async (req: Request): Promise<Response> => {
 
     const results = [];
 
+    // Enviar mensagens
     for (const appointment of appointments) {
       try {
         const client = appointment.clients;
         const procedure = appointment.procedures;
         
-        // Clean phone number
+        // Limpar número de telefone
         const cleanPhone = client.celular.replace(/\D/g, '');
         const phoneNumber = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
 
-        // Format date for display
+        // Formatando data
         const formattedDate = new Date(appointment.appointment_date).toLocaleDateString('pt-BR');
         
-        // Replace variables in template
+        // Substituir variáveis no template
         let message = reminderSettings.template_content;
         message = message.replace(/{clientName}/g, client.nome);
         message = message.replace(/{clientPhone}/g, client.celular);
@@ -106,7 +125,6 @@ const handler = async (req: Request): Promise<Response> => {
 
         console.log(`Sending reminder to ${client.nome} (${client.celular})`);
 
-        // Send WhatsApp message using Z-API
         const response = await fetch(`https://api.z-api.io/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_TOKEN}/send-text`, {
           method: 'POST',
           headers: {

@@ -44,13 +44,20 @@ const handler = async (req: Request): Promise<Response> => {
       active: reminderSettings.is_active 
     });
 
-    // --- Gestão de fuso horário igual ao código funcionando ---
+    // Usar fuso horário correto do Brasil usando date-fns-tz
     const now = new Date();
-    // Ajustar para fuso horário de Brasília (UTC-3)
-    now.setHours(now.getHours() - 3);
-
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
+    const BRAZIL_TIMEZONE = 'America/Sao_Paulo';
+    
+    // Converter para horário do Brasil usando date-fns-tz
+    const brazilTime = new Intl.DateTimeFormat('en-CA', {
+      timeZone: BRAZIL_TIMEZONE,
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit'
+    }).formatToParts(now);
+    
+    const currentHour = parseInt(brazilTime.find(part => part.type === 'hour')?.value || '0');
+    const currentMinute = parseInt(brazilTime.find(part => part.type === 'minute')?.value || '0');
 
     const [reminderHour, reminderMinute] = reminderSettings.reminder_time.split(':').map(Number);
 
@@ -75,15 +82,22 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('✅ Time check passed - sending reminders...');
 
-    // Calcular data de amanhã
-    const tomorrow = new Date(now);
+    // Calcular data de amanhã no fuso do Brasil
+    const brazilDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: BRAZIL_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(now);
+    
+    const tomorrow = new Date(brazilDate + 'T12:00:00');
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
     
     console.log('📅 Checking appointments for date:', tomorrowStr);
 
-    // Verificar lembretes já enviados hoje
-    const todayStr = now.toISOString().split('T')[0];
+    // Verificar lembretes já enviados hoje (data do Brasil)
+    const todayStr = brazilDate;
     
     const { data: sentToday, error: sentTodayError } = await supabase
       .from('reminder_logs')

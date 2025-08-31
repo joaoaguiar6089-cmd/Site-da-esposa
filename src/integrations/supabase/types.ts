@@ -647,6 +647,10 @@ export type Database = {
         Args: { user_id_param: string }
         Returns: boolean
       }
+      check_and_send_reminders: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       check_appointment_conflict: {
         Args: {
           p_appointment_date: string

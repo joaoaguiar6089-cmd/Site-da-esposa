@@ -337,6 +337,13 @@ const ProceduresManagement = () => {
     setImageEditorOpen(true);
   };
 
+  const handleEditExistingImage = () => {
+    if (formData.image_url) {
+      setSelectedImageFile(null);
+      setImageEditorOpen(true);
+    }
+  };
+
   const handleImageSave = async (canvas: HTMLCanvasElement) => {
     setUploadingImage(true);
     
@@ -570,14 +577,26 @@ const ProceduresManagement = () => {
                   
                   {formData.image_url && (
                     <div className="mt-2">
-                      <img 
-                        src={formData.image_url} 
-                        alt="Preview" 
-                        className="w-32 h-32 object-cover rounded border"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
+                      <div className="flex items-start gap-3">
+                        <img 
+                          src={formData.image_url} 
+                          alt="Preview" 
+                          className="w-32 h-32 object-cover rounded border"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditExistingImage()}
+                          className="flex items-center gap-2"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                          Ajustar Imagem
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -872,6 +891,7 @@ const ProceduresManagement = () => {
       {/* Image Editor */}
       <ImageEditor
         imageFile={selectedImageFile}
+        imageUrl={!selectedImageFile ? formData.image_url : undefined}
         open={imageEditorOpen}
         onSave={handleImageSave}
         onCancel={() => {

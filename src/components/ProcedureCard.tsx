@@ -38,7 +38,7 @@ const ProcedureCard = ({
         <img 
           src={image} 
           alt={title}
-          className="w-full h-48 object-contain bg-muted group-hover:scale-105 transition-transform duration-300"
+          className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
         />
         <div className="absolute top-4 right-4">
           <Badge variant="secondary" className="bg-white/90 text-primary font-semibold">

@@ -401,6 +401,47 @@ export type Database = {
           },
         ]
       }
+      reminder_logs: {
+        Row: {
+          appointment_date: string | null
+          appointment_id: string | null
+          client_phone: string | null
+          created_at: string | null
+          id: string
+          message_id: string | null
+          sent_date: string | null
+          status: string | null
+        }
+        Insert: {
+          appointment_date?: string | null
+          appointment_id?: string | null
+          client_phone?: string | null
+          created_at?: string | null
+          id?: string
+          message_id?: string | null
+          sent_date?: string | null
+          status?: string | null
+        }
+        Update: {
+          appointment_date?: string | null
+          appointment_id?: string | null
+          client_phone?: string | null
+          created_at?: string | null
+          id?: string
+          message_id?: string | null
+          sent_date?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminder_logs_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reminder_settings: {
         Row: {
           created_at: string

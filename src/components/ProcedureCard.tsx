@@ -78,19 +78,17 @@ const ProcedureCard = ({
             </div>
           )}
           
-          {benefits && benefits.length > 0 && (
-            <div>
-              <h4 className="font-semibold text-sm text-primary mb-2">Benefícios:</h4>
-              <ul className="space-y-1">
-                {benefits.map((benefit, index) => (
-                  <li key={index} className="text-sm text-muted-foreground flex items-start">
-                    <span className="text-accent mr-2">•</span>
-                    {benefit}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <div>
+            <h4 className="font-semibold text-sm text-primary mb-2">Benefícios:</h4>
+            <ul className="space-y-1">
+              {benefits.map((benefit, index) => (
+                <li key={index} className="text-sm text-muted-foreground flex items-start">
+                  <span className="text-accent mr-2">•</span>
+                  {benefit}
+                </li>
+              ))}
+            </ul>
+          </div>
           
           <Button 
             onClick={handleAgendamento}

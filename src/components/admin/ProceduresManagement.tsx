@@ -1,18 +1,16 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { Plus, Upload, Edit2, Trash2, X, Star, StarOff, Search, Filter } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ImageEditor } from "./ImageEditor";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Edit, Trash2, Star, X, Upload, Image, Search, Filter } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface Category {
   id: string;
@@ -73,8 +71,6 @@ const ProceduresManagement = () => {
   });
   const [newBenefit, setNewBenefit] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [imageEditorOpen, setImageEditorOpen] = useState(false);
-  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const { toast } = useToast();
 
   const loadProcedures = async () => {
@@ -332,61 +328,43 @@ const ProceduresManagement = () => {
       return;
     }
 
-    // Open image editor instead of uploading directly
-    setSelectedImageFile(file);
-    setImageEditorOpen(true);
-  };
-
-  const handleEditExistingImage = () => {
-    if (formData.image_url) {
-      setSelectedImageFile(null);
-      setImageEditorOpen(true);
-    }
-  };
-
-  const handleImageSave = async (canvas: HTMLCanvasElement) => {
-    setUploadingImage(true);
-    
-    try {
-      // Convert canvas to blob
-      const blob = await new Promise<Blob>((resolve) => {
-        canvas.toBlob((blob) => {
-          if (blob) resolve(blob);
-        }, 'image/jpeg', 0.9);
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "Erro",
+        description: "A imagem deve ter no máximo 5MB.",
+        variant: "destructive",
       });
+      return;
+    }
 
-      if (!blob) {
-        throw new Error('Failed to create image blob');
-      }
+    setUploadingImage(true);
 
-      const file = new File([blob], `procedure-${Date.now()}.jpg`, { type: 'image/jpeg' });
-      
-      // Upload to Supabase Storage
-      const fileName = `${Date.now()}-${file.name}`;
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `procedures/${fileName}`;
+
       const { error: uploadError } = await supabase.storage
         .from('procedure-images')
-        .upload(fileName, file);
+        .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data } = supabase.storage
         .from('procedure-images')
-        .getPublicUrl(fileName);
+        .getPublicUrl(filePath);
 
       setFormData({ ...formData, image_url: data.publicUrl });
-      setImageEditorOpen(false);
-      setSelectedImageFile(null);
-      
+
       toast({
         title: "Sucesso",
-        description: "Imagem ajustada e enviada com sucesso!",
+        description: "Imagem enviada com sucesso!",
       });
-    } catch (error) {
-      console.error('Error uploading image:', error);
+    } catch (error: any) {
       toast({
-        title: "Erro",
-        description: "Erro ao enviar imagem.",
+        title: "Erro ao enviar imagem",
+        description: error.message,
         variant: "destructive",
       });
     } finally {
@@ -562,12 +540,12 @@ const ProceduresManagement = () => {
                           {uploadingImage ? (
                             <>
                               <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                              Processando...
+                              Enviando...
                             </>
                           ) : (
                             <>
                               <Upload className="w-4 h-4" />
-                              Upload & Ajustar
+                              Upload
                             </>
                           )}
                         </label>
@@ -577,26 +555,14 @@ const ProceduresManagement = () => {
                   
                   {formData.image_url && (
                     <div className="mt-2">
-                      <div className="flex items-start gap-3">
-                        <img 
-                          src={formData.image_url} 
-                          alt="Preview" 
-                          className="w-32 h-32 object-cover rounded border"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditExistingImage()}
-                          className="flex items-center gap-2"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                          Ajustar Imagem
-                        </Button>
-                      </div>
+                      <img 
+                        src={formData.image_url} 
+                        alt="Preview" 
+                        className="w-32 h-32 object-cover rounded border"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
                     </div>
                   )}
                 </div>
@@ -857,7 +823,7 @@ const ProceduresManagement = () => {
                       size="sm"
                       onClick={() => handleEdit(procedure)}
                     >
-                      <Edit2 className="w-4 h-4" />
+                      <Edit className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="outline"
@@ -887,18 +853,6 @@ const ProceduresManagement = () => {
           <p className="text-muted-foreground">Nenhum procedimento cadastrado ainda.</p>
         </Card>
       )}
-
-      {/* Image Editor */}
-      <ImageEditor
-        imageFile={selectedImageFile}
-        imageUrl={!selectedImageFile ? formData.image_url : undefined}
-        open={imageEditorOpen}
-        onSave={handleImageSave}
-        onCancel={() => {
-          setImageEditorOpen(false);
-          setSelectedImageFile(null);
-        }}
-      />
     </div>
   );
 };

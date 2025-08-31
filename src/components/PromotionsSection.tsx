@@ -10,6 +10,7 @@ interface Promotion {
   description: string;
   image_url: string;
   display_order: number;
+  procedure_id?: string;
 }
 
 export default function PromotionsSection() {
@@ -21,7 +22,7 @@ export default function PromotionsSection() {
     try {
       const { data, error } = await supabase
         .from("promotions")
-        .select("*")
+        .select("id, title, description, image_url, display_order, procedure_id")
         .eq("is_active", true)
         .order("display_order", { ascending: true })
         .limit(4);
@@ -98,7 +99,12 @@ export default function PromotionsSection() {
                     <Button 
                       size="lg" 
                       className="text-lg px-8 py-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
-                      onClick={() => window.location.href = '/agendamento'}
+                      onClick={() => {
+                        const url = currentPromotion.procedure_id 
+                          ? `/agendamento?procedimento=${currentPromotion.procedure_id}`
+                          : '/agendamento';
+                        window.location.href = url;
+                      }}
                     >
                       Agendar Agora
                     </Button>

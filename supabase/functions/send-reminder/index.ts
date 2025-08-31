@@ -47,7 +47,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Checking appointments for date:', tomorrowStr);
 
-    // Get appointments for tomorrow that are scheduled
+    // Get appointments for tomorrow that are scheduled or confirmed
     const { data: appointments, error } = await supabase
       .from('appointments')
       .select(`
@@ -56,7 +56,7 @@ const handler = async (req: Request): Promise<Response> => {
         procedures!appointments_procedure_id_fkey(name, duration)
       `)
       .eq('appointment_date', tomorrowStr)
-      .eq('status', 'agendado');
+      .in('status', ['agendado', 'confirmado']);
 
     if (error) {
       console.error('Error fetching appointments:', error);

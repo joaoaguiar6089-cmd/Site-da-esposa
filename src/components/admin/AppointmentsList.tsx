@@ -349,9 +349,21 @@ Tefé-AM
 
   // Deletar agendamento
   const deleteAppointment = async (id: string) => {
-    if (!confirm('Tem certeza que deseja deletar este agendamento?')) return;
+    if (!confirm('Tem certeza que deseja deletar este agendamento? Esta ação também removerá todos os logs de lembrete associados.')) return;
 
     try {
+      // Primeiro, deletar os logs de lembrete relacionados
+      const { error: reminderError } = await supabase
+        .from('reminder_logs')
+        .delete()
+        .eq('appointment_id', id);
+
+      if (reminderError) {
+        console.error('Erro ao deletar logs de lembrete:', reminderError);
+        // Continue mesmo se houver erro ao deletar logs, pois podem não existir
+      }
+
+      // Depois, deletar o agendamento
       const { error } = await supabase
         .from('appointments')
         .delete()

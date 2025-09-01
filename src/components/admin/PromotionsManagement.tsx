@@ -44,7 +44,7 @@ export default function PromotionsManagement() {
     image_url: "",
     is_active: true,
     display_order: 1,
-    procedure_id: ""
+    procedure_id: "none"
   });
 
   const fetchPromotions = async () => {
@@ -139,7 +139,7 @@ export default function PromotionsManagement() {
 
     const submitData = {
       ...formData,
-      procedure_id: formData.procedure_id || null
+      procedure_id: formData.procedure_id === "none" ? null : formData.procedure_id || null
     };
 
     try {
@@ -189,7 +189,7 @@ export default function PromotionsManagement() {
       image_url: promotion.image_url,
       is_active: promotion.is_active,
       display_order: promotion.display_order,
-      procedure_id: promotion.procedure_id || ""
+      procedure_id: promotion.procedure_id || "none"
     });
     setIsDialogOpen(true);
   };
@@ -228,7 +228,7 @@ export default function PromotionsManagement() {
       image_url: "",
       is_active: true,
       display_order: 1,
-      procedure_id: ""
+      procedure_id: "none"
     });
     setEditingPromotion(null);
   };
@@ -312,7 +312,7 @@ export default function PromotionsManagement() {
                     <SelectValue placeholder="Selecione um procedimento" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum procedimento</SelectItem>
+                    <SelectItem value="none">Nenhum procedimento</SelectItem>
                     {procedures.map((procedure) => (
                       <SelectItem key={procedure.id} value={procedure.id}>
                         {procedure.name}

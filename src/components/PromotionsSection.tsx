@@ -87,7 +87,7 @@ export default function PromotionsSection() {
                           <img
                             src={promotion.image_url}
                             alt={promotion.title}
-                            className="w-full h-full object-cover transition-all duration-1000 group-hover:scale-110 group-hover:rotate-1"
+                            className="w-full h-full object-cover group-hover:scale-[1.01]"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent z-20"></div>
                           

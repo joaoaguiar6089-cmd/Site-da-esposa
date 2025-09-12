@@ -32,6 +32,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
   procedureId,
   bodySelectionType,
   bodyImageUrl,
+  bodyImageUrlMale,
   onSelectionChange,
 }) => {
   const [areaGroups, setAreaGroups] = useState<AreaGroup[]>([]);
@@ -42,26 +43,22 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
   const imageRef = useRef<HTMLImageElement>(null);
 
   const getImageUrl = useCallback(() => {
-    if (bodySelectionType === 'custom' && bodyImageUrl) {
-      return bodyImageUrl;
+    if (bodySelectionType === 'custom' && (selectedGender === 'male' ? bodyImageUrlMale : bodyImageUrl)) {
+      return selectedGender === 'male' ? (bodyImageUrlMale || bodyImageUrl) : (bodyImageUrl || bodyImageUrlMale);
     }
-    
     const defaultImages = {
       'face_male': '/images/face-male-default.png',
       'face_female': '/images/face-female-default.png',
       'body_male': '/images/body-male-default.png',
       'body_female': '/images/body-female-default.png'
-    };
-
+    } as const;
     if (bodySelectionType.includes('male') || bodySelectionType.includes('female')) {
       return defaultImages[bodySelectionType as keyof typeof defaultImages];
     }
-
-    // Para tipos que permitem seleção de gênero
     const genderSuffix = selectedGender === 'male' ? 'male' : 'female';
     const baseType = bodySelectionType.includes('face') ? 'face' : 'body';
     return defaultImages[`${baseType}_${genderSuffix}` as keyof typeof defaultImages];
-  }, [bodySelectionType, bodyImageUrl, selectedGender]);
+  }, [bodySelectionType, bodyImageUrl, bodyImageUrlMale, selectedGender]);
 
   useEffect(() => {
     loadAreaGroups();
@@ -78,7 +75,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
   }, [selectedGroupIds, areaGroups, selectedGender, onSelectionChange]);
 
   const loadAreaGroups = async () => {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('body_area_groups')
       .select('*')
       .eq('procedure_id', procedureId);

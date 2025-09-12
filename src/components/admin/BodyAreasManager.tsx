@@ -23,6 +23,8 @@ interface AreaGroup {
 interface BodyAreasManagerProps {
   procedureId: string;
   imageUrl: string;
+  imageUrlMale?: string;
+  bodySelectionType?: string;
   open: boolean;
   onClose: () => void;
 }
@@ -30,6 +32,8 @@ interface BodyAreasManagerProps {
 const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
   procedureId,
   imageUrl,
+  imageUrlMale,
+  bodySelectionType,
   open,
   onClose,
 }) => {
@@ -53,9 +57,28 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
     }
   }, [open, procedureId]);
 
+  const getCurrentImageUrl = useCallback(() => {
+    if (bodySelectionType === 'custom' && imageUrl) {
+      return imageUrl;
+    }
+
+    const defaultImages = {
+      'face_male': '/images/face-male-default.png',
+      'face_female': '/images/face-female-default.png',
+      'body_male': '/images/body-male-default.png',
+      'body_female': '/images/body-female-default.png'
+    } as const;
+
+    if (bodySelectionType && (bodySelectionType.includes('male') || bodySelectionType.includes('female'))) {
+      return defaultImages[bodySelectionType as keyof typeof defaultImages] || imageUrl || '';
+    }
+
+    return imageUrl || '';
+  }, [bodySelectionType, imageUrl, imageUrlMale]);
+
   const loadAreaGroups = async () => {
-    const { data, error } = await supabase
-      .from('body_area_groups')
+    const { data, error } = await (supabase as any)
+      .from('body_area_groups' as any)
       .select('*')
       .eq('procedure_id', procedureId);
 
@@ -291,14 +314,14 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
     try {
       // Deletar grupos existentes
       await supabase
-        .from('body_area_groups')
+        .from('body_area_groups' as any)
         .delete()
         .eq('procedure_id', procedureId);
 
       // Inserir novos grupos
       if (areaGroups.length > 0) {
         const { error } = await supabase
-          .from('body_area_groups')
+          .from('body_area_groups' as any)
           .insert(
             areaGroups.map(group => ({
               procedure_id: procedureId,

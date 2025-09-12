@@ -872,7 +872,13 @@ Para reagendar, entre em contato conosco.`;
                 bodyImageUrl={selectedProcedure.body_image_url}
                 bodyImageUrlMale={selectedProcedure.body_image_url_male}
                 onSelectionChange={(areas, totalPrice, gender) => {
-                  setSelectedBodyAreas(areas);
+                  const mapped = areas.map((g) => ({
+                    id: g.id,
+                    name: g.name,
+                    price: g.price,
+                    coordinates: { x: 0, y: 0, width: 0, height: 0 },
+                  }));
+                  setSelectedBodyAreas(mapped);
                   setTotalBodyAreasPrice(totalPrice);
                   setSelectedGender(gender);
                 }}

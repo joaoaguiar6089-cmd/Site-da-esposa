@@ -77,8 +77,10 @@ const ProceduresManagement = () => {
   });
   const [newBenefit, setNewBenefit] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingBodyImage, setUploadingBodyImage] = useState(false);
   const [imageEditorOpen, setImageEditorOpen] = useState(false);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [selectedBodyImageFile, setSelectedBodyImageFile] = useState<File | null>(null);
   const [bodyAreasManagerOpen, setBodyAreasManagerOpen] = useState(false);
   const { toast } = useToast();
 
@@ -454,15 +456,58 @@ const ProceduresManagement = () => {
     }
   };
 
+  const uploadBodyImage = async (file: File) => {
+    if (!file) return;
+
+    setUploadingBodyImage(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `body-${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('procedure-images')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('procedure-images')
+        .getPublicUrl(fileName);
+
+      setFormData(prev => ({
+        ...prev,
+        body_image_url: publicUrl
+      }));
+
+      toast({
+        title: "Upload realizado",
+        description: "Imagem corporais enviada com sucesso!",
+      });
+
+      setSelectedBodyImageFile(null);
+    } catch (error: any) {
+      console.error('Erro no upload:', error);
+      toast({
+        title: "Erro no upload",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingBodyImage(false);
+    }
+  };
+
   const getDefaultBodyImage = (type: string): string => {
-    // URLs de imagens padrão para diferentes tipos de corpo
     const defaultImages = {
       'face_male': '/images/face-male-default.png',
       'face_female': '/images/face-female-default.png', 
       'body_male': '/images/body-male-default.png',
       'body_female': '/images/body-female-default.png'
     };
-    return defaultImages[type as keyof typeof defaultImages] || '';
+    return defaultImages[type as keyof typeof defaultImages] || '/images/face-female-default.png';
   };
 
   if (loading) return <div>Carregando procedimentos...</div>;
@@ -739,14 +784,70 @@ const ProceduresManagement = () => {
                       </div>
 
                       {formData.body_selection_type === 'custom' && (
-                        <div>
-                          <Label htmlFor="body_image_url">Imagem para Seleção</Label>
-                          <Input
-                            id="body_image_url"
-                            value={formData.body_image_url || ''}
-                            onChange={(e) => setFormData({ ...formData, body_image_url: e.target.value })}
-                            placeholder="URL da imagem customizada"
-                          />
+                        <div className="space-y-4">
+                          <Label>Imagem para Seleção</Label>
+                          
+                          {/* Upload de arquivo */}
+                          <div>
+                            <Label htmlFor="body-image-upload" className="text-sm text-muted-foreground">
+                              Upload de Arquivo
+                            </Label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Input
+                                id="body-image-upload"
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => setSelectedBodyImageFile(e.target.files?.[0] || null)}
+                                className="flex-1"
+                              />
+                              <Button
+                                type="button"
+                                onClick={() => selectedBodyImageFile && uploadBodyImage(selectedBodyImageFile)}
+                                disabled={!selectedBodyImageFile || uploadingBodyImage}
+                                size="sm"
+                              >
+                                {uploadingBodyImage ? 'Enviando...' : 'Upload'}
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Divisor */}
+                          <div className="flex items-center gap-4">
+                            <div className="flex-1 border-t"></div>
+                            <span className="text-xs text-muted-foreground">OU</span>
+                            <div className="flex-1 border-t"></div>
+                          </div>
+
+                          {/* URL da imagem */}
+                          <div>
+                            <Label htmlFor="body_image_url" className="text-sm text-muted-foreground">
+                              URL da Imagem
+                            </Label>
+                            <Input
+                              id="body_image_url"
+                              value={formData.body_image_url || ''}
+                              onChange={(e) => setFormData({ ...formData, body_image_url: e.target.value })}
+                              placeholder="https://exemplo.com/imagem.jpg"
+                              className="mt-1"
+                            />
+                          </div>
+
+                          {/* Preview da imagem */}
+                          {formData.body_image_url && (
+                            <div className="space-y-2">
+                              <Label className="text-sm text-muted-foreground">Preview</Label>
+                              <div className="border rounded p-2">
+                                <img 
+                                  src={formData.body_image_url} 
+                                  alt="Preview da imagem corporal"
+                                  className="max-w-32 max-h-32 object-contain mx-auto"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -1006,15 +1107,4 @@ const ProceduresManagement = () => {
   );
 };
 
-  const getDefaultBodyImage = (bodySelectionType: string) => {
-    const defaultImages = {
-      'face_male': '/images/face-male-default.png',
-      'face_female': '/images/face-female-default.png',
-      'body_male': '/images/body-male-default.png',
-      'body_female': '/images/body-female-default.png'
-    };
-    
-    return defaultImages[bodySelectionType as keyof typeof defaultImages] || '/images/face-female-default.png';
-  };
-
-  export default ProceduresManagement;
+export default ProceduresManagement;

@@ -1213,6 +1213,8 @@ const ProceduresManagement = () => {
         <BodyAreasManager
           procedureId={editingProcedure.id}
           imageUrl={formData.body_selection_type === 'custom' ? (formData.body_image_url || '') : getDefaultBodyImage(formData.body_selection_type)}
+          imageUrlMale={formData.body_selection_type === 'custom' ? (formData.body_image_url_male || '') : getDefaultBodyImage(formData.body_selection_type.replace('female', 'male'))}
+          bodySelectionType={formData.body_selection_type}
           open={bodyAreasManagerOpen}
           onClose={() => setBodyAreasManagerOpen(false)}
         />

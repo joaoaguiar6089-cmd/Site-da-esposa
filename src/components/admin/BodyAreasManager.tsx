@@ -1,23 +1,23 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { toast } from 'sonner';
-import { X, Plus, Edit2, Trash2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface BodyArea {
   id?: string;
   name: string;
   price: number;
   coordinates: {
-    x: number; // percentual
-    y: number; // percentual
-    width: number; // percentual
-    height: number; // percentual
+    x: number;
+    y: number;
+    width: number;
+    height: number;
   };
+  isSymmetric?: boolean;
 }
 
 interface BodyAreasManagerProps {
@@ -35,18 +35,17 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
 }) => {
   const [areas, setAreas] = useState<BodyArea[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [currentArea, setCurrentArea] = useState<BodyArea | null>(null);
-  const [editingArea, setEditingArea] = useState<BodyArea | null>(null);
-  const [startPoint, setStartPoint] = useState({ x: 0, y: 0 });
-  const [isSymmetric, setIsSymmetric] = useState(false);
+  const [currentArea, setCurrentArea] = useState<Partial<BodyArea> | null>(null);
+  const [areaForm, setAreaForm] = useState({ name: '', price: 0 });
+  const [editingArea, setEditingArea] = useState<BodyArea & { id: string } | null>(null);
+  const [createSymmetric, setCreateSymmetric] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [dragAreaIndex, setDragAreaIndex] = useState<number | null>(null);
+  
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
-
-  const [areaForm, setAreaForm] = useState({
-    name: '',
-    price: 0
-  });
 
   useEffect(() => {
     if (open && procedureId) {
@@ -69,12 +68,8 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
       id: area.id,
       name: area.name,
       price: area.price,
-      coordinates: area.coordinates as {
-        x: number;
-        y: number;
-        width: number;
-        height: number;
-      }
+      coordinates: area.coordinates as any,
+      isSymmetric: (area as any).is_symmetric || false
     }));
 
     setAreas(mappedAreas);
@@ -82,8 +77,7 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
 
   const getCanvasCoordinates = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return { x: 0, y: 0 };
+    if (!canvas) return null;
 
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
@@ -105,125 +99,198 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
 
     // Desenhar áreas existentes
     areas.forEach((area, index) => {
-      const x = (area.coordinates.x / 100) * canvas.width;
-      const y = (area.coordinates.y / 100) * canvas.height;
-      const width = (area.coordinates.width / 100) * canvas.width;
-      const height = (area.coordinates.height / 100) * canvas.height;
+      const drawArea = (coords: any, isSymmetric = false) => {
+        const x = (coords.x / 100) * canvas.width;
+        const y = (coords.y / 100) * canvas.height;
+        const width = (coords.width / 100) * canvas.width;
+        const height = (coords.height / 100) * canvas.height;
 
-      ctx.strokeStyle = '#ef4444';
-      ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
-      ctx.lineWidth = 2;
-      ctx.fillRect(x, y, width, height);
-      ctx.strokeRect(x, y, width, height);
+        ctx.strokeStyle = '#ef4444';
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
+        ctx.lineWidth = 2;
+        ctx.fillRect(x, y, width, height);
+        ctx.strokeRect(x, y, width, height);
 
-      // Label
-      ctx.fillStyle = '#ef4444';
-      ctx.font = '12px Arial';
-      ctx.fillText(`${index + 1}. ${area.name}`, x, y - 5);
+        if (!isSymmetric) {
+          // Label apenas na área principal
+          ctx.fillStyle = '#ef4444';
+          ctx.font = '12px Arial';
+          ctx.fillText(`${index + 1}. ${area.name}`, x, y - 5);
+        }
+      };
+
+      // Desenhar área principal
+      drawArea(area.coordinates);
+
+      // Se for simétrica, desenhar área espelhada
+      if (area.isSymmetric) {
+        const centerX = 50;
+        const originalCenterX = area.coordinates.x + (area.coordinates.width / 2);
+        const distanceFromCenter = originalCenterX - centerX;
+        const mirroredCenterX = centerX - distanceFromCenter;
+        const mirroredX = mirroredCenterX - (area.coordinates.width / 2);
+
+        if (mirroredX >= 0 && mirroredX + area.coordinates.width <= 100) {
+          const mirroredCoords = {
+            x: mirroredX,
+            y: area.coordinates.y,
+            width: area.coordinates.width,
+            height: area.coordinates.height
+          };
+          drawArea(mirroredCoords, true);
+        }
+      }
     });
 
     // Desenhar área atual sendo criada
-    if (currentArea) {
-      const x = (currentArea.coordinates.x / 100) * canvas.width;
-      const y = (currentArea.coordinates.y / 100) * canvas.height;
-      const width = (currentArea.coordinates.width / 100) * canvas.width;
-      const height = (currentArea.coordinates.height / 100) * canvas.height;
+    if (currentArea?.coordinates) {
+      const drawCurrentArea = (coords: any, isSymmetric = false) => {
+        const x = (coords.x / 100) * canvas.width;
+        const y = (coords.y / 100) * canvas.height;
+        const width = (coords.width / 100) * canvas.width;
+        const height = (coords.height / 100) * canvas.height;
 
-      ctx.strokeStyle = '#22c55e';
-      ctx.fillStyle = 'rgba(34, 197, 94, 0.3)';
-      ctx.lineWidth = 2;
-      ctx.fillRect(x, y, width, height);
-      ctx.strokeRect(x, y, width, height);
+        ctx.strokeStyle = '#22c55e';
+        ctx.fillStyle = 'rgba(34, 197, 94, 0.3)';
+        ctx.lineWidth = 2;
+        ctx.fillRect(x, y, width, height);
+        ctx.strokeRect(x, y, width, height);
+      };
+
+      // Desenhar área principal sendo criada
+      drawCurrentArea(currentArea.coordinates);
+
+      // Se for simétrica, desenhar área espelhada sendo criada
+      if (createSymmetric) {
+        const centerX = 50;
+        const originalCenterX = currentArea.coordinates.x + (currentArea.coordinates.width / 2);
+        const distanceFromCenter = originalCenterX - centerX;
+        const mirroredCenterX = centerX - distanceFromCenter;
+        const mirroredX = mirroredCenterX - (currentArea.coordinates.width / 2);
+
+        if (mirroredX >= 0 && mirroredX + currentArea.coordinates.width <= 100) {
+          const mirroredCoords = {
+            x: mirroredX,
+            y: currentArea.coordinates.y,
+            width: currentArea.coordinates.width,
+            height: currentArea.coordinates.height
+          };
+          drawCurrentArea(mirroredCoords, true);
+        }
+      }
     }
-  }, [areas, currentArea]);
+  }, [areas, currentArea, createSymmetric]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const coords = getCanvasCoordinates(e);
-    setStartPoint(coords);
-    setIsDrawing(true);
-    setCurrentArea({
-      name: areaForm.name || 'Nova Área',
-      price: areaForm.price,
-      coordinates: {
-        x: coords.x,
-        y: coords.y,
-        width: 0,
-        height: 0
+    if (!coords) return;
+
+    // Verificar se clicou em uma área existente para arrastar
+    const clickedAreaIndex = areas.findIndex(area => {
+      // Verificar área principal
+      const inMainArea = coords.x >= area.coordinates.x && 
+        coords.x <= area.coordinates.x + area.coordinates.width &&
+        coords.y >= area.coordinates.y && 
+        coords.y <= area.coordinates.y + area.coordinates.height;
+
+      // Se for simétrica, verificar também a área espelhada
+      if (area.isSymmetric) {
+        const centerX = 50;
+        const originalCenterX = area.coordinates.x + (area.coordinates.width / 2);
+        const distanceFromCenter = originalCenterX - centerX;
+        const mirroredCenterX = centerX - distanceFromCenter;
+        const mirroredX = mirroredCenterX - (area.coordinates.width / 2);
+
+        const inMirroredArea = coords.x >= mirroredX && 
+          coords.x <= mirroredX + area.coordinates.width &&
+          coords.y >= area.coordinates.y && 
+          coords.y <= area.coordinates.y + area.coordinates.height;
+
+        return inMainArea || inMirroredArea;
       }
+
+      return inMainArea;
     });
+
+    if (clickedAreaIndex !== -1) {
+      setIsDragging(true);
+      setDragAreaIndex(clickedAreaIndex);
+      setDragStart({ x: coords.x, y: coords.y });
+    } else {
+      setIsDrawing(true);
+      setCurrentArea({
+        coordinates: {
+          x: coords.x,
+          y: coords.y,
+          width: 0,
+          height: 0
+        }
+      });
+    }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !currentArea) return;
-
     const coords = getCanvasCoordinates(e);
-    const width = Math.abs(coords.x - startPoint.x);
-    const height = Math.abs(coords.y - startPoint.y);
-    const x = Math.min(startPoint.x, coords.x);
-    const y = Math.min(startPoint.y, coords.y);
+    if (!coords) return;
 
-    setCurrentArea({
-      ...currentArea,
-      coordinates: { x, y, width, height }
-    });
+    if (isDragging && dragStart && dragAreaIndex !== null) {
+      const deltaX = coords.x - dragStart.x;
+      const deltaY = coords.y - dragStart.y;
+      
+      setAreas(prev => prev.map((area, index) => {
+        if (index === dragAreaIndex) {
+          const newX = Math.max(0, Math.min(100 - area.coordinates.width, area.coordinates.x + deltaX));
+          const newY = Math.max(0, Math.min(100 - area.coordinates.height, area.coordinates.y + deltaY));
+          
+          return {
+            ...area,
+            coordinates: {
+              ...area.coordinates,
+              x: newX,
+              y: newY
+            }
+          };
+        }
+        return area;
+      }));
+      
+      setDragStart({ x: coords.x, y: coords.y });
+    } else if (isDrawing && currentArea?.coordinates) {
+      setCurrentArea(prev => ({
+        ...prev!,
+        coordinates: {
+          ...prev!.coordinates!,
+          width: Math.abs(coords.x - prev!.coordinates!.x),
+          height: Math.abs(coords.y - prev!.coordinates!.y),
+          x: Math.min(coords.x, prev!.coordinates!.x),
+          y: Math.min(coords.y, prev!.coordinates!.y)
+        }
+      }));
+    }
+
+    drawAreas();
   };
 
   const handleMouseUp = () => {
-    if (!currentArea || !isDrawing) return;
-
-    if (currentArea.coordinates.width > 1 && currentArea.coordinates.height > 1) {
-      if (!areaForm.name.trim()) {
-        toast.error('Por favor, insira o nome da área');
-        setCurrentArea(null);
-        setIsDrawing(false);
-        return;
-      }
-      
-      const newArea = { ...currentArea, name: areaForm.name, price: areaForm.price };
-      let areasToAdd = [newArea];
-      
-      // Se simétrico está marcado, criar área espelhada
-      if (isSymmetric) {
-        const mirroredArea = createMirroredArea(newArea);
-        if (mirroredArea) {
-          areasToAdd.push(mirroredArea);
-        }
-      }
-      
-      setAreas(prev => [...prev, ...areasToAdd]);
-      setAreaForm({ name: '', price: 0 });
+    if (isDragging) {
+      setIsDragging(false);
+      setDragAreaIndex(null);
+      setDragStart(null);
+      return;
     }
 
-    setCurrentArea(null);
-    setIsDrawing(false);
-  };
+    if (!isDrawing || !currentArea?.coordinates) return;
 
-  const createMirroredArea = (originalArea: BodyArea): BodyArea | null => {
-    // Calcular a posição espelhada baseada no centro da imagem (50%)
-    const centerX = 50;
-    const originalCenterX = originalArea.coordinates.x + (originalArea.coordinates.width / 2);
-    const distanceFromCenter = originalCenterX - centerX;
-    
-    // Criar a área espelhada
-    const mirroredCenterX = centerX - distanceFromCenter;
-    const mirroredX = mirroredCenterX - (originalArea.coordinates.width / 2);
-    
-    // Verificar se a área espelhada está dentro dos limites (0-100%)
-    if (mirroredX < 0 || mirroredX + originalArea.coordinates.width > 100) {
-      toast.error('Área simétrica ficaria fora dos limites da imagem');
-      return null;
-    }
-    
-    return {
-      name: `${originalArea.name} (Espelhado)`,
-      price: originalArea.price,
-      coordinates: {
-        x: mirroredX,
-        y: originalArea.coordinates.y,
-        width: originalArea.coordinates.width,
-        height: originalArea.coordinates.height
-      }
+    const area: BodyArea = {
+      name: '',
+      price: 0,
+      coordinates: currentArea.coordinates,
+      isSymmetric: createSymmetric
     };
+
+    setAreas(prev => [...prev, area]);
+    setIsDrawing(false);
+    setCurrentArea(null);
   };
 
   const handleImageLoad = () => {
@@ -257,7 +324,8 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
               procedure_id: procedureId,
               name: area.name,
               price: area.price,
-              coordinates: area.coordinates
+              coordinates: area.coordinates,
+              is_symmetric: area.isSymmetric || false
             }))
           );
 
@@ -298,130 +366,131 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
         <DialogHeader>
-          <DialogTitle>Gerenciar Áreas Selecionáveis</DialogTitle>
+          <DialogTitle>Gerenciar Áreas do Corpo</DialogTitle>
         </DialogHeader>
         
-        <div className="flex gap-6 h-full">
-          {/* Canvas Area */}
+        <div className="flex gap-6 h-[70vh]">
           <div className="flex-1" ref={containerRef}>
-            <div className="relative">
-              <img
-                ref={imageRef}
-                src={imageUrl}
-                alt="Área corporal"
-                className="hidden"
-                onLoad={handleImageLoad}
-                crossOrigin="anonymous"
-              />
-              <canvas
-                ref={canvasRef}
-                className="max-w-full max-h-96 border border-border cursor-crosshair"
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-              />
+            <div className="mb-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="symmetric"
+                  checked={createSymmetric}
+                  onCheckedChange={(checked) => setCreateSymmetric(checked === true)}
+                />
+                <Label htmlFor="symmetric">Criar Área Simétrica Automaticamente</Label>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Clique e arraste para criar áreas. Áreas existentes podem ser arrastadas para reposicionamento.
+              </p>
             </div>
+            
+            <img
+              ref={imageRef}
+              src={imageUrl}
+              alt="Áreas corporais"
+              className="hidden"
+              onLoad={handleImageLoad}
+              crossOrigin="anonymous"
+            />
+            <canvas
+              ref={canvasRef}
+              className="max-w-full max-h-full border border-border cursor-crosshair"
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={() => {
+                setIsDrawing(false);
+                setIsDragging(false);
+                setCurrentArea(null);
+              }}
+            />
           </div>
 
-          {/* Controls */}
-          <div className="w-80 space-y-4">
-            <Card className="p-4">
-              <h3 className="font-semibold mb-3">Nova Área</h3>
-              <div className="space-y-3">
-                <div>
-                  <Label htmlFor="area-name">Nome da Área</Label>
-                  <Input
-                    id="area-name"
-                    value={areaForm.name}
-                    onChange={(e) => setAreaForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Ex: Testa, Bochecha..."
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="area-price">Preço (R$)</Label>
-                  <Input
-                    id="area-price"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={areaForm.price}
-                    onChange={(e) => setAreaForm(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                  />
-                </div>
-                
-                {/* Checkbox para área simétrica */}
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="symmetric-area"
-                    checked={isSymmetric}
-                    onChange={(e) => setIsSymmetric(e.target.checked)}
-                    className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary"
-                  />
-                  <Label htmlFor="symmetric-area" className="text-sm">
-                    Criar área simétrica automaticamente
-                  </Label>
-                </div>
-                
-                {isSymmetric && (
-                  <p className="text-xs text-muted-foreground">
-                    ⚡ Ao desenhar uma área, será criada automaticamente uma área espelhada do lado oposto
-                  </p>
-                )}
-                
-                {editingArea && (
-                  <div className="flex gap-2">
-                    <Button onClick={updateArea} size="sm">Atualizar</Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => {
-                        setEditingArea(null);
-                        setAreaForm({ name: '', price: 0 });
-                      }}
-                    >
-                      Cancelar
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </Card>
-
-            <Card className="p-4">
-              <h3 className="font-semibold mb-3">Áreas Definidas ({areas.length})</h3>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
+          <div className="w-80 space-y-4 overflow-y-auto">
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Áreas Definidas</h3>
+              <div className="space-y-2">
                 {areas.map((area, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{area.name}</p>
-                      <p className="text-xs text-muted-foreground">R$ {area.price.toFixed(2)}</p>
+                  <div key={index} className="border p-3 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium">Área {index + 1}</span>
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => editArea(index)}
+                        >
+                          Editar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => deleteArea(index)}
+                        >
+                          Excluir
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => editArea(index)}
-                      >
-                        <Edit2 className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteArea(index)}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
+                    <div className="text-sm space-y-1">
+                      <p><strong>Nome:</strong> {area.name || 'Não definido'}</p>
+                      <p><strong>Preço:</strong> R$ {area.price.toFixed(2)}</p>
+                      {area.isSymmetric && (
+                        <p className="text-blue-600"><strong>Área Simétrica</strong></p>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
-            </Card>
+            </div>
 
-            <div className="flex gap-2">
+            {editingArea ? (
+              <div className="border p-4 rounded-lg">
+                <h4 className="font-medium mb-3">Editando Área</h4>
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="edit-name">Nome da Área</Label>
+                    <Input
+                      id="edit-name"
+                      value={areaForm.name}
+                      onChange={(e) => setAreaForm(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Ex: Testa, Bochecha..."
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-price">Preço (R$)</Label>
+                    <Input
+                      id="edit-price"
+                      type="number"
+                      step="0.01"
+                      value={areaForm.price}
+                      onChange={(e) => setAreaForm(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={updateArea} className="flex-1">
+                      Salvar
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setEditingArea(null);
+                        setAreaForm({ name: '', price: 0 });
+                      }}
+                      className="flex-1"
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="flex gap-2 pt-4 border-t">
               <Button onClick={saveAreas} className="flex-1">
                 Salvar Áreas
               </Button>
-              <Button variant="outline" onClick={onClose}>
+              <Button variant="outline" onClick={onClose} className="flex-1">
                 Cancelar
               </Button>
             </div>

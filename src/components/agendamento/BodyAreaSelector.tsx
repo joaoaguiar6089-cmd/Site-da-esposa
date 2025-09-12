@@ -16,6 +16,7 @@ interface BodyArea {
     width: number;
     height: number;
   };
+  isSymmetric?: boolean;
 }
 
 interface BodyAreaSelectorProps {
@@ -90,7 +91,8 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
       id: area.id,
       name: area.name,
       price: area.price,
-      coordinates: area.coordinates as any
+      coordinates: area.coordinates as any,
+      isSymmetric: (area as any).is_symmetric || false
     }));
 
     setAreas(mappedAreas);
@@ -108,37 +110,63 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
       const isSelected = selectedAreaIds.includes(area.id);
       const isHovered = hoveredArea === area.id;
       
-      const x = (area.coordinates.x / 100) * canvas.width;
-      const y = (area.coordinates.y / 100) * canvas.height;
-      const width = (area.coordinates.width / 100) * canvas.width;
-      const height = (area.coordinates.height / 100) * canvas.height;
+      const drawAreaSelection = (coords: any, isSymmetricPart = false) => {
+        const x = (coords.x / 100) * canvas.width;
+        const y = (coords.y / 100) * canvas.height;
+        const width = (coords.width / 100) * canvas.width;
+        const height = (coords.height / 100) * canvas.height;
 
-      // Área selecionada
-      if (isSelected) {
-        ctx.fillStyle = 'rgba(34, 197, 94, 0.4)';
-        ctx.fillRect(x, y, width, height);
-        ctx.strokeStyle = '#22c55e';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, width, height);
-      }
-      // Área hover
-      else if (isHovered) {
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
-        ctx.fillRect(x, y, width, height);
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, width, height);
-        
-        // Mostrar nome e preço
-        ctx.fillStyle = '#000';
-        ctx.font = '14px Arial';
-        ctx.fillText(`${area.name} - R$ ${area.price.toFixed(2)}`, x, y - 5);
-      }
-      // Área disponível
-      else {
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, width, height);
+        // Área selecionada
+        if (isSelected) {
+          ctx.fillStyle = 'rgba(34, 197, 94, 0.4)';
+          ctx.fillRect(x, y, width, height);
+          ctx.strokeStyle = '#22c55e';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x, y, width, height);
+        }
+        // Área hover
+        else if (isHovered) {
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
+          ctx.fillRect(x, y, width, height);
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x, y, width, height);
+          
+          // Mostrar nome e preço apenas na área principal
+          if (!isSymmetricPart) {
+            ctx.fillStyle = '#000';
+            ctx.font = '14px Arial';
+            ctx.fillText(`${area.name} - R$ ${area.price.toFixed(2)}`, x, y - 5);
+          }
+        }
+        // Área disponível
+        else {
+          ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x, y, width, height);
+        }
+      };
+
+      // Desenhar área principal
+      drawAreaSelection(area.coordinates);
+
+      // Se for simétrica, desenhar área espelhada
+      if (area.isSymmetric) {
+        const centerX = 50;
+        const originalCenterX = area.coordinates.x + (area.coordinates.width / 2);
+        const distanceFromCenter = originalCenterX - centerX;
+        const mirroredCenterX = centerX - distanceFromCenter;
+        const mirroredX = mirroredCenterX - (area.coordinates.width / 2);
+
+        if (mirroredX >= 0 && mirroredX + area.coordinates.width <= 100) {
+          const mirroredCoords = {
+            x: mirroredX,
+            y: area.coordinates.y,
+            width: area.coordinates.width,
+            height: area.coordinates.height
+          };
+          drawAreaSelection(mirroredCoords, true);
+        }
       }
     });
   }, [areas, selectedAreaIds, hoveredArea]);
@@ -151,10 +179,27 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
 
-    const clickedArea = areas.find(area => 
-      x >= area.coordinates.x && x <= area.coordinates.x + area.coordinates.width &&
-      y >= area.coordinates.y && y <= area.coordinates.y + area.coordinates.height
-    );
+    const clickedArea = areas.find(area => {
+      // Verificar área principal
+      const inMainArea = x >= area.coordinates.x && x <= area.coordinates.x + area.coordinates.width &&
+        y >= area.coordinates.y && y <= area.coordinates.y + area.coordinates.height;
+
+      // Se for simétrica, verificar também a área espelhada
+      if (area.isSymmetric) {
+        const centerX = 50;
+        const originalCenterX = area.coordinates.x + (area.coordinates.width / 2);
+        const distanceFromCenter = originalCenterX - centerX;
+        const mirroredCenterX = centerX - distanceFromCenter;
+        const mirroredX = mirroredCenterX - (area.coordinates.width / 2);
+
+        const inMirroredArea = x >= mirroredX && x <= mirroredX + area.coordinates.width &&
+          y >= area.coordinates.y && y <= area.coordinates.y + area.coordinates.height;
+
+        return inMainArea || inMirroredArea;
+      }
+
+      return inMainArea;
+    });
 
     if (clickedArea) {
       toggleAreaSelection(clickedArea.id);
@@ -169,10 +214,27 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
 
-    const hoveredAreaFound = areas.find(area => 
-      x >= area.coordinates.x && x <= area.coordinates.x + area.coordinates.width &&
-      y >= area.coordinates.y && y <= area.coordinates.y + area.coordinates.height
-    );
+    const hoveredAreaFound = areas.find(area => {
+      // Verificar área principal
+      const inMainArea = x >= area.coordinates.x && x <= area.coordinates.x + area.coordinates.width &&
+        y >= area.coordinates.y && y <= area.coordinates.y + area.coordinates.height;
+
+      // Se for simétrica, verificar também a área espelhada
+      if (area.isSymmetric) {
+        const centerX = 50;
+        const originalCenterX = area.coordinates.x + (area.coordinates.width / 2);
+        const distanceFromCenter = originalCenterX - centerX;
+        const mirroredCenterX = centerX - distanceFromCenter;
+        const mirroredX = mirroredCenterX - (area.coordinates.width / 2);
+
+        const inMirroredArea = x >= mirroredX && x <= mirroredX + area.coordinates.width &&
+          y >= area.coordinates.y && y <= area.coordinates.y + area.coordinates.height;
+
+        return inMainArea || inMirroredArea;
+      }
+
+      return inMainArea;
+    });
 
     setHoveredArea(hoveredAreaFound ? hoveredAreaFound.id : null);
   };

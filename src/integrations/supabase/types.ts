@@ -165,6 +165,7 @@ export type Database = {
           coordinates: Json
           created_at: string
           id: string
+          is_symmetric: boolean | null
           name: string
           price: number
           procedure_id: string
@@ -174,6 +175,7 @@ export type Database = {
           coordinates: Json
           created_at?: string
           id?: string
+          is_symmetric?: boolean | null
           name: string
           price?: number
           procedure_id: string
@@ -183,6 +185,7 @@ export type Database = {
           coordinates?: Json
           created_at?: string
           id?: string
+          is_symmetric?: boolean | null
           name?: string
           price?: number
           procedure_id?: string

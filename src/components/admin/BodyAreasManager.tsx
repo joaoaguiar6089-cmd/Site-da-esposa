@@ -38,6 +38,7 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
   const [currentArea, setCurrentArea] = useState<BodyArea | null>(null);
   const [editingArea, setEditingArea] = useState<BodyArea | null>(null);
   const [startPoint, setStartPoint] = useState({ x: 0, y: 0 });
+  const [isSymmetric, setIsSymmetric] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -178,12 +179,51 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
         return;
       }
       
-      setAreas(prev => [...prev, { ...currentArea, name: areaForm.name, price: areaForm.price }]);
+      const newArea = { ...currentArea, name: areaForm.name, price: areaForm.price };
+      let areasToAdd = [newArea];
+      
+      // Se simétrico está marcado, criar área espelhada
+      if (isSymmetric) {
+        const mirroredArea = createMirroredArea(newArea);
+        if (mirroredArea) {
+          areasToAdd.push(mirroredArea);
+        }
+      }
+      
+      setAreas(prev => [...prev, ...areasToAdd]);
       setAreaForm({ name: '', price: 0 });
     }
 
     setCurrentArea(null);
     setIsDrawing(false);
+  };
+
+  const createMirroredArea = (originalArea: BodyArea): BodyArea | null => {
+    // Calcular a posição espelhada baseada no centro da imagem (50%)
+    const centerX = 50;
+    const originalCenterX = originalArea.coordinates.x + (originalArea.coordinates.width / 2);
+    const distanceFromCenter = originalCenterX - centerX;
+    
+    // Criar a área espelhada
+    const mirroredCenterX = centerX - distanceFromCenter;
+    const mirroredX = mirroredCenterX - (originalArea.coordinates.width / 2);
+    
+    // Verificar se a área espelhada está dentro dos limites (0-100%)
+    if (mirroredX < 0 || mirroredX + originalArea.coordinates.width > 100) {
+      toast.error('Área simétrica ficaria fora dos limites da imagem');
+      return null;
+    }
+    
+    return {
+      name: `${originalArea.name} (Espelhado)`,
+      price: originalArea.price,
+      coordinates: {
+        x: mirroredX,
+        y: originalArea.coordinates.y,
+        width: originalArea.coordinates.width,
+        height: originalArea.coordinates.height
+      }
+    };
   };
 
   const handleImageLoad = () => {
@@ -308,6 +348,27 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
                     onChange={(e) => setAreaForm(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
                   />
                 </div>
+                
+                {/* Checkbox para área simétrica */}
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="symmetric-area"
+                    checked={isSymmetric}
+                    onChange={(e) => setIsSymmetric(e.target.checked)}
+                    className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary"
+                  />
+                  <Label htmlFor="symmetric-area" className="text-sm">
+                    Criar área simétrica automaticamente
+                  </Label>
+                </div>
+                
+                {isSymmetric && (
+                  <p className="text-xs text-muted-foreground">
+                    ⚡ Ao desenhar uma área, será criada automaticamente uma área espelhada do lado oposto
+                  </p>
+                )}
+                
                 {editingArea && (
                   <div className="flex gap-2">
                     <Button onClick={updateArea} size="sm">Atualizar</Button>

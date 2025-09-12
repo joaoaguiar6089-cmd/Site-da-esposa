@@ -44,6 +44,48 @@ export type Database = {
         }
         Relationships: []
       }
+      appointment_body_selections: {
+        Row: {
+          appointment_id: string
+          area_name: string
+          area_price: number
+          body_area_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          appointment_id: string
+          area_name: string
+          area_price: number
+          body_area_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          appointment_id?: string
+          area_name?: string
+          area_price?: number
+          body_area_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_body_selections_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_body_selections_body_area_id_fkey"
+            columns: ["body_area_id"]
+            isOneToOne: false
+            referencedRelation: "body_areas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointments: {
         Row: {
           appointment_date: string
@@ -54,7 +96,9 @@ export type Database = {
           notes: string | null
           procedure_id: string
           professional_id: string | null
+          selected_gender: string | null
           status: string
+          total_body_areas_price: number | null
           updated_at: string
         }
         Insert: {
@@ -66,7 +110,9 @@ export type Database = {
           notes?: string | null
           procedure_id: string
           professional_id?: string | null
+          selected_gender?: string | null
           status?: string
+          total_body_areas_price?: number | null
           updated_at?: string
         }
         Update: {
@@ -78,7 +124,9 @@ export type Database = {
           notes?: string | null
           procedure_id?: string
           professional_id?: string | null
+          selected_gender?: string | null
           status?: string
+          total_body_areas_price?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -108,6 +156,44 @@ export type Database = {
             columns: ["professional_id"]
             isOneToOne: false
             referencedRelation: "professionals_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      body_areas: {
+        Row: {
+          coordinates: Json
+          created_at: string
+          id: string
+          name: string
+          price: number
+          procedure_id: string
+          updated_at: string
+        }
+        Insert: {
+          coordinates: Json
+          created_at?: string
+          id?: string
+          name: string
+          price?: number
+          procedure_id: string
+          updated_at?: string
+        }
+        Update: {
+          coordinates?: Json
+          created_at?: string
+          id?: string
+          name?: string
+          price?: number
+          procedure_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "body_areas_procedure_id_fkey"
+            columns: ["procedure_id"]
+            isOneToOne: false
+            referencedRelation: "procedures"
             referencedColumns: ["id"]
           },
         ]
@@ -237,6 +323,8 @@ export type Database = {
       procedures: {
         Row: {
           benefits: string[] | null
+          body_image_url: string | null
+          body_selection_type: string | null
           category_id: string | null
           created_at: string
           description: string | null
@@ -247,12 +335,15 @@ export type Database = {
           is_featured: boolean | null
           name: string
           price: number | null
+          requires_body_selection: boolean | null
           sessions: number
           subcategory_id: string | null
           updated_at: string | null
         }
         Insert: {
           benefits?: string[] | null
+          body_image_url?: string | null
+          body_selection_type?: string | null
           category_id?: string | null
           created_at?: string
           description?: string | null
@@ -263,12 +354,15 @@ export type Database = {
           is_featured?: boolean | null
           name: string
           price?: number | null
+          requires_body_selection?: boolean | null
           sessions?: number
           subcategory_id?: string | null
           updated_at?: string | null
         }
         Update: {
           benefits?: string[] | null
+          body_image_url?: string | null
+          body_selection_type?: string | null
           category_id?: string | null
           created_at?: string
           description?: string | null
@@ -279,6 +373,7 @@ export type Database = {
           is_featured?: boolean | null
           name?: string
           price?: number | null
+          requires_body_selection?: boolean | null
           sessions?: number
           subcategory_id?: string | null
           updated_at?: string | null

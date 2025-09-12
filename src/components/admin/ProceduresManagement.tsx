@@ -13,6 +13,7 @@ import { Plus, Upload, Edit2, Trash2, X, Star, StarOff, Search, Filter } from "l
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ImageEditor } from "./ImageEditor";
 import { Checkbox } from "@/components/ui/checkbox";
+import BodyAreasManager from "./BodyAreasManager";
 
 interface Category {
   id: string;
@@ -69,12 +70,16 @@ const ProceduresManagement = () => {
     benefits: [] as string[],
     is_featured: false,
     sessions: "1",
-    indication: ""
+    indication: "",
+    requires_body_selection: false,
+    body_selection_type: "",
+    body_image_url: ""
   });
   const [newBenefit, setNewBenefit] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageEditorOpen, setImageEditorOpen] = useState(false);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [bodyAreasManagerOpen, setBodyAreasManagerOpen] = useState(false);
   const { toast } = useToast();
 
   const loadProcedures = async () => {
@@ -193,7 +198,10 @@ const ProceduresManagement = () => {
         benefits: formData.benefits.length > 0 ? formData.benefits : null,
         is_featured: formData.is_featured,
         sessions: parseInt(formData.sessions),
-        indication: formData.indication || null
+        indication: formData.indication || null,
+        requires_body_selection: formData.requires_body_selection,
+        body_selection_type: formData.body_selection_type || null,
+        body_image_url: formData.body_image_url || null
       };
 
       if (editingProcedure) {
@@ -232,7 +240,10 @@ const ProceduresManagement = () => {
         benefits: [], 
         is_featured: false, 
         sessions: "1", 
-        indication: "" 
+        indication: "",
+        requires_body_selection: false,
+        body_selection_type: "",
+        body_image_url: ""
       });
       setEditingProcedure(null);
       setDialogOpen(false);
@@ -259,7 +270,10 @@ const ProceduresManagement = () => {
       benefits: procedure.benefits || [],
       is_featured: procedure.is_featured,
       sessions: procedure.sessions.toString(),
-      indication: procedure.indication || ""
+      indication: procedure.indication || "",
+      requires_body_selection: (procedure as any).requires_body_selection || false,
+      body_selection_type: (procedure as any).body_selection_type || "",
+      body_image_url: (procedure as any).body_image_url || ""
     });
     setDialogOpen(true);
   };
@@ -302,7 +316,10 @@ const ProceduresManagement = () => {
       benefits: [], 
       is_featured: false, 
       sessions: "1", 
-      indication: "" 
+      indication: "",
+      requires_body_selection: false,
+      body_selection_type: "",
+      body_image_url: ""
     });
     setEditingProcedure(null);
     setNewBenefit("");
@@ -435,6 +452,17 @@ const ProceduresManagement = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const getDefaultBodyImage = (type: string): string => {
+    // URLs de imagens padrão para diferentes tipos de corpo
+    const defaultImages = {
+      'face_male': '/images/face-male-default.png',
+      'face_female': '/images/face-female-default.png', 
+      'body_male': '/images/body-male-default.png',
+      'body_female': '/images/body-female-default.png'
+    };
+    return defaultImages[type as keyof typeof defaultImages] || '';
   };
 
   if (loading) return <div>Carregando procedimentos...</div>;
@@ -673,17 +701,82 @@ const ProceduresManagement = () => {
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="is_featured"
-                  checked={formData.is_featured}
-                  onCheckedChange={(checked) => 
-                    setFormData({ ...formData, is_featured: checked as boolean })
-                  }
-                />
-                <Label htmlFor="is_featured" className="text-sm font-medium">
-                  Destacar na página inicial (máximo 4)
-                </Label>
+              <div className="space-y-4">
+                {/* Seleção de Área Corporal */}
+                <div className="border rounded-lg p-4 space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="requires_body_selection"
+                      checked={formData.requires_body_selection || false}
+                      onCheckedChange={(checked) => 
+                        setFormData({ ...formData, requires_body_selection: checked as boolean })
+                      }
+                    />
+                    <Label htmlFor="requires_body_selection" className="text-sm font-medium">
+                      Requer seleção de área corporal
+                    </Label>
+                  </div>
+
+                  {formData.requires_body_selection && (
+                    <div className="space-y-3 ml-6">
+                      <div>
+                        <Label htmlFor="body_selection_type">Tipo de Seleção</Label>
+                        <Select 
+                          value={formData.body_selection_type || ''} 
+                          onValueChange={(value) => setFormData({ ...formData, body_selection_type: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o tipo de área" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="face_male">Rosto Masculino</SelectItem>
+                            <SelectItem value="face_female">Rosto Feminino</SelectItem>
+                            <SelectItem value="body_male">Corpo Masculino</SelectItem>
+                            <SelectItem value="body_female">Corpo Feminino</SelectItem>
+                            <SelectItem value="custom">Imagem Customizada</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {formData.body_selection_type === 'custom' && (
+                        <div>
+                          <Label htmlFor="body_image_url">Imagem para Seleção</Label>
+                          <Input
+                            id="body_image_url"
+                            value={formData.body_image_url || ''}
+                            onChange={(e) => setFormData({ ...formData, body_image_url: e.target.value })}
+                            placeholder="URL da imagem customizada"
+                          />
+                        </div>
+                      )}
+
+                      {editingProcedure && formData.requires_body_selection && formData.body_selection_type && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setBodyAreasManagerOpen(true)}
+                          className="w-full"
+                        >
+                          Gerenciar Áreas Selecionáveis
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Checkbox destacar */}
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="is_featured"
+                    checked={formData.is_featured}
+                    onCheckedChange={(checked) => 
+                      setFormData({ ...formData, is_featured: checked as boolean })
+                    }
+                  />
+                  <Label htmlFor="is_featured" className="text-sm font-medium">
+                    Destacar na página inicial (máximo 4)
+                  </Label>
+                </div>
               </div>
 
               <Button type="submit" className="w-full">
@@ -899,6 +992,16 @@ const ProceduresManagement = () => {
           setSelectedImageFile(null);
         }}
       />
+
+      {/* Body Areas Manager */}
+      {editingProcedure && (
+        <BodyAreasManager
+          procedureId={editingProcedure.id}
+          imageUrl={formData.body_selection_type === 'custom' ? (formData.body_image_url || '') : getDefaultBodyImage(formData.body_selection_type)}
+          open={bodyAreasManagerOpen}
+          onClose={() => setBodyAreasManagerOpen(false)}
+        />
+      )}
     </div>
   );
 };

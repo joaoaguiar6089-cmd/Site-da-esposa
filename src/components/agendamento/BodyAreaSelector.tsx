@@ -6,17 +6,18 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
 
-interface BodyArea {
+interface AreaShape {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface AreaGroup {
   id: string;
   name: string;
   price: number;
-  coordinates: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-  isSymmetric?: boolean;
+  shapes: AreaShape[];
 }
 
 interface BodyAreaSelectorProps {
@@ -24,7 +25,7 @@ interface BodyAreaSelectorProps {
   bodySelectionType: string;
   bodyImageUrl?: string;
   bodyImageUrlMale?: string;
-  onSelectionChange: (selectedAreas: BodyArea[], totalPrice: number, gender: 'male' | 'female') => void;
+  onSelectionChange: (selectedGroups: AreaGroup[], totalPrice: number, gender: 'male' | 'female') => void;
 }
 
 const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
@@ -33,10 +34,10 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
   bodyImageUrl,
   onSelectionChange,
 }) => {
-  const [areas, setAreas] = useState<BodyArea[]>([]);
-  const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>([]);
+  const [areaGroups, setAreaGroups] = useState<AreaGroup[]>([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
   const [selectedGender, setSelectedGender] = useState<'male' | 'female'>('female');
-  const [hoveredArea, setHoveredArea] = useState<string | null>(null);
+  const [hoveredGroupId, setHoveredGroupId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
 
@@ -63,39 +64,38 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
   }, [bodySelectionType, bodyImageUrl, selectedGender]);
 
   useEffect(() => {
-    loadBodyAreas();
+    loadAreaGroups();
   }, [procedureId]);
 
   useEffect(() => {
     drawCanvas();
-  }, [areas, selectedAreaIds, hoveredArea, getImageUrl]);
+  }, [areaGroups, selectedGroupIds, hoveredGroupId, getImageUrl]);
 
   useEffect(() => {
-    const selectedAreas = areas.filter(area => selectedAreaIds.includes(area.id));
-    const totalPrice = selectedAreas.reduce((sum, area) => sum + area.price, 0);
-    onSelectionChange(selectedAreas, totalPrice, selectedGender);
-  }, [selectedAreaIds, areas, selectedGender, onSelectionChange]);
+    const selectedGroups = areaGroups.filter(group => selectedGroupIds.includes(group.id));
+    const totalPrice = selectedGroups.reduce((sum, group) => sum + group.price, 0);
+    onSelectionChange(selectedGroups, totalPrice, selectedGender);
+  }, [selectedGroupIds, areaGroups, selectedGender, onSelectionChange]);
 
-  const loadBodyAreas = async () => {
+  const loadAreaGroups = async () => {
     const { data, error } = await supabase
-      .from('body_areas')
+      .from('body_area_groups')
       .select('*')
       .eq('procedure_id', procedureId);
 
     if (error) {
-      console.error('Erro ao carregar áreas:', error);
+      console.error('Erro ao carregar grupos de áreas:', error);
       return;
     }
 
-    const mappedAreas: BodyArea[] = (data || []).map(area => ({
-      id: area.id,
-      name: area.name,
-      price: area.price,
-      coordinates: area.coordinates as any,
-      isSymmetric: (area as any).is_symmetric || false
+    const mappedGroups: AreaGroup[] = (data || []).map(group => ({
+      id: group.id,
+      name: group.name,
+      price: group.price,
+      shapes: group.shapes as AreaShape[]
     }));
 
-    setAreas(mappedAreas);
+    setAreaGroups(mappedGroups);
   };
 
   const drawCanvas = useCallback(() => {
@@ -106,70 +106,89 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(imageRef.current, 0, 0, canvas.width, canvas.height);
 
-    areas.forEach((area) => {
-      const isSelected = selectedAreaIds.includes(area.id);
-      const isHovered = hoveredArea === area.id;
+    areaGroups.forEach((group, groupIndex) => {
+      const isSelected = selectedGroupIds.includes(group.id);
+      const isHovered = hoveredGroupId === group.id;
       
-      const drawAreaSelection = (coords: any, isSymmetricPart = false) => {
-        const x = (coords.x / 100) * canvas.width;
-        const y = (coords.y / 100) * canvas.height;
-        const width = (coords.width / 100) * canvas.width;
-        const height = (coords.height / 100) * canvas.height;
+      // Determinar cores baseado no estado
+      let strokeColor = 'rgba(239, 68, 68, 0.6)';
+      let fillColor = 'transparent';
+      let lineWidth = 1;
+      
+      if (isSelected) {
+        strokeColor = '#22c55e';
+        fillColor = 'rgba(34, 197, 94, 0.4)';
+        lineWidth = 3;
+      } else if (isHovered) {
+        strokeColor = '#ef4444';
+        fillColor = 'rgba(239, 68, 68, 0.3)';
+        lineWidth = 2;
+      }
 
-        // Área selecionada
-        if (isSelected) {
-          ctx.fillStyle = 'rgba(34, 197, 94, 0.4)';
+      // Desenhar todas as formas do grupo
+      group.shapes.forEach((shape) => {
+        const x = (shape.x / 100) * canvas.width;
+        const y = (shape.y / 100) * canvas.height;
+        const width = (shape.width / 100) * canvas.width;
+        const height = (shape.height / 100) * canvas.height;
+
+        ctx.strokeStyle = strokeColor;
+        ctx.fillStyle = fillColor;
+        ctx.lineWidth = lineWidth;
+        
+        if (fillColor !== 'transparent') {
           ctx.fillRect(x, y, width, height);
-          ctx.strokeStyle = '#22c55e';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(x, y, width, height);
         }
-        // Área hover
-        else if (isHovered) {
-          ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
-          ctx.fillRect(x, y, width, height);
-          ctx.strokeStyle = '#ef4444';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(x, y, width, height);
-          
-          // Mostrar nome e preço apenas na área principal
-          if (!isSymmetricPart) {
-            ctx.fillStyle = '#000';
-            ctx.font = '14px Arial';
-            ctx.fillText(`${area.name} - R$ ${area.price.toFixed(2)}`, x, y - 5);
-          }
-        }
-        // Área disponível
-        else {
-          ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(x, y, width, height);
-        }
-      };
+        ctx.strokeRect(x, y, width, height);
+      });
 
-      // Desenhar área principal
-      drawAreaSelection(area.coordinates);
-
-      // Se for simétrica, desenhar área espelhada
-      if (area.isSymmetric) {
-        const centerX = 50;
-        const originalCenterX = area.coordinates.x + (area.coordinates.width / 2);
-        const distanceFromCenter = originalCenterX - centerX;
-        const mirroredCenterX = centerX - distanceFromCenter;
-        const mirroredX = mirroredCenterX - (area.coordinates.width / 2);
-
-        if (mirroredX >= 0 && mirroredX + area.coordinates.width <= 100) {
-          const mirroredCoords = {
-            x: mirroredX,
-            y: area.coordinates.y,
-            width: area.coordinates.width,
-            height: area.coordinates.height
-          };
-          drawAreaSelection(mirroredCoords, true);
-        }
+      // Mostrar label apenas quando hover e apenas uma vez por grupo
+      if (isHovered && group.shapes.length > 0) {
+        const firstShape = group.shapes[0];
+        const x = (firstShape.x / 100) * canvas.width;
+        const y = (firstShape.y / 100) * canvas.height;
+        
+        // Fundo para o texto
+        const textMetrics = ctx.measureText(`${group.name} - R$ ${group.price.toFixed(2)}`);
+        const textWidth = textMetrics.width + 10;
+        const textHeight = 20;
+        
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(x, y - textHeight - 5, textWidth, textHeight);
+        
+        // Texto
+        ctx.fillStyle = '#fff';
+        ctx.font = '14px Arial';
+        ctx.fillText(`${group.name} - R$ ${group.price.toFixed(2)}`, x + 5, y - 10);
+      }
+      
+      // Label numerado sempre visível nas áreas disponíveis
+      if (!isSelected && !isHovered && group.shapes.length > 0) {
+        const firstShape = group.shapes[0];
+        const x = (firstShape.x / 100) * canvas.width;
+        const y = (firstShape.y / 100) * canvas.height;
+        
+        // Círculo numerado pequeno
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
+        ctx.beginPath();
+        ctx.arc(x + 15, y + 15, 12, 0, 2 * Math.PI);
+        ctx.fill();
+        
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText((groupIndex + 1).toString(), x + 15, y + 19);
+        ctx.textAlign = 'left'; // Reset text align
       }
     });
-  }, [areas, selectedAreaIds, hoveredArea]);
+  }, [areaGroups, selectedGroupIds, hoveredGroupId]);
+
+  const isPointInGroup = (x: number, y: number, group: AreaGroup): boolean => {
+    return group.shapes.some(shape => 
+      x >= shape.x && x <= shape.x + shape.width &&
+      y >= shape.y && y <= shape.y + shape.height
+    );
+  };
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -179,30 +198,10 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
 
-    const clickedArea = areas.find(area => {
-      // Verificar área principal
-      const inMainArea = x >= area.coordinates.x && x <= area.coordinates.x + area.coordinates.width &&
-        y >= area.coordinates.y && y <= area.coordinates.y + area.coordinates.height;
+    const clickedGroup = areaGroups.find(group => isPointInGroup(x, y, group));
 
-      // Se for simétrica, verificar também a área espelhada
-      if (area.isSymmetric) {
-        const centerX = 50;
-        const originalCenterX = area.coordinates.x + (area.coordinates.width / 2);
-        const distanceFromCenter = originalCenterX - centerX;
-        const mirroredCenterX = centerX - distanceFromCenter;
-        const mirroredX = mirroredCenterX - (area.coordinates.width / 2);
-
-        const inMirroredArea = x >= mirroredX && x <= mirroredX + area.coordinates.width &&
-          y >= area.coordinates.y && y <= area.coordinates.y + area.coordinates.height;
-
-        return inMainArea || inMirroredArea;
-      }
-
-      return inMainArea;
-    });
-
-    if (clickedArea) {
-      toggleAreaSelection(clickedArea.id);
+    if (clickedGroup) {
+      toggleGroupSelection(clickedGroup.id);
     }
   };
 
@@ -214,36 +213,15 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
 
-    const hoveredAreaFound = areas.find(area => {
-      // Verificar área principal
-      const inMainArea = x >= area.coordinates.x && x <= area.coordinates.x + area.coordinates.width &&
-        y >= area.coordinates.y && y <= area.coordinates.y + area.coordinates.height;
-
-      // Se for simétrica, verificar também a área espelhada
-      if (area.isSymmetric) {
-        const centerX = 50;
-        const originalCenterX = area.coordinates.x + (area.coordinates.width / 2);
-        const distanceFromCenter = originalCenterX - centerX;
-        const mirroredCenterX = centerX - distanceFromCenter;
-        const mirroredX = mirroredCenterX - (area.coordinates.width / 2);
-
-        const inMirroredArea = x >= mirroredX && x <= mirroredX + area.coordinates.width &&
-          y >= area.coordinates.y && y <= area.coordinates.y + area.coordinates.height;
-
-        return inMainArea || inMirroredArea;
-      }
-
-      return inMainArea;
-    });
-
-    setHoveredArea(hoveredAreaFound ? hoveredAreaFound.id : null);
+    const hoveredGroup = areaGroups.find(group => isPointInGroup(x, y, group));
+    setHoveredGroupId(hoveredGroup ? hoveredGroup.id : null);
   };
 
-  const toggleAreaSelection = (areaId: string) => {
-    setSelectedAreaIds(prev => 
-      prev.includes(areaId)
-        ? prev.filter(id => id !== areaId)
-        : [...prev, areaId]
+  const toggleGroupSelection = (groupId: string) => {
+    setSelectedGroupIds(prev => 
+      prev.includes(groupId)
+        ? prev.filter(id => id !== groupId)
+        : [...prev, groupId]
     );
   };
 
@@ -258,13 +236,13 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
   };
 
   const needsGenderSelection = !bodySelectionType.includes('male') && !bodySelectionType.includes('female');
-  const selectedAreas = areas.filter(area => selectedAreaIds.includes(area.id));
-  const totalPrice = selectedAreas.reduce((sum, area) => sum + area.price, 0);
+  const selectedGroups = areaGroups.filter(group => selectedGroupIds.includes(group.id));
+  const totalPrice = selectedGroups.reduce((sum, group) => sum + group.price, 0);
 
   return (
     <Card className="p-6">
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold">Selecione as áreas para o procedimento</h3>
+        <h3 className="text-lg font-semibold">Selecione os procedimentos desejados</h3>
         
         {needsGenderSelection && (
           <div>
@@ -287,7 +265,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
             <img
               ref={imageRef}
               src={getImageUrl()}
-              alt="Áreas corporais"
+              alt="Seleção de procedimentos"
               className="hidden"
               onLoad={handleImageLoad}
               crossOrigin="anonymous"
@@ -297,47 +275,74 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
               className="max-w-full max-h-96 border border-border cursor-pointer"
               onClick={handleCanvasClick}
               onMouseMove={handleCanvasMouseMove}
-              onMouseLeave={() => setHoveredArea(null)}
+              onMouseLeave={() => setHoveredGroupId(null)}
             />
-            <p className="text-sm text-muted-foreground mt-2">
-              Clique nas áreas destacadas para selecioná-las
-            </p>
+            <div className="mt-2 text-sm text-muted-foreground space-y-1">
+              <p>• Clique nas áreas numeradas para selecioná-las</p>
+              <p>• Passe o mouse sobre as áreas para ver detalhes</p>
+              <p>• Áreas em verde estão selecionadas</p>
+            </div>
           </div>
 
           <div className="w-80">
             <div className="space-y-4">
               <div>
-                <h4 className="font-medium mb-2">Áreas Disponíveis</h4>
+                <h4 className="font-medium mb-2">Procedimentos Disponíveis</h4>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {areas.map((area) => (
-                    <div key={area.id} className="flex items-center space-x-2">
+                  {areaGroups.map((group, index) => (
+                    <div key={group.id} className="flex items-start space-x-2">
                       <Checkbox
-                        id={area.id}
-                        checked={selectedAreaIds.includes(area.id)}
-                        onCheckedChange={() => toggleAreaSelection(area.id)}
+                        id={group.id}
+                        checked={selectedGroupIds.includes(group.id)}
+                        onCheckedChange={() => toggleGroupSelection(group.id)}
                       />
-                      <Label htmlFor={area.id} className="flex-1 cursor-pointer">
-                        {area.name} - R$ {area.price.toFixed(2)}
-                      </Label>
+                      <div className="flex-1">
+                        <Label htmlFor={group.id} className="cursor-pointer font-medium">
+                          {index + 1}. {group.name}
+                        </Label>
+                        <div className="text-sm text-muted-foreground">
+                          <p>R$ {group.price.toFixed(2)}</p>
+                          <p>{group.shapes.length} área{group.shapes.length !== 1 ? 's' : ''}</p>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {selectedAreas.length > 0 && (
+              {selectedGroups.length > 0 && (
                 <div className="border-t pt-4">
                   <h4 className="font-medium mb-2">Resumo da Seleção</h4>
-                  <div className="space-y-1">
-                    {selectedAreas.map(area => (
-                      <div key={area.id} className="flex justify-between text-sm">
-                        <span>{area.name}</span>
-                        <span>R$ {area.price.toFixed(2)}</span>
+                  <div className="space-y-2">
+                    {selectedGroups.map(group => (
+                      <div key={group.id} className="flex justify-between text-sm bg-green-50 p-2 rounded">
+                        <span className="font-medium">{group.name}</span>
+                        <span>R$ {group.price.toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
-                  <div className="border-t mt-2 pt-2 font-semibold">
-                    Total: R$ {totalPrice.toFixed(2)}
+                  <div className="border-t mt-3 pt-3 font-semibold text-lg">
+                    <div className="flex justify-between">
+                      <span>Total:</span>
+                      <span className="text-green-600">R$ {totalPrice.toFixed(2)}</span>
+                    </div>
                   </div>
+                </div>
+              )}
+
+              {selectedGroups.length === 0 && areaGroups.length > 0 && (
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    Selecione pelo menos um procedimento para continuar
+                  </p>
+                </div>
+              )}
+
+              {areaGroups.length === 0 && (
+                <div className="text-center p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    Nenhum procedimento configurado ainda.
+                  </p>
                 </div>
               )}
             </div>

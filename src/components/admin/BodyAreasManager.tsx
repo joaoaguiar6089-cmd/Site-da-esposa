@@ -42,6 +42,7 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [dragAreaIndex, setDragAreaIndex] = useState<number | null>(null);
+  const [dragType, setDragType] = useState<'main' | 'mirrored' | null>(null);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -186,12 +187,23 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
     if (!coords) return;
 
     // Verificar se clicou em uma área existente para arrastar
-    const clickedAreaIndex = areas.findIndex(area => {
+    let clickedAreaIndex = -1;
+    let clickedType: 'main' | 'mirrored' | null = null;
+
+    for (let i = 0; i < areas.length; i++) {
+      const area = areas[i];
+      
       // Verificar área principal
       const inMainArea = coords.x >= area.coordinates.x && 
         coords.x <= area.coordinates.x + area.coordinates.width &&
         coords.y >= area.coordinates.y && 
         coords.y <= area.coordinates.y + area.coordinates.height;
+
+      if (inMainArea) {
+        clickedAreaIndex = i;
+        clickedType = 'main';
+        break;
+      }
 
       // Se for simétrica, verificar também a área espelhada
       if (area.isSymmetric) {
@@ -206,15 +218,18 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
           coords.y >= area.coordinates.y && 
           coords.y <= area.coordinates.y + area.coordinates.height;
 
-        return inMainArea || inMirroredArea;
+        if (inMirroredArea) {
+          clickedAreaIndex = i;
+          clickedType = 'mirrored';
+          break;
+        }
       }
+    }
 
-      return inMainArea;
-    });
-
-    if (clickedAreaIndex !== -1) {
+    if (clickedAreaIndex !== -1 && clickedType) {
       setIsDragging(true);
       setDragAreaIndex(clickedAreaIndex);
+      setDragType(clickedType);
       setDragStart({ x: coords.x, y: coords.y });
     } else {
       setIsDrawing(true);
@@ -233,23 +248,47 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
     const coords = getCanvasCoordinates(e);
     if (!coords) return;
 
-    if (isDragging && dragStart && dragAreaIndex !== null) {
+    if (isDragging && dragStart && dragAreaIndex !== null && dragType) {
       const deltaX = coords.x - dragStart.x;
       const deltaY = coords.y - dragStart.y;
       
       setAreas(prev => prev.map((area, index) => {
         if (index === dragAreaIndex) {
-          const newX = Math.max(0, Math.min(100 - area.coordinates.width, area.coordinates.x + deltaX));
-          const newY = Math.max(0, Math.min(100 - area.coordinates.height, area.coordinates.y + deltaY));
-          
-          return {
-            ...area,
-            coordinates: {
-              ...area.coordinates,
-              x: newX,
-              y: newY
-            }
-          };
+          if (dragType === 'main') {
+            // Arrastar área principal
+            const newX = Math.max(0, Math.min(100 - area.coordinates.width, area.coordinates.x + deltaX));
+            const newY = Math.max(0, Math.min(100 - area.coordinates.height, area.coordinates.y + deltaY));
+            
+            return {
+              ...area,
+              coordinates: {
+                ...area.coordinates,
+                x: newX,
+                y: newY
+              }
+            };
+          } else if (dragType === 'mirrored' && area.isSymmetric) {
+            // Arrastar área espelhada - recalcular posição da área principal
+            const centerX = 50;
+            const currentMirroredCenterX = area.coordinates.x + (area.coordinates.width / 2);
+            const currentDistanceFromCenter = currentMirroredCenterX - centerX;
+            const newMirroredCenterX = centerX - currentDistanceFromCenter + deltaX;
+            const newDistanceFromCenter = centerX - newMirroredCenterX;
+            const newMainCenterX = centerX + newDistanceFromCenter;
+            const newMainX = newMainCenterX - (area.coordinates.width / 2);
+            
+            const boundedMainX = Math.max(0, Math.min(100 - area.coordinates.width, newMainX));
+            const newY = Math.max(0, Math.min(100 - area.coordinates.height, area.coordinates.y + deltaY));
+            
+            return {
+              ...area,
+              coordinates: {
+                ...area.coordinates,
+                x: boundedMainX,
+                y: newY
+              }
+            };
+          }
         }
         return area;
       }));
@@ -276,6 +315,7 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
       setIsDragging(false);
       setDragAreaIndex(null);
       setDragStart(null);
+      setDragType(null);
       return;
     }
 

@@ -22,6 +22,7 @@ interface BodyAreaSelectorProps {
   procedureId: string;
   bodySelectionType: string;
   bodyImageUrl?: string;
+  bodyImageUrlMale?: string;
   onSelectionChange: (selectedAreas: BodyArea[], totalPrice: number, gender: 'male' | 'female') => void;
 }
 

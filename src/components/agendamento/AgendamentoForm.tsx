@@ -24,6 +24,7 @@ interface Procedure {
   requires_body_selection: boolean;
   body_selection_type: string;
   body_image_url: string;
+  body_image_url_male: string;
 }
 
 interface BodyArea {
@@ -71,7 +72,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
     try {
       const { data, error } = await supabase
         .from('procedures')
-        .select('id, name, description, duration, price, requires_body_selection, body_selection_type, body_image_url')
+        .select('id, name, description, duration, price, requires_body_selection, body_selection_type, body_image_url, body_image_url_male')
         .order('name');
 
       if (error) throw error;
@@ -869,6 +870,7 @@ Para reagendar, entre em contato conosco.`;
                 procedureId={selectedProcedure.id}
                 bodySelectionType={selectedProcedure.body_selection_type || ''}
                 bodyImageUrl={selectedProcedure.body_image_url}
+                bodyImageUrlMale={selectedProcedure.body_image_url_male}
                 onSelectionChange={(areas, totalPrice, gender) => {
                   setSelectedBodyAreas(areas);
                   setTotalBodyAreasPrice(totalPrice);

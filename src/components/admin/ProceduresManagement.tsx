@@ -73,14 +73,17 @@ const ProceduresManagement = () => {
     indication: "",
     requires_body_selection: false,
     body_selection_type: "",
-    body_image_url: ""
+    body_image_url: "",
+    body_image_url_male: ""
   });
   const [newBenefit, setNewBenefit] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingBodyImage, setUploadingBodyImage] = useState(false);
+  const [uploadingBodyImageMale, setUploadingBodyImageMale] = useState(false);
   const [imageEditorOpen, setImageEditorOpen] = useState(false);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [selectedBodyImageFile, setSelectedBodyImageFile] = useState<File | null>(null);
+  const [selectedBodyImageMaleFile, setSelectedBodyImageMaleFile] = useState<File | null>(null);
   const [bodyAreasManagerOpen, setBodyAreasManagerOpen] = useState(false);
   const { toast } = useToast();
 
@@ -203,7 +206,8 @@ const ProceduresManagement = () => {
         indication: formData.indication || null,
         requires_body_selection: formData.requires_body_selection,
         body_selection_type: formData.body_selection_type || null,
-        body_image_url: formData.body_image_url || null
+        body_image_url: formData.body_image_url || null,
+        body_image_url_male: formData.body_image_url_male || null
       };
 
       if (editingProcedure) {
@@ -245,7 +249,8 @@ const ProceduresManagement = () => {
         indication: "",
         requires_body_selection: false,
         body_selection_type: "",
-        body_image_url: ""
+        body_image_url: "",
+        body_image_url_male: ""
       });
       setEditingProcedure(null);
       setDialogOpen(false);
@@ -261,22 +266,23 @@ const ProceduresManagement = () => {
 
   const handleEdit = (procedure: Procedure) => {
     setEditingProcedure(procedure);
-    setFormData({
-      name: procedure.name,
-      description: procedure.description || "",
-      duration: procedure.duration.toString(),
-      price: procedure.price?.toString() || "",
-      category_id: procedure.category_id || "",
-      subcategory_id: procedure.subcategory_id || "",
-      image_url: procedure.image_url || "",
-      benefits: procedure.benefits || [],
-      is_featured: procedure.is_featured,
-      sessions: procedure.sessions.toString(),
-      indication: procedure.indication || "",
-      requires_body_selection: (procedure as any).requires_body_selection || false,
-      body_selection_type: (procedure as any).body_selection_type || "",
-      body_image_url: (procedure as any).body_image_url || ""
-    });
+      setFormData({
+        name: procedure.name,
+        description: procedure.description || "",
+        duration: procedure.duration.toString(),
+        price: procedure.price?.toString() || "",
+        category_id: procedure.category_id || "",
+        subcategory_id: procedure.subcategory_id || "",
+        image_url: procedure.image_url || "",
+        benefits: procedure.benefits || [],
+        is_featured: procedure.is_featured,
+        sessions: procedure.sessions.toString(),
+        indication: procedure.indication || "",
+        requires_body_selection: (procedure as any).requires_body_selection || false,
+        body_selection_type: (procedure as any).body_selection_type || "",
+        body_image_url: (procedure as any).body_image_url || "",
+        body_image_url_male: (procedure as any).body_image_url_male || ""
+      });
     setDialogOpen(true);
   };
 
@@ -321,7 +327,8 @@ const ProceduresManagement = () => {
       indication: "",
       requires_body_selection: false,
       body_selection_type: "",
-      body_image_url: ""
+      body_image_url: "",
+      body_image_url_male: ""
     });
     setEditingProcedure(null);
     setNewBenefit("");
@@ -500,14 +507,59 @@ const ProceduresManagement = () => {
     }
   };
 
-  const getDefaultBodyImage = (type: string): string => {
+  const uploadBodyImageMale = async (file: File) => {
+    if (!file) return;
+
+    setUploadingBodyImageMale(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `body-male-${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('procedure-images')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('procedure-images')
+        .getPublicUrl(fileName);
+
+      setFormData(prev => ({
+        ...prev,
+        body_image_url_male: publicUrl
+      }));
+
+      toast({
+        title: "Upload realizado",
+        description: "Imagem masculina enviada com sucesso!",
+      });
+
+      setSelectedBodyImageMaleFile(null);
+    } catch (error: any) {
+      console.error('Erro no upload:', error);
+      toast({
+        title: "Erro no upload",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingBodyImageMale(false);
+    }
+  };
+
+  const getDefaultBodyImage = (bodySelectionType: string): string => {
     const defaultImages = {
       'face_male': '/images/face-male-default.png',
-      'face_female': '/images/face-female-default.png', 
+      'face_female': '/images/face-female-default.png',
       'body_male': '/images/body-male-default.png',
       'body_female': '/images/body-female-default.png'
     };
-    return defaultImages[type as keyof typeof defaultImages] || '/images/face-female-default.png';
+    
+    return defaultImages[bodySelectionType as keyof typeof defaultImages] || '/images/face-female-default.png';
   };
 
   if (loading) return <div>Carregando procedimentos...</div>;
@@ -784,70 +836,132 @@ const ProceduresManagement = () => {
                       </div>
 
                       {formData.body_selection_type === 'custom' && (
-                        <div className="space-y-4">
-                          <Label>Imagem para Seleção</Label>
+                        <div className="space-y-6">
+                          <h4 className="font-semibold">Imagens Personalizadas</h4>
                           
-                          {/* Upload de arquivo */}
-                          <div>
-                            <Label htmlFor="body-image-upload" className="text-sm text-muted-foreground">
-                              Upload de Arquivo
-                            </Label>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Input
-                                id="body-image-upload"
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => setSelectedBodyImageFile(e.target.files?.[0] || null)}
-                                className="flex-1"
-                              />
-                              <Button
-                                type="button"
-                                onClick={() => selectedBodyImageFile && uploadBodyImage(selectedBodyImageFile)}
-                                disabled={!selectedBodyImageFile || uploadingBodyImage}
-                                size="sm"
-                              >
-                                {uploadingBodyImage ? 'Enviando...' : 'Upload'}
-                              </Button>
-                            </div>
-                          </div>
-
-                          {/* Divisor */}
-                          <div className="flex items-center gap-4">
-                            <div className="flex-1 border-t"></div>
-                            <span className="text-xs text-muted-foreground">OU</span>
-                            <div className="flex-1 border-t"></div>
-                          </div>
-
-                          {/* URL da imagem */}
-                          <div>
-                            <Label htmlFor="body_image_url" className="text-sm text-muted-foreground">
-                              URL da Imagem
-                            </Label>
-                            <Input
-                              id="body_image_url"
-                              value={formData.body_image_url || ''}
-                              onChange={(e) => setFormData({ ...formData, body_image_url: e.target.value })}
-                              placeholder="https://exemplo.com/imagem.jpg"
-                              className="mt-1"
-                            />
-                          </div>
-
-                          {/* Preview da imagem */}
-                          {formData.body_image_url && (
-                            <div className="space-y-2">
-                              <Label className="text-sm text-muted-foreground">Preview</Label>
-                              <div className="border rounded p-2">
-                                <img 
-                                  src={formData.body_image_url} 
-                                  alt="Preview da imagem corporal"
-                                  className="max-w-32 max-h-32 object-contain mx-auto"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = 'none';
-                                  }}
+                          {/* Imagem Feminina */}
+                          <div className="space-y-4 p-4 border rounded-lg">
+                            <h5 className="font-medium text-sm">Imagem Feminina</h5>
+                            
+                            {/* Upload de arquivo feminino */}
+                            <div>
+                              <Label htmlFor="body-image-upload-female" className="text-sm text-muted-foreground">
+                                Upload de Arquivo
+                              </Label>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Input
+                                  id="body-image-upload-female"
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => setSelectedBodyImageFile(e.target.files?.[0] || null)}
+                                  className="flex-1"
                                 />
+                                <Button
+                                  type="button"
+                                  onClick={() => selectedBodyImageFile && uploadBodyImage(selectedBodyImageFile)}
+                                  disabled={!selectedBodyImageFile || uploadingBodyImage}
+                                  size="sm"
+                                >
+                                  {uploadingBodyImage ? 'Enviando...' : 'Upload'}
+                                </Button>
                               </div>
                             </div>
-                          )}
+
+                            {/* URL da imagem feminina */}
+                            <div>
+                              <Label htmlFor="body_image_url" className="text-sm text-muted-foreground">
+                                URL da Imagem
+                              </Label>
+                              <Input
+                                id="body_image_url"
+                                value={formData.body_image_url || ''}
+                                onChange={(e) => setFormData({ ...formData, body_image_url: e.target.value })}
+                                placeholder="https://exemplo.com/imagem-feminina.jpg"
+                                className="mt-1"
+                              />
+                            </div>
+
+                            {/* Preview da imagem feminina */}
+                            {formData.body_image_url && (
+                              <div className="space-y-2">
+                                <Label className="text-sm text-muted-foreground">Preview Feminino</Label>
+                                <div className="border rounded p-2">
+                                  <img 
+                                    src={formData.body_image_url} 
+                                    alt="Preview da imagem feminina"
+                                    className="max-w-24 max-h-24 object-contain mx-auto"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).style.display = 'none';
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Imagem Masculina */}
+                          <div className="space-y-4 p-4 border rounded-lg">
+                            <h5 className="font-medium text-sm">Imagem Masculina (Opcional)</h5>
+                            
+                            {/* Upload de arquivo masculino */}
+                            <div>
+                              <Label htmlFor="body-image-upload-male" className="text-sm text-muted-foreground">
+                                Upload de Arquivo
+                              </Label>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Input
+                                  id="body-image-upload-male"
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => setSelectedBodyImageMaleFile(e.target.files?.[0] || null)}
+                                  className="flex-1"
+                                />
+                                <Button
+                                  type="button"
+                                  onClick={() => selectedBodyImageMaleFile && uploadBodyImageMale(selectedBodyImageMaleFile)}
+                                  disabled={!selectedBodyImageMaleFile || uploadingBodyImageMale}
+                                  size="sm"
+                                >
+                                  {uploadingBodyImageMale ? 'Enviando...' : 'Upload'}
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* URL da imagem masculina */}
+                            <div>
+                              <Label htmlFor="body_image_url_male" className="text-sm text-muted-foreground">
+                                URL da Imagem
+                              </Label>
+                              <Input
+                                id="body_image_url_male"
+                                value={formData.body_image_url_male || ''}
+                                onChange={(e) => setFormData({ ...formData, body_image_url_male: e.target.value })}
+                                placeholder="https://exemplo.com/imagem-masculina.jpg"
+                                className="mt-1"
+                              />
+                            </div>
+
+                            {/* Preview da imagem masculina */}
+                            {formData.body_image_url_male && (
+                              <div className="space-y-2">
+                                <Label className="text-sm text-muted-foreground">Preview Masculino</Label>
+                                <div className="border rounded p-2">
+                                  <img 
+                                    src={formData.body_image_url_male} 
+                                    alt="Preview da imagem masculina"
+                                    className="max-w-24 max-h-24 object-contain mx-auto"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).style.display = 'none';
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="text-sm text-muted-foreground bg-muted p-3 rounded">
+                            💡 <strong>Dica:</strong> Se apenas uma imagem for fornecida, não haverá seleção de gênero no agendamento.
+                          </div>
                         </div>
                       )}
 

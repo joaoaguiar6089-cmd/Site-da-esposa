@@ -324,6 +324,7 @@ export type Database = {
         Row: {
           benefits: string[] | null
           body_image_url: string | null
+          body_image_url_male: string | null
           body_selection_type: string | null
           category_id: string | null
           created_at: string
@@ -343,6 +344,7 @@ export type Database = {
         Insert: {
           benefits?: string[] | null
           body_image_url?: string | null
+          body_image_url_male?: string | null
           body_selection_type?: string | null
           category_id?: string | null
           created_at?: string
@@ -362,6 +364,7 @@ export type Database = {
         Update: {
           benefits?: string[] | null
           body_image_url?: string | null
+          body_image_url_male?: string | null
           body_selection_type?: string | null
           category_id?: string | null
           created_at?: string

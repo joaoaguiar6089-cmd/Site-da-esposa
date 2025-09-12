@@ -278,9 +278,10 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
               onMouseLeave={() => setHoveredGroupId(null)}
             />
             <div className="mt-2 text-sm text-muted-foreground space-y-1">
-              <p>• Clique nas áreas numeradas para selecioná-las</p>
-              <p>• Passe o mouse sobre as áreas para ver detalhes</p>
-              <p>• Áreas em verde estão selecionadas</p>
+              <p>• <strong>Áreas em vermelho:</strong> Disponíveis para seleção</p>
+              <p>• <strong>Áreas em verde:</strong> Selecionadas</p>
+              <p>• <strong>Passe o mouse:</strong> Para ver detalhes do procedimento</p>
+              <p>• <strong>Clique:</strong> Para selecionar/desselecionar</p>
             </div>
           </div>
 

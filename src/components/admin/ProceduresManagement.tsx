@@ -1006,4 +1006,15 @@ const ProceduresManagement = () => {
   );
 };
 
-export default ProceduresManagement;
+  const getDefaultBodyImage = (bodySelectionType: string) => {
+    const defaultImages = {
+      'face_male': '/images/face-male-default.png',
+      'face_female': '/images/face-female-default.png',
+      'body_male': '/images/body-male-default.png',
+      'body_female': '/images/body-female-default.png'
+    };
+    
+    return defaultImages[bodySelectionType as keyof typeof defaultImages] || '/images/face-female-default.png';
+  };
+
+  export default ProceduresManagement;

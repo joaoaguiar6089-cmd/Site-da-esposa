@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatDateToBrazil, getCurrentDateBrazil, getCurrentDateTimeBrazil } from '@/utils/dateUtils';
 import type { Client } from "@/types/client";
+import BodyAreaSelector from "./BodyAreaSelector";
 
 interface Procedure {
   id: string;
@@ -20,6 +21,21 @@ interface Procedure {
   description: string;
   duration: number;
   price: number;
+  requires_body_selection: boolean;
+  body_selection_type: string;
+  body_image_url: string;
+}
+
+interface BodyArea {
+  id: string;
+  name: string;
+  price: number;
+  coordinates: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
 }
 
 
@@ -42,6 +58,9 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
     appointment_time: "",
     notes: "",
   });
+  const [selectedBodyAreas, setSelectedBodyAreas] = useState<BodyArea[]>([]);
+  const [selectedGender, setSelectedGender] = useState<'male' | 'female'>('female');
+  const [totalBodyAreasPrice, setTotalBodyAreasPrice] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadingProcedures, setLoadingProcedures] = useState(true);
   const [cancelling, setCancelling] = useState(false);
@@ -50,7 +69,10 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
 
   const loadProcedures = async () => {
     try {
-      const { data, error } = await supabase.from('procedures').select('*').order('name');
+      const { data, error } = await supabase
+        .from('procedures')
+        .select('id, name, description, duration, price, requires_body_selection, body_selection_type, body_image_url')
+        .order('name');
 
       if (error) throw error;
 
@@ -93,7 +115,8 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         .from('appointments')
         .select(`
           *,
-          procedures!appointments_procedure_id_fkey(name, duration, price)
+          procedures!appointments_procedure_id_fkey(name, duration, price, requires_body_selection, body_selection_type),
+          appointment_body_selections(*)
         `)
         .eq('id', appointmentId)
         .single();
@@ -107,6 +130,22 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         appointment_time: data.appointment_time,
         notes: data.notes || "",
       });
+
+      // Carregar seleções de áreas corporais se existirem
+      if (data.appointment_body_selections) {
+        const bodyAreas: BodyArea[] = data.appointment_body_selections.map((selection: any) => ({
+          id: selection.body_area_id,
+          name: selection.area_name,
+          price: selection.area_price,
+          coordinates: { x: 0, y: 0, width: 0, height: 0 } // Coordenadas não são necessárias aqui
+        }));
+        setSelectedBodyAreas(bodyAreas);
+        setTotalBodyAreasPrice(data.total_body_areas_price || 0);
+      }
+
+      if (data.selected_gender) {
+        setSelectedGender(data.selected_gender as 'male' | 'female');
+      }
 
       // Carregar horários disponíveis para a data
       loadAvailableTimes(data.appointment_date);
@@ -355,6 +394,17 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
       return;
     }
 
+    // Verificar se o procedimento requer seleção de áreas corporais
+    const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
+    if (selectedProcedure?.requires_body_selection && selectedBodyAreas.length === 0) {
+      toast({
+        title: "Seleção de áreas obrigatória",
+        description: "Por favor, selecione pelo menos uma área corporal para este procedimento.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     
     try {
@@ -380,9 +430,9 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         return;
       }
 
-      let result;
+      let appointmentResult;
       if (editingId) {
-        result = await supabase
+        appointmentResult = await supabase
           .from('appointments')
           .update({
             procedure_id: formData.procedure_id,
@@ -390,10 +440,14 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
             appointment_date: formData.appointment_date,
             appointment_time: formData.appointment_time,
             notes: formData.notes.trim() || null,
+            selected_gender: selectedProcedure?.requires_body_selection ? selectedGender : null,
+            total_body_areas_price: totalBodyAreasPrice,
           })
-          .eq('id', editingId);
+          .eq('id', editingId)
+          .select()
+          .single();
       } else {
-        result = await supabase
+        appointmentResult = await supabase
           .from('appointments')
           .insert({
             client_id: client.id,
@@ -403,10 +457,41 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
             appointment_time: formData.appointment_time,
             notes: formData.notes.trim() || null,
             status: 'agendado',
-          });
+            selected_gender: selectedProcedure?.requires_body_selection ? selectedGender : null,
+            total_body_areas_price: totalBodyAreasPrice,
+          })
+          .select()
+          .single();
       }
 
-      if (result.error) throw result.error;
+      if (appointmentResult.error) throw appointmentResult.error;
+
+      const appointmentId = appointmentResult.data.id;
+
+      // Salvar seleções de áreas corporais se houver
+      if (selectedBodyAreas.length > 0) {
+        // Deletar seleções anteriores se estiver editando
+        if (editingId) {
+          await supabase
+            .from('appointment_body_selections')
+            .delete()
+            .eq('appointment_id', appointmentId);
+        }
+
+        // Inserir novas seleções
+        const bodySelections = selectedBodyAreas.map(area => ({
+          appointment_id: appointmentId,
+          body_area_id: area.id,
+          area_name: area.name,
+          area_price: area.price
+        }));
+
+        const { error: selectionsError } = await supabase
+          .from('appointment_body_selections')
+          .insert(bodySelections);
+
+        if (selectionsError) throw selectionsError;
+      }
 
       // Enviar notificações e dados para webhook
       try {
@@ -422,7 +507,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
             celular: client.celular
           },
           appointment: {
-            id: editingId || null,
+            id: editingId || appointmentId,
             procedure_id: formData.procedure_id,
             procedure_name: selectedProc?.name,
             procedure_price: selectedProc?.price,
@@ -435,7 +520,10 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
             notes: formData.notes.trim() || null,
             status: 'agendado',
             action: editingId ? 'updated' : 'created',
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            selected_gender: selectedGender,
+            selected_body_areas: selectedBodyAreas,
+            total_body_areas_price: totalBodyAreasPrice
           }
         };
 
@@ -699,6 +787,10 @@ Para reagendar, entre em contato conosco.`;
                             setFormData(prev => ({ ...prev, procedure_id: procedure.id, appointment_time: "" }));
                             setProcedureSearchOpen(false);
                             
+                            // Resetar seleções de áreas corporais se mudar o procedimento
+                            setSelectedBodyAreas([]);
+                            setTotalBodyAreasPrice(0);
+                            
                             // Recarregar horários se uma data já estiver selecionada
                             if (formData.appointment_date) {
                               loadAvailableTimes(formData.appointment_date);
@@ -769,6 +861,22 @@ Para reagendar, entre em contato conosco.`;
               required
             />
           </div>
+
+          {/* Seleção de Áreas Corporais - se o procedimento requer */}
+          {selectedProcedure?.requires_body_selection && (
+            <div className="space-y-4">
+              <BodyAreaSelector
+                procedureId={selectedProcedure.id}
+                bodySelectionType={selectedProcedure.body_selection_type || ''}
+                bodyImageUrl={selectedProcedure.body_image_url}
+                onSelectionChange={(areas, totalPrice, gender) => {
+                  setSelectedBodyAreas(areas);
+                  setTotalBodyAreasPrice(totalPrice);
+                  setSelectedGender(gender);
+                }}
+              />
+            </div>
+          )}
 
           <div>
             <label htmlFor="time" className="text-sm font-medium">

@@ -360,7 +360,7 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
             
             <img
               ref={imageRef}
-              src={imageUrl}
+              src={getCurrentImageUrl()}
               alt="Configuração de áreas"
               className="hidden"
               onLoad={handleImageLoad}

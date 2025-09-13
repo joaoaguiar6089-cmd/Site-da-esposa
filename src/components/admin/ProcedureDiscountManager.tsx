@@ -44,7 +44,12 @@ const ProcedureDiscountManager: React.FC<ProcedureDiscountManagerProps> = ({
             </div>
             
             <Button 
-              onClick={() => setDiscountManagerOpen(true)}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setDiscountManagerOpen(true);
+              }}
               className="w-full"
               variant="outline"
             >

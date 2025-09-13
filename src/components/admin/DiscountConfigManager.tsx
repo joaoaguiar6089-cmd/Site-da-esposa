@@ -184,7 +184,15 @@ const DiscountConfigManager: React.FC<DiscountConfigManagerProps> = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog 
+      open={open} 
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          onClose();
+        }
+      }}
+      modal={true}
+    >
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -232,8 +240,11 @@ const DiscountConfigManager: React.FC<DiscountConfigManagerProps> = ({
                         ...prev,
                         max_groups: e.target.value ? parseInt(e.target.value) : undefined
                       }))}
-                      placeholder="Sem limite"
+                      placeholder="Deixe vazio para '3+ grupos'"
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Deixe vazio para aplicar a partir do mínimo (ex: "2+ grupos")
+                    </p>
                   </div>
                 </div>
 
@@ -259,7 +270,15 @@ const DiscountConfigManager: React.FC<DiscountConfigManagerProps> = ({
                     {loading ? 'Salvando...' : editingConfig ? 'Atualizar' : 'Criar'}
                   </Button>
                   {editingConfig && (
-                    <Button type="button" variant="outline" onClick={resetForm}>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        resetForm();
+                      }}
+                    >
                       Cancelar
                     </Button>
                   )}
@@ -307,16 +326,26 @@ const DiscountConfigManager: React.FC<DiscountConfigManagerProps> = ({
                           </div>
                           <div className="flex gap-1">
                             <Button
+                              type="button"
                               size="sm"
                               variant="outline"
-                              onClick={() => handleEdit(config as DiscountConfig & { id: string })}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleEdit(config as DiscountConfig & { id: string });
+                              }}
                             >
                               <Edit2 className="w-3 h-3" />
                             </Button>
                             <Button
+                              type="button"
                               size="sm"
                               variant="destructive"
-                              onClick={() => handleDelete(config.id!)}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleDelete(config.id!);
+                              }}
                             >
                               <Trash2 className="w-3 h-3" />
                             </Button>
@@ -334,8 +363,10 @@ const DiscountConfigManager: React.FC<DiscountConfigManagerProps> = ({
         <div className="bg-muted/50 p-4 rounded-lg">
           <h4 className="font-medium mb-2">💡 Como funciona:</h4>
           <ul className="text-sm text-muted-foreground space-y-1">
+            <li>• Configure faixas exatas (ex: "2 grupos" = 10%) ou intervalos (ex: "2-4 grupos" = 15%)</li>
+            <li>• Para intervalos, deixe "Máx. Grupos" vazio para aplicar a partir do mínimo (ex: "3+ grupos")</li>
             <li>• Os descontos são aplicados automaticamente no agendamento</li>
-            <li>• O sistema escolhe o maior desconto aplicável</li>
+            <li>• O sistema escolhe o maior desconto aplicável para o cliente</li>
             <li>• O desconto é calculado sobre o valor total dos grupos selecionados</li>
             <li>• Configurações não podem ter faixas sobrepostas</li>
           </ul>

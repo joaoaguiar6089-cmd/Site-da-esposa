@@ -199,6 +199,7 @@ export type Database = {
       body_area_groups: {
         Row: {
           created_at: string | null
+          gender: string | null
           id: string
           name: string
           price: number
@@ -208,6 +209,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          gender?: string | null
           id?: string
           name: string
           price?: number
@@ -217,6 +219,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          gender?: string | null
           id?: string
           name?: string
           price?: number
@@ -358,6 +361,39 @@ export type Database = {
           id?: string
           setting_key?: string
           setting_value?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      procedure_discount_config: {
+        Row: {
+          created_at: string
+          discount_percentage: number
+          id: string
+          is_active: boolean
+          max_groups: number | null
+          min_groups: number
+          procedure_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          discount_percentage: number
+          id?: string
+          is_active?: boolean
+          max_groups?: number | null
+          min_groups: number
+          procedure_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          discount_percentage?: number
+          id?: string
+          is_active?: boolean
+          max_groups?: number | null
+          min_groups?: number
+          procedure_id?: string
           updated_at?: string
         }
         Relationships: []

@@ -28,6 +28,14 @@ interface BodyAreaSelectorProps {
   onSelectionChange: (selectedGroups: AreaGroup[], totalPrice: number, gender: 'male' | 'female') => void;
 }
 
+type TooltipState = {
+  visible: boolean;
+  text: string;
+  // Posição em px relativa ao wrapper
+  left: number;
+  top: number;
+};
+
 const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
   procedureId,
   bodySelectionType,
@@ -38,14 +46,26 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
   const [selectedGender, setSelectedGender] = useState<'male' | 'female'>('female');
   const [hoveredGroupId, setHoveredGroupId] = useState<string | null>(null);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const [tooltip, setTooltip] = useState<TooltipState>({
+    visible: false,
+    text: '',
+    left: 0,
+    top: 0,
+  });
+
+  // Timer para esconder tooltip no mobile
+  const hideTooltipTimer = useRef<number | null>(null);
 
   const getImageUrl = useCallback(() => {
     if (bodySelectionType === 'custom' && bodyImageUrl) {
       return bodyImageUrl;
     }
-    
+
     const defaultImages = {
       'face_male': '/images/face-male-default.png',
       'face_female': '/images/face-female-default.png',
@@ -76,6 +96,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
     onSelectionChange(selectedGroups, totalPrice, selectedGender);
   }, [selectedGroupIds, areaGroups, selectedGender, onSelectionChange]);
 
+  // ========= SUPABASE =========
   const loadAreaGroups = async () => {
     const { data, error } = await (supabase as any)
       .from('body_area_groups')
@@ -97,102 +118,195 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
     setAreaGroups(mappedGroups);
   };
 
+  // ========= CANVAS =========
+  const resizeCanvasToDisplaySize = () => {
+    const canvas = canvasRef.current;
+    const image = imageRef.current;
+    if (!canvas || !image) return;
+
+    // Tamanho CSS já é controlado pelo Tailwind (max-w-full, max-h-96).
+    // Precisamos ajustar o buffer interno (atributos width/height) para DPR.
+    const dpr = window.devicePixelRatio || 1;
+    // Medidas calculadas via CSS (tamanho que o canvas ocupa na tela):
+    const rect = canvas.getBoundingClientRect();
+    // Define o buffer interno levando em conta o DPR para ficar nítido:
+    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // Normaliza o sistema de coordenadas
+    }
+  };
+
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx || !imageRef.current) return;
+    const image = imageRef.current;
+    if (!canvas || !image) return;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(imageRef.current, 0, 0, canvas.width, canvas.height);
+    resizeCanvasToDisplaySize();
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Desenha a imagem ajustada ao tamanho CSS do canvas mantendo aspect-fill (object-contain visual simulado)
+    const rect = canvas.getBoundingClientRect();
+    const cw = rect.width;
+    const ch = rect.height;
+
+    // Dimensões naturais da imagem:
+    const iw = image.naturalWidth;
+    const ih = image.naturalHeight;
+    const imageAspect = iw / ih;
+    const canvasAspect = cw / ch;
+
+    let drawW = cw;
+    let drawH = ch;
+    let dx = 0;
+    let dy = 0;
+
+    // "object-contain": encaixa a imagem inteira dentro do canvas
+    if (imageAspect > canvasAspect) {
+      // imagem mais "larga": largura bate, altura centraliza
+      drawH = cw / imageAspect;
+      dy = (ch - drawH) / 2;
+    } else {
+      // imagem mais "alta": altura bate, largura centraliza
+      drawW = ch * imageAspect;
+      dx = (cw - drawW) / 2;
+    }
+
+    // Fundo branco (opcional)
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, cw, ch);
+
+    ctx.drawImage(image, 0, 0, iw, ih, dx, dy, drawW, drawH);
 
     areaGroups.forEach((group, groupIndex) => {
       const isSelected = selectedGroupIds.includes(group.id);
       const isHovered = hoveredGroupId === group.id;
-      
-      let strokeColor = 'rgba(239, 68, 68, 0.9)';
-      let fillColor = 'rgba(239, 68, 68, 0.2)'; // Preenchimento vermelho padrão
+
+      let strokeColor = 'rgba(239, 68, 68, 0.9)'; // vermelho/hover
+      let fillColor = 'transparent';
       let lineWidth = 2;
 
       if (isSelected) {
-        strokeColor = '#22c55e';
-        fillColor = 'rgba(34, 197, 94, 0.4)';
+        strokeColor = '#22c55e'; // verde
+        fillColor = 'rgba(34, 197, 94, 0.28)'; // leve transparência
         lineWidth = 3;
       } else if (isHovered) {
         strokeColor = '#ef4444';
-        fillColor = 'rgba(239, 68, 68, 0.4)'; // Vermelho mais intenso no hover
+        fillColor = 'rgba(239, 68, 68, 0.28)';
         lineWidth = 2;
       }
 
       group.shapes.forEach((shape) => {
-        const x = (shape.x / 100) * canvas.width;
-        const y = (shape.y / 100) * canvas.height;
-        const width = (shape.width / 100) * canvas.width;
-        const height = (shape.height / 100) * canvas.height;
+        // Converter porcentagens para coordenadas dentro do retângulo desenhado (dx,dy,drawW,drawH)
+        const x = dx + (shape.x / 100) * drawW;
+        const y = dy + (shape.y / 100) * drawH;
+        const width = (shape.width / 100) * drawW;
+        const height = (shape.height / 100) * drawH;
 
         ctx.strokeStyle = strokeColor;
         ctx.fillStyle = fillColor;
         ctx.lineWidth = lineWidth;
-        
-        // Sempre preenche a área (removido a condição de transparente)
-        ctx.fillRect(x, y, width, height);
+
+        if (fillColor !== 'transparent') {
+          ctx.fillRect(x, y, width, height);
+        }
         ctx.strokeRect(x, y, width, height);
       });
 
-      if (isHovered && group.shapes.length > 0) {
-        const firstShape = group.shapes[0];
-        const x = (firstShape.x / 100) * canvas.width;
-        const y = (firstShape.y / 100) * canvas.height;
-        
-        const textMetrics = ctx.measureText(`${group.name} - R$ ${group.price.toFixed(2)}`);
-        const textWidth = textMetrics.width + 10;
-        const textHeight = 22;
-        
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.fillRect(x, y - textHeight - 5, textWidth, textHeight);
-        
-        ctx.fillStyle = '#fff';
-        ctx.font = '16px Arial';
-        ctx.fillText(`${group.name} - R$ ${group.price.toFixed(2)}`, x + 5, y - 10);
-      }
-      
+      // Marcador numérico quando não selecionado/hover (mantido)
       if (!isSelected && !isHovered && group.shapes.length > 0) {
-        const firstShape = group.shapes[0];
-        const x = (firstShape.x / 100) * canvas.width;
-        const y = (firstShape.y / 100) * canvas.height;
-        
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
+        const s = group.shapes[0];
+        const x = dx + (s.x / 100) * drawW;
+        const y = dy + (s.y / 100) * drawH;
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.88)';
         ctx.beginPath();
-        ctx.arc(x + 15, y + 15, 12, 0, 2 * Math.PI);
+        ctx.arc(x + 16, y + 16, 13, 0, 2 * Math.PI);
         ctx.fill();
-        
+
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 10px Arial';
+        ctx.font = 'bold 11px system-ui, -apple-system, Segoe UI, Roboto, Arial';
         ctx.textAlign = 'center';
-        ctx.fillText((groupIndex + 1).toString(), x + 15, y + 19);
+        ctx.fillText((groupIndex + 1).toString(), x + 16, y + 20);
         ctx.textAlign = 'left';
       }
     });
   }, [areaGroups, selectedGroupIds, hoveredGroupId]);
 
-  const isPointInGroup = (x: number, y: number, group: AreaGroup): boolean => {
-    return group.shapes.some(shape => 
-      x >= shape.x && x <= shape.x + shape.width &&
-      y >= shape.y && y <= shape.y + shape.height
+  // ========= HIT TEST =========
+  const isPointInGroup = (xPct: number, yPct: number, group: AreaGroup): boolean => {
+    return group.shapes.some(shape =>
+      xPct >= shape.x && xPct <= shape.x + shape.width &&
+      yPct >= shape.y && yPct <= shape.y + shape.height
     );
   };
 
+  // ========= TOOLTIP HELPERS =========
+  const showTooltipAt = (clientX: number, clientY: number, text: string) => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+
+    const wrapperRect = wrapper.getBoundingClientRect();
+
+    // Posição base (offset do wrapper)
+    let left = clientX - wrapperRect.left + 14; // leve offset à direita
+    let top = clientY - wrapperRect.top + 14;   // leve offset abaixo
+
+    // Tamanhos estimados (ajustados depois via CSS responsivo). Para garantir que não estoure, usamos um "limite".
+    const estWidth = 260;  // estimativa conservadora
+    const estHeight = 56;  // estimativa conservadora
+
+    // Ajustes para manter dentro do wrapper
+    if (left + estWidth > wrapperRect.width - 8) {
+      left = Math.max(8, wrapperRect.width - estWidth - 8);
+    }
+    if (top + estHeight > wrapperRect.height - 8) {
+      top = Math.max(8, wrapperRect.height - estHeight - 8);
+    }
+
+    setTooltip({ visible: true, text, left, top });
+  };
+
+  const hideTooltip = () => {
+    setTooltip(prev => ({ ...prev, visible: false }));
+  };
+
+  // ========= EVENTS =========
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const wrapper = wrapperRef.current;
+    if (!canvas || !wrapper) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const xPct = ((e.clientX - rect.left) / rect.width) * 100;
+    const yPct = ((e.clientY - rect.top) / rect.height) * 100;
 
-    const clickedGroup = areaGroups.find(group => isPointInGroup(x, y, group));
+    const clickedGroup = areaGroups.find(group => isPointInGroup(xPct, yPct, group));
+
+    // No mobile, também mostramos tooltip fixo por alguns segundos
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
 
     if (clickedGroup) {
       toggleGroupSelection(clickedGroup.id);
+
+      const text = `${clickedGroup.name} — R$ ${clickedGroup.price.toFixed(2)}`;
+      showTooltipAt(e.clientX, e.clientY, text);
+
+      if (isMobile) {
+        if (hideTooltipTimer.current) {
+          window.clearTimeout(hideTooltipTimer.current);
+        }
+        hideTooltipTimer.current = window.setTimeout(() => {
+          hideTooltip();
+        }, 2500);
+      }
+    } else if (isMobile) {
+      // Toque fora: esconde tooltip
+      hideTooltip();
     }
   };
 
@@ -201,15 +315,27 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const xPct = ((e.clientX - rect.left) / rect.width) * 100;
+    const yPct = ((e.clientY - rect.top) / rect.height) * 100;
 
-    const hoveredGroup = areaGroups.find(group => isPointInGroup(x, y, group));
+    const hoveredGroup = areaGroups.find(group => isPointInGroup(xPct, yPct, group));
     setHoveredGroupId(hoveredGroup ? hoveredGroup.id : null);
+
+    if (hoveredGroup) {
+      const text = `${hoveredGroup.name} — R$ ${hoveredGroup.price.toFixed(2)}`;
+      showTooltipAt(e.clientX, e.clientY, text);
+    } else {
+      hideTooltip();
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredGroupId(null);
+    hideTooltip();
   };
 
   const toggleGroupSelection = (groupId: string) => {
-    setSelectedGroupIds(prev => 
+    setSelectedGroupIds(prev =>
       prev.includes(groupId)
         ? prev.filter(id => id !== groupId)
         : [...prev, groupId]
@@ -217,14 +343,15 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
   };
 
   const handleImageLoad = () => {
-    const canvas = canvasRef.current;
-    const image = imageRef.current;
-    if (!canvas || !image) return;
-
-    canvas.width = image.naturalWidth;
-    canvas.height = image.naturalHeight;
     drawCanvas();
   };
+
+  // Atualiza canvas no resize (mantém nitidez e layout)
+  useEffect(() => {
+    const onResize = () => drawCanvas();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [drawCanvas]);
 
   const needsGenderSelection = !bodySelectionType.includes('male') && !bodySelectionType.includes('female');
   const selectedGroups = areaGroups.filter(group => selectedGroupIds.includes(group.id));
@@ -234,7 +361,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
     <Card className="p-6">
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">Selecione os procedimentos desejados</h3>
-        
+
         {needsGenderSelection && (
           <div>
             <Label>Sexo do Cliente</Label>
@@ -256,7 +383,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
             <div className="space-y-4">
               <div>
                 <h4 className="font-medium mb-2">Procedimentos Disponíveis</h4>
-                <div className="space-y-2 max-h-60 overflow-y-auto">
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                   {areaGroups.map((group, index) => (
                     <div key={group.id} className="flex items-start space-x-2">
                       <Checkbox
@@ -315,8 +442,10 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
               )}
             </div>
           </div>
+
+          {/* ==== LADO DO CANVAS + TOOLTIP ==== */}
           <div className="flex-1 order-2 md:order-1 flex justify-center items-start">
-            <div className="relative inline-block">
+            <div ref={wrapperRef} className="relative inline-block">
               <img
                 ref={imageRef}
                 src={getImageUrl()}
@@ -328,16 +457,44 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
               <canvas
                 ref={canvasRef}
                 className="max-w-full max-h-96 border border-border cursor-pointer object-contain"
-                style={{ 
-                  width: 'auto', 
+                style={{
+                  width: '100%',
                   height: 'auto',
-                  maxWidth: '100%',
-                  maxHeight: '24rem'
+                  maxHeight: '24rem',
                 }}
                 onClick={handleCanvasClick}
                 onMouseMove={handleCanvasMouseMove}
-                onMouseLeave={() => setHoveredGroupId(null)}
+                onMouseLeave={handleMouseLeave}
               />
+
+              {/* TOOLTIP OVERLAY */}
+              {tooltip.visible && (
+                <div
+                  className="
+                    absolute z-10 select-none
+                    px-3 py-2 rounded-xl
+                    bg-black/80 text-white
+                    shadow-lg border border-white/10
+                    backdrop-blur-sm
+                    text-sm md:text-base lg:text-lg
+                    leading-tight
+                    pointer-events-none
+                    max-w-[80vw] md:max-w-[360px]
+                  "
+                  style={{
+                    left: tooltip.left,
+                    top: tooltip.top,
+                    // pequena animação/elevação
+                    transform: 'translateZ(0)',
+                  }}
+                >
+                  <div className="font-semibold">{tooltip.text}</div>
+                  {/* Indicador opcional de ajuda no mobile */}
+                  <div className="mt-1 hidden [@media(max-width:768px)]:block text-[11px] opacity-80">
+                    Toque novamente para selecionar/deselecionar
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

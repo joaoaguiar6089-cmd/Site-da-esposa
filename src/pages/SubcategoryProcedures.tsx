@@ -43,6 +43,30 @@ const SubcategoryProcedures = () => {
     }
   }, [subcategoryId]);
 
+  // Scroll automático para o procedimento específico
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && hash.startsWith('#procedure-')) {
+      // Aguarda um pouco para garantir que os elementos foram renderizados
+      const timer = setTimeout(() => {
+        const element = document.querySelector(hash);
+        if (element) {
+          element.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+          });
+          // Adiciona um destaque temporário
+          element.classList.add('ring-2', 'ring-primary', 'ring-opacity-50');
+          setTimeout(() => {
+            element.classList.remove('ring-2', 'ring-primary', 'ring-opacity-50');
+          }, 2000);
+        }
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [procedures]);
+
   const loadSubcategoryData = async () => {
     try {
       const { data, error } = await supabase

@@ -262,7 +262,7 @@ const Header = () => {
                     featuredProcedures.map((procedure) => (
                       <a
                         key={procedure.id}
-                        href={`/categoria/${procedure.category_id}`}
+                        href={`/categoria/${procedure.category_id}#procedure-${procedure.id}`}
                         className="flex items-center justify-between px-6 py-3 text-gray-700 hover:bg-red-50/80 hover:text-red-600 transition-all duration-300 group"
                       >
                         <div className="flex flex-col">
@@ -427,11 +427,11 @@ const Header = () => {
                             featuredProcedures.map((procedure) => (
                               <a
                                 key={procedure.id}
-                                href={`/categoria/${procedure.category_id}`}
+                                href={`/categoria/${procedure.category_id}#procedure-${procedure.id}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setIsOpen(false);
-                                  window.location.href = `/categoria/${procedure.category_id}`;
+                                  window.location.href = `/categoria/${procedure.category_id}#procedure-${procedure.id}`;
                                 }}
                                 className="block px-4 py-3 text-left bg-white/70 text-gray-700 hover:bg-red-50/80 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/60 hover:border-red-200"
                               >

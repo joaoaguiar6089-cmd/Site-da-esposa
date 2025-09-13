@@ -33,7 +33,10 @@ const ProcedureCard = ({
   };
 
   return (
-    <Card className="group overflow-hidden hover:shadow-elegant transition-all duration-300 hover:-translate-y-1">
+    <Card 
+      id={procedureId ? `procedure-${procedureId}` : undefined}
+      className="group overflow-hidden hover:shadow-elegant transition-all duration-300 hover:-translate-y-1"
+    >
       <div className="relative overflow-hidden">
         <img 
           src={image} 

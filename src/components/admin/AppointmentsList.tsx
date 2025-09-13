@@ -58,10 +58,14 @@ const AppointmentsList = () => {
   const [selectedProfessional, setSelectedProfessional] = useState("");
   const { toast } = useToast();
 
-  // Carregar todos os agendamentos
+  // Carregar todos os agendamentos (apenas de hoje em diante)
   const loadAppointments = async () => {
     try {
       setLoading(true);
+      
+      // Obter a data atual no formato YYYY-MM-DD
+      const today = new Date().toISOString().split('T')[0];
+      
       const { data, error } = await supabase
         .from('appointments')
         .select(`
@@ -86,6 +90,7 @@ const AppointmentsList = () => {
             name
           )
         `)
+        .gte('appointment_date', today) // Filtro para datas >= hoje
         .order('appointment_date')
         .order('appointment_time');
 
@@ -279,6 +284,7 @@ Tefé-AM
       });
     }
   };
+  
   const updateAppointmentStatus = async (id: string, newStatus: string) => {
     try {
       // Primeiro, buscar os dados do agendamento para notificações
@@ -516,7 +522,7 @@ Aguardamos você!`;
         {filteredAppointments.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center">
-              <p>Nenhum agendamento encontrado.</p>
+              <p>Nenhum agendamento encontrado a partir de hoje.</p>
             </CardContent>
           </Card>
         ) : (

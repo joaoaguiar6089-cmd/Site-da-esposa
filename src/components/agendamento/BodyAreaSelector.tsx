@@ -77,7 +77,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
   }, [selectedGroupIds, areaGroups, selectedGender, onSelectionChange]);
 
   const loadAreaGroups = async () => {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('body_area_groups')
       .select('*')
       .eq('procedure_id', procedureId);
@@ -87,7 +87,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
       return;
     }
 
-    const mappedGroups = (data || []).map(group => ({
+    const mappedGroups = (data || []).map((group: any) => ({
       id: group.id,
       name: group.name,
       price: group.price,

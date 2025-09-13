@@ -133,7 +133,7 @@ export default function PromotionsSection() {
             <div className="w-24 h-1 bg-gradient-to-r from-primary to-primary/60 rounded-full mx-auto mb-5" />
           </div>
           <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-            Aproveite nossas ofertas exclusivas e cuide da sua beleza com preços especiais
+            Principais novidades e promoções da clínica, especialmente para vocês.
           </p>
         </div>
 

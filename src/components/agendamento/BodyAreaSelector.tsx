@@ -109,19 +109,20 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
       const isSelected = selectedGroupIds.includes(group.id);
       const isHovered = hoveredGroupId === group.id;
       
-      let strokeColor = 'rgba(239, 68, 68, 0.9)';
+      let strokeColor = 'rgba(239, 68, 68, 0.9)'; // Mantido alto para o estado padrão
       let fillColor = 'transparent';
-      let lineWidth = 2;
-      
+      let lineWidth = 2; // Mantido para o estado padrão
+
       if (isSelected) {
         strokeColor = '#22c55e';
         fillColor = 'rgba(34, 197, 94, 0.4)';
-        lineWidth = 3;
+        lineWidth = 3; // Linha mais grossa e cor mais vibrante para selecionado
       } else if (isHovered) {
-        strokeColor = '#ef4444';
-        fillColor = 'rgba(239, 68, 68, 0.5)';
+        strokeColor = '#ef4444'; // Cor vermelha ainda mais forte no hover
+        fillColor = 'rgba(239, 68, 68, 0.5)'; // Opacidade média no hover
         lineWidth = 2;
       }
+      // Se não estiver selecionado nem em hover, ele usa os valores iniciais (0.9 de opacidade e lineWidth 2)
 
       group.shapes.forEach((shape) => {
         const x = (shape.x / 100) * canvas.width;
@@ -161,7 +162,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
         const x = (firstShape.x / 100) * canvas.width;
         const y = (firstShape.y / 100) * canvas.height;
         
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.8)'; // Mantido a opacidade do círculo numerado
         ctx.beginPath();
         ctx.arc(x + 15, y + 15, 12, 0, 2 * Math.PI);
         ctx.fill();
@@ -332,6 +333,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
               onMouseMove={handleCanvasMouseMove}
               onMouseLeave={() => setHoveredGroupId(null)}
             />
+            {/* As legendas foram removidas daqui */}
           </div>
         </div>
       </div>

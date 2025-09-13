@@ -86,6 +86,42 @@ export type Database = {
           },
         ]
       }
+      appointment_selected_areas: {
+        Row: {
+          appointment_id: string
+          area_group_id: string
+          id: string
+          selected_at: string | null
+        }
+        Insert: {
+          appointment_id: string
+          area_group_id: string
+          id?: string
+          selected_at?: string | null
+        }
+        Update: {
+          appointment_id?: string
+          area_group_id?: string
+          id?: string
+          selected_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_appointment"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_area_group"
+            columns: ["area_group_id"]
+            isOneToOne: false
+            referencedRelation: "body_area_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointments: {
         Row: {
           appointment_date: string
@@ -156,6 +192,44 @@ export type Database = {
             columns: ["professional_id"]
             isOneToOne: false
             referencedRelation: "professionals_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      body_area_groups: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          price: number
+          procedure_id: string
+          shapes: Json
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          price?: number
+          procedure_id: string
+          shapes: Json
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          price?: number
+          procedure_id?: string
+          shapes?: Json
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_procedure"
+            columns: ["procedure_id"]
+            isOneToOne: false
+            referencedRelation: "procedures"
             referencedColumns: ["id"]
           },
         ]
@@ -339,6 +413,7 @@ export type Database = {
           is_featured: boolean | null
           name: string
           price: number | null
+          requires_area_selection: boolean | null
           requires_body_selection: boolean | null
           sessions: number
           subcategory_id: string | null
@@ -359,6 +434,7 @@ export type Database = {
           is_featured?: boolean | null
           name: string
           price?: number | null
+          requires_area_selection?: boolean | null
           requires_body_selection?: boolean | null
           sessions?: number
           subcategory_id?: string | null
@@ -379,6 +455,7 @@ export type Database = {
           is_featured?: boolean | null
           name?: string
           price?: number | null
+          requires_area_selection?: boolean | null
           requires_body_selection?: boolean | null
           sessions?: number
           subcategory_id?: string | null
@@ -466,6 +543,7 @@ export type Database = {
           id: string
           image_url: string
           is_active: boolean
+          is_procedure: boolean | null
           procedure_id: string | null
           title: string
           updated_at: string
@@ -477,6 +555,7 @@ export type Database = {
           id?: string
           image_url: string
           is_active?: boolean
+          is_procedure?: boolean | null
           procedure_id?: string | null
           title: string
           updated_at?: string
@@ -488,6 +567,7 @@ export type Database = {
           id?: string
           image_url?: string
           is_active?: boolean
+          is_procedure?: boolean | null
           procedure_id?: string | null
           title?: string
           updated_at?: string

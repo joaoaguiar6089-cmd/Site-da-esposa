@@ -28,7 +28,7 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
     { id: "professionals", label: "Profissionais", icon: UserPlus },
     { id: "categories", label: "Categorias", icon: Tag },
     { id: "procedures", label: "Procedimentos", icon: Stethoscope },
-    { id: "promotions", label: "Promoções", icon: Badge },
+    { id: "promotions", label: "Feed", icon: Badge },
     { id: "hero-image", label: "Imagem Principal", icon: Image },
     { id: "schedule", label: "Horários", icon: Clock },
     { id: "notifications", label: "Notificações", icon: MessageSquare },

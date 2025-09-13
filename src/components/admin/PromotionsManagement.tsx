@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,7 @@ interface Promotion {
   is_active: boolean;
   display_order: number;
   procedure_id?: string;
+  is_procedure?: boolean;
   created_at: string;
 }
 
@@ -44,7 +46,8 @@ export default function PromotionsManagement() {
     image_url: "",
     is_active: true,
     display_order: 1,
-    procedure_id: "none"
+    procedure_id: "none",
+    is_procedure: false,
   });
 
   const fetchPromotions = async () => {
@@ -57,10 +60,10 @@ export default function PromotionsManagement() {
       if (error) throw error;
       setPromotions(data || []);
     } catch (error) {
-      console.error("Erro ao buscar promoções:", error);
+      console.error("Erro ao buscar posts:", error);
       toast({
         title: "Erro",
-        description: "Não foi possível carregar as promoções",
+        description: "Não foi possível carregar os posts",
         variant: "destructive",
       });
     } finally {
@@ -139,7 +142,7 @@ export default function PromotionsManagement() {
 
     const submitData = {
       ...formData,
-      procedure_id: formData.procedure_id === "none" ? null : formData.procedure_id || null
+      procedure_id: (formData.is_procedure && formData.procedure_id !== "none") ? formData.procedure_id : null
     };
 
     try {
@@ -153,7 +156,7 @@ export default function PromotionsManagement() {
         
         toast({
           title: "Sucesso",
-          description: "Promoção atualizada com sucesso!",
+          description: "Post atualizado com sucesso!",
         });
       } else {
         const { error } = await supabase
@@ -164,7 +167,7 @@ export default function PromotionsManagement() {
         
         toast({
           title: "Sucesso",
-          description: "Promoção criada com sucesso!",
+          description: "Post criado com sucesso!",
         });
       }
 
@@ -172,10 +175,10 @@ export default function PromotionsManagement() {
       resetForm();
       fetchPromotions();
     } catch (error) {
-      console.error("Erro ao salvar promoção:", error);
+      console.error("Erro ao salvar post:", error);
       toast({
         title: "Erro",
-        description: "Erro ao salvar promoção",
+        description: "Erro ao salvar post",
         variant: "destructive",
       });
     }
@@ -189,13 +192,14 @@ export default function PromotionsManagement() {
       image_url: promotion.image_url,
       is_active: promotion.is_active,
       display_order: promotion.display_order,
-      procedure_id: promotion.procedure_id || "none"
+      procedure_id: promotion.procedure_id || "none",
+      is_procedure: promotion.is_procedure || false
     });
     setIsDialogOpen(true);
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta promoção?")) return;
+    if (!confirm("Tem certeza que deseja excluir este post?")) return;
 
     try {
       const { error } = await supabase
@@ -207,15 +211,15 @@ export default function PromotionsManagement() {
       
       toast({
         title: "Sucesso",
-        description: "Promoção excluída com sucesso!",
+        description: "Post excluído com sucesso!",
       });
       
       fetchPromotions();
     } catch (error) {
-      console.error("Erro ao excluir promoção:", error);
+      console.error("Erro ao excluir post:", error);
       toast({
         title: "Erro",
-        description: "Erro ao excluir promoção",
+        description: "Erro ao excluir post",
         variant: "destructive",
       });
     }
@@ -228,7 +232,8 @@ export default function PromotionsManagement() {
       image_url: "",
       is_active: true,
       display_order: 1,
-      procedure_id: "none"
+      procedure_id: "none",
+      is_procedure: false,
     });
     setEditingPromotion(null);
   };
@@ -246,27 +251,27 @@ export default function PromotionsManagement() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Gerenciar Promoções</h2>
+          <h2 className="text-3xl font-bold tracking-tight">Gerenciar Feed</h2>
           <p className="text-muted-foreground">
-            Gerencie as promoções que aparecem na página principal
+            Gerencie o feed que aparece na página principal
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={openCreateDialog}>
               <Plus className="mr-2 h-4 w-4" />
-              Nova Promoção
+              Novo Post
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>
-                {editingPromotion ? "Editar Promoção" : "Nova Promoção"}
+                {editingPromotion ? "Editar Post" : "Novo Post"}
               </DialogTitle>
               <DialogDescription>
                 {editingPromotion 
-                  ? "Edite as informações da promoção" 
-                  : "Crie uma nova promoção para exibir na página principal"
+                  ? "Edite as informações do post" 
+                  : "Crie um novo post para exibir na página principal"
                 }
               </DialogDescription>
             </DialogHeader>
@@ -279,7 +284,7 @@ export default function PromotionsManagement() {
                     id="title"
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="Ex: Promoção Especial"
+                    placeholder="Ex: Novidade na Clínica"
                   />
                 </div>
 
@@ -302,28 +307,39 @@ export default function PromotionsManagement() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="procedure">Procedimento (Opcional)</Label>
-                <Select
-                  value={formData.procedure_id}
-                  onValueChange={(value) => setFormData({ ...formData, procedure_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um procedimento" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nenhum procedimento</SelectItem>
-                    {procedures.map((procedure) => (
-                      <SelectItem key={procedure.id} value={procedure.id}>
-                        {procedure.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Se selecionado, ao clicar em "Agendar Agora" o procedimento será pré-selecionado
-                </p>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="is_procedure"
+                  checked={formData.is_procedure}
+                  onCheckedChange={(checked) => setFormData({ ...formData, is_procedure: !!checked })}
+                />
+                <Label htmlFor="is_procedure">É um procedimento/promoção</Label>
               </div>
+
+              {formData.is_procedure && (
+                <div className="space-y-2">
+                  <Label htmlFor="procedure">Procedimento</Label>
+                  <Select
+                    value={formData.procedure_id}
+                    onValueChange={(value) => setFormData({ ...formData, procedure_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um procedimento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum procedimento</SelectItem>
+                      {procedures.map((procedure) => (
+                        <SelectItem key={procedure.id} value={procedure.id}>
+                          {procedure.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Se selecionado, ao clicar em "Agendar Agora" o procedimento será pré-selecionado
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="description">Descrição *</Label>
@@ -331,13 +347,13 @@ export default function PromotionsManagement() {
                   id="description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Descreva a promoção..."
+                  placeholder="Descreva o post..."
                   rows={4}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="image">Imagem da Promoção *</Label>
+                <Label htmlFor="image">Imagem do Post *</Label>
                 <div className="flex items-center gap-4">
                   <Input
                     id="image"
@@ -365,7 +381,7 @@ export default function PromotionsManagement() {
                   checked={formData.is_active}
                   onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
                 />
-                <Label htmlFor="is_active">Ativa</Label>
+                <Label htmlFor="is_active">Ativo</Label>
               </div>
 
               <DialogFooter>
@@ -383,9 +399,9 @@ export default function PromotionsManagement() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Promoções Cadastradas</CardTitle>
+          <CardTitle>Posts</CardTitle>
           <CardDescription>
-            Lista de todas as promoções. Máximo de 4 promoções ativas por vez.
+            Lista de todos os posts. Máximo de 4 posts ativos por vez.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -395,6 +411,7 @@ export default function PromotionsManagement() {
                 <TableHead>Imagem</TableHead>
                 <TableHead>Título</TableHead>
                 <TableHead>Descrição</TableHead>
+                <TableHead>Tipo</TableHead>
                 <TableHead>Procedimento</TableHead>
                 <TableHead>Ordem</TableHead>
                 <TableHead>Status</TableHead>
@@ -414,18 +431,23 @@ export default function PromotionsManagement() {
                   <TableCell className="font-medium">{promotion.title}</TableCell>
                   <TableCell className="max-w-xs truncate">{promotion.description}</TableCell>
                   <TableCell>
-                    {promotion.procedure_id ? (
+                    <Badge variant={promotion.is_procedure ? "default" : "secondary"}>
+                      {promotion.is_procedure ? "Procedimento" : "Post Informativo"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {promotion.is_procedure && promotion.procedure_id ? (
                       <Badge variant="outline">
                         {procedures.find(p => p.id === promotion.procedure_id)?.name || 'Procedimento'}
                       </Badge>
                     ) : (
-                      <span className="text-muted-foreground text-sm">Nenhum</span>
+                      <span className="text-muted-foreground text-sm">-</span>
                     )}
                   </TableCell>
                   <TableCell>{promotion.display_order}º</TableCell>
                   <TableCell>
                     <Badge variant={promotion.is_active ? "default" : "secondary"}>
-                      {promotion.is_active ? "Ativa" : "Inativa"}
+                      {promotion.is_active ? "Ativo" : "Inativo"}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -450,8 +472,8 @@ export default function PromotionsManagement() {
               ))}
               {promotions.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    Nenhuma promoção cadastrada
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    Nenhum post cadastrado
                   </TableCell>
                 </TableRow>
               )}

@@ -15,6 +15,19 @@ import { formatDateToBrazil, getCurrentDateBrazil, getCurrentDateTimeBrazil } fr
 import type { Client } from "@/types/client";
 import BodyAreaSelector from "./BodyAreaSelector";
 
+interface Category {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+interface Subcategory {
+  id: string;
+  name: string;
+  description?: string;
+  category_id: string;
+}
+
 interface Procedure {
   id: string;
   name: string;
@@ -25,6 +38,8 @@ interface Procedure {
   body_selection_type: string;
   body_image_url: string;
   body_image_url_male: string;
+  category_id?: string;
+  subcategory_id?: string;
 }
 
 interface BodyArea {
@@ -53,6 +68,10 @@ interface AgendamentoFormProps {
 
 const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preSelectedProcedureId, selectedDate, adminMode = false, sendNotification = true }: AgendamentoFormProps) => {
   const [procedures, setProcedures] = useState<Procedure[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string>('');
   const [formData, setFormData] = useState({
     procedure_id: "",
     appointment_date: "",
@@ -70,14 +89,33 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
 
   const loadProcedures = async () => {
     try {
-      const { data, error } = await supabase
+      // Carregar procedimentos
+      const { data: proceduresData, error: proceduresError } = await supabase
         .from('procedures')
-        .select('id, name, description, duration, price, requires_body_selection, body_selection_type, body_image_url, body_image_url_male')
+        .select('id, name, description, duration, price, requires_body_selection, body_selection_type, body_image_url, body_image_url_male, category_id, subcategory_id')
         .order('name');
 
-      if (error) throw error;
+      if (proceduresError) throw proceduresError;
 
-      setProcedures(data || []);
+      // Carregar categorias
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name');
+
+      if (categoriesError) throw categoriesError;
+
+      // Carregar subcategorias
+      const { data: subcategoriesData, error: subcategoriesError } = await supabase
+        .from('subcategories')
+        .select('*')
+        .order('name');
+
+      if (subcategoriesError) throw subcategoriesError;
+
+      setProcedures(proceduresData || []);
+      setCategories(categoriesData || []);
+      setSubcategories(subcategoriesData || []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast({
@@ -779,56 +817,125 @@ Para reagendar, entre em contato conosco.`;
                   <CommandInput placeholder="Buscar procedimento..." className="h-9" />
                   <CommandList>
                     <CommandEmpty>Nenhum procedimento encontrado.</CommandEmpty>
-                    <CommandGroup>
-                      {procedures.map((procedure) => (
+                    
+                    {/* Se nenhuma categoria selecionada, mostrar categorias */}
+                    {!selectedCategoryId && categories.map((category) => (
+                      <CommandGroup key={category.id} heading={`📁 ${category.name}`}>
                         <CommandItem
-                          key={procedure.id}
-                          value={`${procedure.name} ${procedure.description || ''}`}
+                          value={category.name}
                           onSelect={() => {
-                            setFormData(prev => ({ ...prev, procedure_id: procedure.id, appointment_time: "" }));
-                            setProcedureSearchOpen(false);
-                            
-                            // Resetar seleções de áreas corporais se mudar o procedimento
-                            setSelectedBodyAreas([]);
-                            setTotalBodyAreasPrice(0);
-                            
-                            // Recarregar horários se uma data já estiver selecionada
-                            if (formData.appointment_date) {
-                              loadAvailableTimes(formData.appointment_date);
-                            }
+                            setSelectedCategoryId(category.id);
+                            setSelectedSubcategoryId('');
                           }}
                         >
                           <div className="flex flex-col w-full">
-                            <div className="flex items-center justify-between">
-                              <span className="font-medium">{procedure.name}</span>
-                              <Check
-                                className={cn(
-                                  "ml-2 h-4 w-4",
-                                  formData.procedure_id === procedure.id ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {procedure.duration}min - R$ {procedure.price?.toFixed(2)}
-                            </div>
-                            {procedure.description && (
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {procedure.description}
-                              </div>
+                            <span className="font-medium">{category.name}</span>
+                            {category.description && (
+                              <span className="text-xs text-muted-foreground">{category.description}</span>
                             )}
                           </div>
                         </CommandItem>
-                      ))}
-                    </CommandGroup>
+                      </CommandGroup>
+                    ))}
+                    
+                    {/* Se categoria selecionada mas não subcategoria, mostrar subcategorias */}
+                    {selectedCategoryId && !selectedSubcategoryId && (
+                      <>
+                        <CommandGroup heading="← Voltar">
+                          <CommandItem
+                            value="voltar-categoria"
+                            onSelect={() => {
+                              setSelectedCategoryId('');
+                              setSelectedSubcategoryId('');
+                            }}
+                          >
+                            <span>← Voltar às categorias</span>
+                          </CommandItem>
+                        </CommandGroup>
+                        
+                        {subcategories
+                          .filter(sub => sub.category_id === selectedCategoryId)
+                          .map((subcategory) => (
+                            <CommandGroup key={subcategory.id} heading={`📂 ${subcategory.name}`}>
+                              <CommandItem
+                                value={subcategory.name}
+                                onSelect={() => {
+                                  setSelectedSubcategoryId(subcategory.id);
+                                }}
+                              >
+                                <div className="flex flex-col w-full">
+                                  <span className="font-medium">{subcategory.name}</span>
+                                  {subcategory.description && (
+                                    <span className="text-xs text-muted-foreground">{subcategory.description}</span>
+                                  )}
+                                </div>
+                              </CommandItem>
+                            </CommandGroup>
+                          ))}
+                      </>
+                    )}
+                    
+                    {/* Se subcategoria selecionada, mostrar procedimentos */}
+                    {selectedSubcategoryId && (
+                      <>
+                        <CommandGroup heading="← Voltar">
+                          <CommandItem
+                            value="voltar-subcategoria"
+                            onSelect={() => {
+                              setSelectedSubcategoryId('');
+                            }}
+                          >
+                            <span>← Voltar às subcategorias</span>
+                          </CommandItem>
+                        </CommandGroup>
+                        
+                        <CommandGroup heading="Procedimentos">
+                          {procedures
+                            .filter(proc => proc.subcategory_id === selectedSubcategoryId)
+                            .map((procedure) => (
+                              <CommandItem
+                                key={procedure.id}
+                                value={procedure.name}
+                                onSelect={() => {
+                                  setFormData(prev => ({ ...prev, procedure_id: procedure.id, appointment_time: "" }));
+                                  setProcedureSearchOpen(false);
+                                  setSelectedCategoryId('');
+                                  setSelectedSubcategoryId('');
+                                  
+                                  // Resetar seleções de áreas corporais se mudar o procedimento
+                                  setSelectedBodyAreas([]);
+                                  setTotalBodyAreasPrice(0);
+                                  
+                                  // Recarregar horários se uma data já estiver selecionada
+                                  if (formData.appointment_date) {
+                                    loadAvailableTimes(formData.appointment_date);
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{procedure.name}</span>
+                                    <span className="text-sm text-muted-foreground">
+                                      {procedure.duration}min - R$ {procedure.price?.toFixed(2)}
+                                    </span>
+                                  </div>
+                                  <Check
+                                    className={cn(
+                                      "ml-2 h-4 w-4",
+                                      formData.procedure_id === procedure.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                </div>
+                              </CommandItem>
+                            ))}
+                        </CommandGroup>
+                      </>
+                    )}
                   </CommandList>
                 </Command>
               </PopoverContent>
             </Popover>
-            {selectedProcedure && (
-              <p className="text-sm text-muted-foreground mt-1">
-                {selectedProcedure.description}
-              </p>
-            )}
+            {/* Removida a descrição que aparecia abaixo do dropdown */}
           </div>
 
 

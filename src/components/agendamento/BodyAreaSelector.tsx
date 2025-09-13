@@ -32,6 +32,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
   procedureId,
   bodySelectionType,
   bodyImageUrl,
+  bodyImageUrlMale,
   onSelectionChange,
 }) => {
   const [areaGroups, setAreaGroups] = useState<AreaGroup[]>([]);
@@ -42,8 +43,14 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
   const imageRef = useRef<HTMLImageElement>(null);
 
   const getImageUrl = useCallback(() => {
-    if (bodySelectionType === 'custom' && bodyImageUrl) {
-      return bodyImageUrl;
+    if (bodySelectionType === 'custom') {
+      // Para tipo custom, usar as imagens específicas baseadas no gênero
+      if (selectedGender === 'male' && bodyImageUrlMale) {
+        return bodyImageUrlMale;
+      }
+      if (selectedGender === 'female' && bodyImageUrl) {
+        return bodyImageUrl;
+      }
     }
     
     const defaultImages = {
@@ -60,7 +67,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
     const genderSuffix = selectedGender === 'male' ? 'male' : 'female';
     const baseType = bodySelectionType.includes('face') ? 'face' : 'body';
     return defaultImages[`${baseType}_${genderSuffix}` as keyof typeof defaultImages];
-  }, [bodySelectionType, bodyImageUrl, selectedGender]);
+  }, [bodySelectionType, bodyImageUrl, bodyImageUrlMale, selectedGender]);
 
   useEffect(() => {
     loadAreaGroups();
@@ -226,7 +233,12 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
     drawCanvas();
   };
 
-  const needsGenderSelection = !bodySelectionType.includes('male') && !bodySelectionType.includes('female');
+  // Mostrar seleção de gênero apenas se:
+  // 1. O tipo não especifica gênero específico (male/female)
+  // 2. E ambas as imagens estão disponíveis (para tipo custom)
+  const needsGenderSelection = !bodySelectionType.includes('male') && 
+    !bodySelectionType.includes('female') && 
+    (bodySelectionType !== 'custom' || (bodyImageUrl && bodyImageUrlMale));
   const selectedGroups = areaGroups.filter(group => selectedGroupIds.includes(group.id));
   const totalPrice = selectedGroups.reduce((sum, group) => sum + group.price, 0);
 

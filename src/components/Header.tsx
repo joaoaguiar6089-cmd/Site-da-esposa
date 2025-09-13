@@ -346,161 +346,166 @@ const Header = () => {
                 {/* Mobile Navigation */}
                 <div className="flex-1 overflow-y-auto py-6 relative z-10">
                   <nav className="space-y-2 px-6">
-                    {navItems.map((item) => (
-                      <div key={item.name}>
-                        {item.hasDropdown ? (
-                          <div className="space-y-2">
-                            <button
-                              onClick={() => {
-                                const categoryKey = item.isFavoritos ? 'favoritos' : 'procedimentos';
-                                setExpandedMobileCategory(
-                                  expandedMobileCategory === categoryKey ? null : categoryKey
-                                );
-                              }}
-                              className="flex items-center justify-between w-full px-5 py-4 text-left bg-gradient-to-r from-white/80 to-red-50/60 text-gray-800 hover:from-red-50 hover:to-red-100/80 hover:text-red-700 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md border border-red-100/40 hover:border-red-200"
-                            >
-                              <span className="font-semibold text-lg">{item.name}</span>
-                              <div className="p-1 rounded-full bg-red-100/50">
-                                <ChevronDown className={`w-4 h-4 transform transition-all duration-300 text-red-600 ${
-                                  expandedMobileCategory === (item.isFavoritos ? 'favoritos' : 'procedimentos') ? 'rotate-180' : ''
-                                }`} />
-                              </div>
-                            </button>
-                            
-                            {/* Lista de Categorias */}
-                            {expandedMobileCategory === 'procedimentos' && (
-                              <div className="ml-3 space-y-2 animate-in slide-in-from-left duration-300 border-l-3 border-red-200/60 pl-4 bg-gradient-to-r from-white/40 to-transparent rounded-r-xl py-3">
-                                {categories.map((category) => (
-                                  <div key={category.id} className="space-y-1">
-                                    {category.subcategories && category.subcategories.length > 0 ? (
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          e.preventDefault();
-                                          setExpandedMobileCategory(category.id);
-                                        }}
-                                        className="flex items-center justify-between w-full px-4 py-3 text-left bg-white/70 text-gray-700 hover:bg-red-50/80 hover:text-red-700 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md border border-white/60 hover:border-red-200"
-                                      >
-                                        <span className="font-medium">{category.name}</span>
-                                        <div className="p-1 rounded-full bg-red-50">
-                                          <ChevronRight className="w-3 h-3 text-red-500" />
-                                        </div>
-                                      </button>
-                                    ) : (
-                                      <a
-                                        href={`/categoria/${category.id}`}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setIsOpen(false);
-                                          window.location.href = `/categoria/${category.id}`;
-                                        }}
-                                        className="block px-4 py-3 text-left bg-white/70 text-gray-700 hover:bg-red-50/80 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/60 hover:border-red-200"
-                                      >
-                                        <span className="font-medium">{category.name}</span>
-                                      </a>
-                                    )}
+                    {/* Dropdown Procedimentos */}
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => {
+                          setExpandedMobileCategory(
+                            expandedMobileCategory === 'procedimentos' ? null : 'procedimentos'
+                          );
+                        }}
+                        className="flex items-center justify-between w-full px-5 py-4 text-left bg-gradient-to-r from-white/80 to-red-50/60 text-gray-800 hover:from-red-50 hover:to-red-100/80 hover:text-red-700 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md border border-red-100/40 hover:border-red-200"
+                      >
+                        <span className="font-semibold text-lg">Procedimentos</span>
+                        <div className="p-1 rounded-full bg-red-100/50">
+                          <ChevronDown className={`w-4 h-4 transform transition-all duration-300 text-red-600 ${
+                            expandedMobileCategory === 'procedimentos' ? 'rotate-180' : ''
+                          }`} />
+                        </div>
+                      </button>
+                      
+                      {/* Lista de Categorias */}
+                      {expandedMobileCategory === 'procedimentos' && (
+                        <div className="ml-3 space-y-2 animate-in slide-in-from-left duration-300 border-l-3 border-red-200/60 pl-4 bg-gradient-to-r from-white/40 to-transparent rounded-r-xl py-3">
+                          {categories.map((category) => (
+                            <div key={category.id} className="space-y-1">
+                              {category.subcategories && category.subcategories.length > 0 ? (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    setExpandedMobileCategory(category.id);
+                                  }}
+                                  className="flex items-center justify-between w-full px-4 py-3 text-left bg-white/70 text-gray-700 hover:bg-red-50/80 hover:text-red-700 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md border border-white/60 hover:border-red-200"
+                                >
+                                  <span className="font-medium">{category.name}</span>
+                                  <div className="p-1 rounded-full bg-red-50">
+                                    <ChevronRight className="w-3 h-3 text-red-500" />
                                   </div>
-                                ))}
-                              </div>
-                            )}
+                                </button>
+                              ) : (
+                                <a
+                                  href={`/categoria/${category.id}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsOpen(false);
+                                    window.location.href = `/categoria/${category.id}`;
+                                  }}
+                                  className="block px-4 py-3 text-left bg-white/70 text-gray-700 hover:bg-red-50/80 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/60 hover:border-red-200"
+                                >
+                                  <span className="font-medium">{category.name}</span>
+                                </a>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
 
-                            {/* Lista de Favoritos */}
-                            {expandedMobileCategory === 'favoritos' && (
-                              <div className="ml-3 space-y-2 animate-in slide-in-from-left duration-300 border-l-3 border-red-200/60 pl-4 bg-gradient-to-r from-white/40 to-transparent rounded-r-xl py-3 max-h-60 overflow-y-auto">
-                                {featuredProcedures.length > 0 ? (
-                                  featuredProcedures.map((procedure) => (
-                                    <a
-                                      key={procedure.id}
-                                      href={`/categoria/${procedure.category_id}`}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setIsOpen(false);
-                                        window.location.href = `/categoria/${procedure.category_id}`;
-                                      }}
-                                      className="block px-4 py-3 text-left bg-white/70 text-gray-700 hover:bg-red-50/80 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/60 hover:border-red-200"
-                                    >
-                                      <div className="flex flex-col">
-                                        <span className="font-medium">{procedure.name}</span>
-                                        {procedure.categories && (
-                                          <span className="text-sm text-gray-500">{procedure.categories.name}</span>
-                                        )}
-                                      </div>
-                                    </a>
-                                  ))
-                                ) : (
-                                  <div className="px-4 py-3 text-gray-500 text-center text-sm">
-                                    Nenhum procedimento favorito
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Lista de Subcategorias */}
-                            {categories.map((category) => (
-                              expandedMobileCategory === category.id && category.subcategories && category.subcategories.length > 0 && (
-                                <div key={`subcategories-${category.id}`} className="ml-3 space-y-2 animate-in slide-in-from-left duration-300 border-l-3 border-red-200/60 pl-4 bg-gradient-to-r from-white/40 to-transparent rounded-r-xl py-3">
-                                  {/* Botão Voltar */}
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      e.preventDefault();
-                                      setExpandedMobileCategory('procedimentos');
-                                    }}
-                                    className="flex items-center px-4 py-2 text-sm text-red-600 hover:text-red-700 transition-all duration-300"
-                                  >
-                                    <ChevronRight className="w-4 h-4 mr-2 rotate-180" />
-                                    Voltar para categorias
-                                  </button>
-
-                                  {/* Título da categoria */}
-                                  <div className="px-4 py-2">
-                                    <h3 className="font-semibold text-gray-800">{category.name}</h3>
-                                  </div>
-
-                                  {/* Todos os procedimentos */}
-                                  <a
-                                    href={`/categoria/${category.id}`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setIsOpen(false);
-                                      window.location.href = `/categoria/${category.id}`;
-                                    }}
-                                    className="block px-4 py-2 text-sm bg-white/80 text-gray-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/80 hover:border-red-200 mx-1 font-medium"
-                                  >
-                                    <span className="mr-2">•</span>
-                                    Todos os procedimentos
-                                  </a>
-
-                                  {/* Subcategorias */}
-                                  {category.subcategories.map((subcategory) => (
-                                    <a
-                                      key={subcategory.id}
-                                      href={`/subcategoria/${subcategory.id}`}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setIsOpen(false);
-                                        window.location.href = `/subcategoria/${subcategory.id}`;
-                                      }}
-                                      className="block px-4 py-2 text-sm bg-white/80 text-gray-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/80 hover:border-red-200 mx-1"
-                                    >
-                                      <span className="mr-2">•</span>
-                                      {subcategory.name}
-                                    </a>
-                                  ))}
+                    {/* Dropdown Favoritos */}
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => {
+                          setExpandedMobileCategory(
+                            expandedMobileCategory === 'favoritos' ? null : 'favoritos'
+                          );
+                        }}
+                        className="flex items-center justify-between w-full px-5 py-4 text-left bg-gradient-to-r from-white/80 to-red-50/60 text-gray-800 hover:from-red-50 hover:to-red-100/80 hover:text-red-700 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md border border-red-100/40 hover:border-red-200"
+                      >
+                        <span className="font-semibold text-lg">Favoritos</span>
+                        <div className="p-1 rounded-full bg-red-100/50">
+                          <ChevronDown className={`w-4 h-4 transform transition-all duration-300 text-red-600 ${
+                            expandedMobileCategory === 'favoritos' ? 'rotate-180' : ''
+                          }`} />
+                        </div>
+                      </button>
+                      
+                      {/* Lista de Favoritos */}
+                      {expandedMobileCategory === 'favoritos' && (
+                        <div className="ml-3 space-y-2 animate-in slide-in-from-left duration-300 border-l-3 border-red-200/60 pl-4 bg-gradient-to-r from-white/40 to-transparent rounded-r-xl py-3 max-h-60 overflow-y-auto">
+                          {featuredProcedures.length > 0 ? (
+                            featuredProcedures.map((procedure) => (
+                              <a
+                                key={procedure.id}
+                                href={`/categoria/${procedure.category_id}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIsOpen(false);
+                                  window.location.href = `/categoria/${procedure.category_id}`;
+                                }}
+                                className="block px-4 py-3 text-left bg-white/70 text-gray-700 hover:bg-red-50/80 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/60 hover:border-red-200"
+                              >
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{procedure.name}</span>
+                                  {procedure.categories && (
+                                    <span className="text-sm text-gray-500">{procedure.categories.name}</span>
+                                  )}
                                 </div>
-                              )
-                            ))}
-                          </div>
-                        ) : (
-                          <a
-                            href={item.href}
-                            onClick={() => setIsOpen(false)}
-                            className="block px-5 py-4 bg-gradient-to-r from-white/80 to-red-50/60 text-gray-800 hover:from-red-50 hover:to-red-100/80 hover:text-red-700 rounded-xl transition-all duration-300 font-semibold hover:translate-x-1 shadow-sm hover:shadow-md border border-red-100/40 hover:border-red-200"
+                              </a>
+                            ))
+                          ) : (
+                            <div className="px-4 py-3 text-gray-500 text-center text-sm">
+                              Nenhum procedimento favorito
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Lista de Subcategorias */}
+                    {categories.map((category) => (
+                      expandedMobileCategory === category.id && category.subcategories && category.subcategories.length > 0 && (
+                        <div key={`subcategories-${category.id}`} className="ml-3 space-y-2 animate-in slide-in-from-left duration-300 border-l-3 border-red-200/60 pl-4 bg-gradient-to-r from-white/40 to-transparent rounded-r-xl py-3">
+                          {/* Botão Voltar */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              setExpandedMobileCategory('procedimentos');
+                            }}
+                            className="flex items-center px-4 py-2 text-sm text-red-600 hover:text-red-700 transition-all duration-300"
                           >
-                            {item.name}
+                            <ChevronRight className="w-4 h-4 mr-2 rotate-180" />
+                            Voltar para categorias
+                          </button>
+
+                          {/* Título da categoria */}
+                          <div className="px-4 py-2">
+                            <h3 className="font-semibold text-gray-800">{category.name}</h3>
+                          </div>
+
+                          {/* Todos os procedimentos */}
+                          <a
+                            href={`/categoria/${category.id}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsOpen(false);
+                              window.location.href = `/categoria/${category.id}`;
+                            }}
+                            className="block px-4 py-2 text-sm bg-white/80 text-gray-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/80 hover:border-red-200 mx-1 font-medium"
+                          >
+                            <span className="mr-2">•</span>
+                            Todos os procedimentos
                           </a>
-                        )}
-                      </div>
+
+                          {/* Subcategorias */}
+                          {category.subcategories.map((subcategory) => (
+                            <a
+                              key={subcategory.id}
+                              href={`/subcategoria/${subcategory.id}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsOpen(false);
+                                window.location.href = `/subcategoria/${subcategory.id}`;
+                              }}
+                              className="block px-4 py-2 text-sm bg-white/80 text-gray-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/80 hover:border-red-200 mx-1"
+                            >
+                              <span className="mr-2">•</span>
+                              {subcategory.name}
+                            </a>
+                          ))}
+                        </div>
+                      )
                     ))}
                   </nav>
                 </div>

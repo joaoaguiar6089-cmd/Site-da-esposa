@@ -32,7 +32,6 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
   procedureId,
   bodySelectionType,
   bodyImageUrl,
-  bodyImageUrlMale,
   onSelectionChange,
 }) => {
   const [areaGroups, setAreaGroups] = useState<AreaGroup[]>([]);
@@ -43,22 +42,26 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
   const imageRef = useRef<HTMLImageElement>(null);
 
   const getImageUrl = useCallback(() => {
-    if (bodySelectionType === 'custom' && (selectedGender === 'male' ? bodyImageUrlMale : bodyImageUrl)) {
-      return selectedGender === 'male' ? (bodyImageUrlMale || bodyImageUrl) : (bodyImageUrl || bodyImageUrlMale);
+    if (bodySelectionType === 'custom' && bodyImageUrl) {
+      return bodyImageUrl;
     }
+    
     const defaultImages = {
       'face_male': '/images/face-male-default.png',
       'face_female': '/images/face-female-default.png',
       'body_male': '/images/body-male-default.png',
       'body_female': '/images/body-female-default.png'
-    } as const;
+    };
+
     if (bodySelectionType.includes('male') || bodySelectionType.includes('female')) {
       return defaultImages[bodySelectionType as keyof typeof defaultImages];
     }
+
+    // Para tipos que permitem seleção de gênero
     const genderSuffix = selectedGender === 'male' ? 'male' : 'female';
     const baseType = bodySelectionType.includes('face') ? 'face' : 'body';
     return defaultImages[`${baseType}_${genderSuffix}` as keyof typeof defaultImages];
-  }, [bodySelectionType, bodyImageUrl, bodyImageUrlMale, selectedGender]);
+  }, [bodySelectionType, bodyImageUrl, selectedGender]);
 
   useEffect(() => {
     loadAreaGroups();
@@ -75,7 +78,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
   }, [selectedGroupIds, areaGroups, selectedGender, onSelectionChange]);
 
   const loadAreaGroups = async () => {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('body_area_groups')
       .select('*')
       .eq('procedure_id', procedureId);
@@ -108,9 +111,9 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
       const isHovered = hoveredGroupId === group.id;
       
       // Determinar cores baseado no estado
-      let strokeColor = 'rgba(239, 68, 68, 0.6)';
+      let strokeColor = 'rgba(239, 68, 68, 0.9)'; // Opacidade aumentada
       let fillColor = 'transparent';
-      let lineWidth = 1;
+      let lineWidth = 2; // Espessura da linha aumentada
       
       if (isSelected) {
         strokeColor = '#22c55e';
@@ -118,7 +121,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
         lineWidth = 3;
       } else if (isHovered) {
         strokeColor = '#ef4444';
-        fillColor = 'rgba(239, 68, 68, 0.3)';
+        fillColor = 'rgba(239, 68, 68, 0.5)';
         lineWidth = 2;
       }
 
@@ -148,14 +151,14 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
         // Fundo para o texto
         const textMetrics = ctx.measureText(`${group.name} - R$ ${group.price.toFixed(2)}`);
         const textWidth = textMetrics.width + 10;
-        const textHeight = 20;
+        const textHeight = 22; // Ajustado para a nova fonte
         
         ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
         ctx.fillRect(x, y - textHeight - 5, textWidth, textHeight);
         
         // Texto
         ctx.fillStyle = '#fff';
-        ctx.font = '14px Arial';
+        ctx.font = '16px Arial'; // Fonte maior
         ctx.fillText(`${group.name} - R$ ${group.price.toFixed(2)}`, x + 5, y - 10);
       }
       
@@ -257,32 +260,8 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
           </div>
         )}
 
-        <div className="flex gap-6">
-          <div className="flex-1">
-            <img
-              ref={imageRef}
-              src={getImageUrl()}
-              alt="Seleção de procedimentos"
-              className="hidden"
-              onLoad={handleImageLoad}
-              crossOrigin="anonymous"
-            />
-            <canvas
-              ref={canvasRef}
-              className="max-w-full max-h-96 border border-border cursor-pointer"
-              onClick={handleCanvasClick}
-              onMouseMove={handleCanvasMouseMove}
-              onMouseLeave={() => setHoveredGroupId(null)}
-            />
-            <div className="mt-2 text-sm text-muted-foreground space-y-1">
-              <p>• <strong>Áreas em vermelho:</strong> Disponíveis para seleção</p>
-              <p>• <strong>Áreas em verde:</strong> Selecionadas</p>
-              <p>• <strong>Passe o mouse:</strong> Para ver detalhes do procedimento</p>
-              <p>• <strong>Clique:</strong> Para selecionar/desselecionar</p>
-            </div>
-          </div>
-
-          <div className="w-80">
+        <div className="flex flex-col md:flex-row md:gap-6">
+          <div className="w-full md:w-80 order-1 md:order-2 mb-4 md:mb-0">
             <div className="space-y-4">
               <div>
                 <h4 className="font-medium mb-2">Procedimentos Disponíveis</h4>
@@ -343,6 +322,28 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+          <div className="flex-1 order-2 md:order-1">
+            <img
+              ref={imageRef}
+              src={getImageUrl()}
+              alt="Seleção de procedimentos"
+              className="hidden"
+              onLoad={handleImageLoad}
+              crossOrigin="anonymous"
+            />
+            <canvas
+              ref={canvasRef}
+              className="max-w-full max-h-96 border border-border cursor-pointer w-full"
+              onClick={handleCanvasClick}
+              onMouseMove={handleCanvasMouseMove}
+              onMouseLeave={() => setHoveredGroupId(null)}
+            />
+            <div className="mt-2 text-sm text-muted-foreground space-y-1">
+              <p>• Clique nas áreas numeradas para selecioná-las</p>
+              <p>• Passe o mouse sobre as áreas para ver detalhes</p>
+              <p>• Áreas em verde estão selecionadas</p>
             </div>
           </div>
         </div>

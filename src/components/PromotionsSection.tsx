@@ -13,6 +13,7 @@ interface Promotion {
   image_url: string;
   display_order: number;
   procedure_id?: string;
+  is_procedure?: boolean;
 }
 
 export default function PromotionsSection() {
@@ -23,7 +24,7 @@ export default function PromotionsSection() {
     try {
       const { data, error } = await supabase
         .from("promotions")
-        .select("id, title, description, image_url, display_order, procedure_id")
+        .select("id, title, description, image_url, display_order, procedure_id, is_procedure")
         .eq("is_active", true)
         .order("display_order", { ascending: true })
         .limit(4);
@@ -31,7 +32,7 @@ export default function PromotionsSection() {
       if (error) throw error;
       setPromotions(data || []);
     } catch (error) {
-      console.error("Erro ao buscar promoções:", error);
+      console.error("Erro ao buscar posts:", error);
     } finally {
       setLoading(false);
     }
@@ -56,13 +57,10 @@ export default function PromotionsSection() {
         <div className="text-center mb-16 animate-fade-in">
           <div className="inline-block">
             <h2 className="text-5xl font-bold tracking-tight mb-6 bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
-              Promoções Especiais
+              Feed da Clínica
             </h2>
             <div className="w-24 h-1 bg-gradient-to-r from-primary to-primary/60 rounded-full mx-auto mb-6"></div>
           </div>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-            Aproveite nossas ofertas exclusivas e cuide da sua beleza com preços especiais
-          </p>
         </div>
 
         <div className="max-w-7xl mx-auto">
@@ -101,9 +99,11 @@ export default function PromotionsSection() {
                           
                           <div className="relative z-10 space-y-6">
                             <div className="space-y-4">
-                              <div className="inline-block px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-semibold tracking-wide uppercase">
-                                Oferta Especial
-                              </div>
+                              {promotion.is_procedure && (
+                                <div className="inline-block px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-semibold tracking-wide uppercase">
+                                  Oferta Especial
+                                </div>
+                              )}
                               <h3 className="text-4xl lg:text-5xl font-bold text-foreground leading-tight">
                                 {promotion.title}
                               </h3>
@@ -120,24 +120,26 @@ export default function PromotionsSection() {
                               </p>
                             </div>
 
-                            <div className="pt-6">
-                              <Button 
-                                size="lg" 
-                                className="group/btn relative text-lg px-10 py-7 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary border-0"
-                                onClick={() => {
-                                  const url = promotion.procedure_id 
-                                    ? `/agendamento?procedimento=${promotion.procedure_id}`
-                                    : '/agendamento';
-                                  window.location.href = url;
-                                }}
-                              >
-                                <span className="relative z-10 font-semibold tracking-wide">
-                                  Agendar Agora
-                                </span>
-                                <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover/btn:opacity-100 transition-opacity duration-500"></div>
-                                <div className="absolute -top-2 -right-2 w-4 h-4 bg-white/30 rounded-full blur-sm opacity-0 group-hover/btn:opacity-100 transition-opacity duration-500"></div>
-                              </Button>
-                            </div>
+                            {promotion.is_procedure && (
+                              <div className="pt-6">
+                                <Button 
+                                  size="lg" 
+                                  className="group/btn relative text-lg px-10 py-7 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary border-0"
+                                  onClick={() => {
+                                    const url = promotion.procedure_id 
+                                      ? `/agendamento?procedimento=${promotion.procedure_id}`
+                                      : '/agendamento';
+                                    window.location.href = url;
+                                  }}
+                                >
+                                  <span className="relative z-10 font-semibold tracking-wide">
+                                    Agendar Agora
+                                  </span>
+                                  <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover/btn:opacity-100 transition-opacity duration-500"></div>
+                                  <div className="absolute -top-2 -right-2 w-4 h-4 bg-white/30 rounded-full blur-sm opacity-0 group-hover/btn:opacity-100 transition-opacity duration-500"></div>
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>

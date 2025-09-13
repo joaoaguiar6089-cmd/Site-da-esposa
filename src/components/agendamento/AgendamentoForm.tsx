@@ -667,7 +667,13 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         description: editingId ? "Seu agendamento foi atualizado com sucesso." : "Seu agendamento foi criado com sucesso. Uma confirmação será enviada via WhatsApp.",
       });
 
-      onAppointmentCreated();
+      console.log('Agendamento criado com sucesso, chamando onAppointmentCreated...');
+      
+      // Garantir que o callback seja executado após um pequeno delay para permitir que o toast apareça
+      setTimeout(() => {
+        console.log('Executando onAppointmentCreated...');
+        onAppointmentCreated();
+      }, 100);
     } catch (error) {
       console.error('Erro ao criar agendamento:', error);
       toast({

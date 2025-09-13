@@ -16,11 +16,22 @@ interface Subcategory {
   category_id: string;
 }
 
+interface FeaturedProcedure {
+  id: string;
+  name: string;
+  category_id?: string;
+  categories?: {
+    name: string;
+  };
+}
+
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [featuredProcedures, setFeaturedProcedures] = useState<FeaturedProcedure[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [showProcedimentos, setShowProcedimentos] = useState(false);
+  const [showFavoritos, setShowFavoritos] = useState(false);
   const [expandedMobileCategory, setExpandedMobileCategory] = useState<string | null>(null);
   
   // Detectar se estamos na página inicial
@@ -32,6 +43,7 @@ const Header = () => {
 
   useEffect(() => {
     loadCategoriesWithSubcategories();
+    loadFeaturedProcedures();
   }, []);
 
   // Limpar timeouts ao desmontar o componente
@@ -73,6 +85,28 @@ const Header = () => {
     }
   };
 
+  const loadFeaturedProcedures = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('procedures')
+        .select(`
+          id,
+          name,
+          category_id,
+          categories:category_id (
+            name
+          )
+        `)
+        .eq('is_featured', true)
+        .order('name');
+
+      if (error) throw error;
+      setFeaturedProcedures(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar procedimentos favoritos:', error);
+    }
+  };
+
   const handleWhatsApp = () => {
     window.open('https://wa.me/5597984387295', '_blank');
   };
@@ -83,13 +117,28 @@ const Header = () => {
       clearTimeout(dropdownTimeoutRef.current);
     }
     setShowProcedimentos(true);
+    setShowFavoritos(false);
   };
 
   const handleDropdownMouseLeave = () => {
     dropdownTimeoutRef.current = setTimeout(() => {
       setShowProcedimentos(false);
       setActiveCategory(null);
-    }, 200); // 200ms é um bom ponto de partida, mas pode ajustar.
+    }, 200);
+  };
+
+  const handleFavoritosMouseEnter = () => {
+    if (dropdownTimeoutRef.current) {
+      clearTimeout(dropdownTimeoutRef.current);
+    }
+    setShowFavoritos(true);
+    setShowProcedimentos(false);
+  };
+
+  const handleFavoritosMouseLeave = () => {
+    dropdownTimeoutRef.current = setTimeout(() => {
+      setShowFavoritos(false);
+    }, 200);
   };
 
   const handleSubmenuMouseEnter = (categoryId: string) => {
@@ -103,7 +152,8 @@ const Header = () => {
   };
 
   const navItems = [
-    { name: "Procedimentos", href: "#", hasDropdown: true }
+    { name: "Procedimentos", href: "#", hasDropdown: true },
+    { name: "Favoritos", href: "#", hasDropdown: true, isFavoritos: true }
   ];
 
   return (
@@ -127,7 +177,7 @@ const Header = () => {
 
           {/* Desktop Navigation - Canto Direito */}
           <div className="hidden lg:flex items-center space-x-6">
-            {/* Contêiner Unificado para Dropdown Desktop */}
+            {/* Contêiner para Dropdown Procedimentos Desktop */}
             <div
               className="relative"
               onMouseEnter={handleDropdownMouseEnter}
@@ -188,6 +238,47 @@ const Header = () => {
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+
+            {/* Contêiner para Dropdown Favoritos Desktop */}
+            <div
+              className="relative"
+              onMouseEnter={handleFavoritosMouseEnter}
+              onMouseLeave={handleFavoritosMouseLeave}
+            >
+              <button className={`flex items-center space-x-1 font-medium transition-all duration-300 py-2 px-3 backdrop-blur-sm hover:backdrop-blur-md rounded-lg ${isHomePage ? 'text-white hover:text-red-300 hover:bg-white/10' : 'text-gray-700 hover:text-red-600 hover:bg-red-50'}`}>
+                <span className="drop-shadow-md">Favoritos</span>
+                <ChevronDown className="w-4 h-4 drop-shadow-md" />
+              </button>
+              
+              {/* Dropdown Menu Favoritos */}
+              {showFavoritos && (
+                <div
+                  className="absolute top-full right-0 w-80 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 py-4 mt-2"
+                >
+                  {featuredProcedures.length > 0 ? (
+                    featuredProcedures.map((procedure) => (
+                      <a
+                        key={procedure.id}
+                        href={`/agendamento?procedure=${procedure.id}`}
+                        className="flex items-center justify-between px-6 py-3 text-gray-700 hover:bg-red-50/80 hover:text-red-600 transition-all duration-300 group"
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">{procedure.name}</span>
+                          {procedure.categories && (
+                            <span className="text-sm text-gray-500">{procedure.categories.name}</span>
+                          )}
+                        </div>
+                        <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
+                      </a>
+                    ))
+                  ) : (
+                    <div className="px-6 py-4 text-gray-500 text-center">
+                      Nenhum procedimento favorito encontrado
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -261,8 +352,9 @@ const Header = () => {
                           <div className="space-y-2">
                             <button
                               onClick={() => {
+                                const categoryKey = item.isFavoritos ? 'favoritos' : 'procedimentos';
                                 setExpandedMobileCategory(
-                                  expandedMobileCategory === 'procedimentos' ? null : 'procedimentos'
+                                  expandedMobileCategory === categoryKey ? null : categoryKey
                                 );
                               }}
                               className="flex items-center justify-between w-full px-5 py-4 text-left bg-gradient-to-r from-white/80 to-red-50/60 text-gray-800 hover:from-red-50 hover:to-red-100/80 hover:text-red-700 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md border border-red-100/40 hover:border-red-200"
@@ -270,7 +362,7 @@ const Header = () => {
                               <span className="font-semibold text-lg">{item.name}</span>
                               <div className="p-1 rounded-full bg-red-100/50">
                                 <ChevronDown className={`w-4 h-4 transform transition-all duration-300 text-red-600 ${
-                                  expandedMobileCategory === 'procedimentos' ? 'rotate-180' : ''
+                                  expandedMobileCategory === (item.isFavoritos ? 'favoritos' : 'procedimentos') ? 'rotate-180' : ''
                                 }`} />
                               </div>
                             </button>
@@ -309,6 +401,37 @@ const Header = () => {
                                     )}
                                   </div>
                                 ))}
+                              </div>
+                            )}
+
+                            {/* Lista de Favoritos */}
+                            {expandedMobileCategory === 'favoritos' && (
+                              <div className="ml-3 space-y-2 animate-in slide-in-from-left duration-300 border-l-3 border-red-200/60 pl-4 bg-gradient-to-r from-white/40 to-transparent rounded-r-xl py-3">
+                                {featuredProcedures.length > 0 ? (
+                                  featuredProcedures.map((procedure) => (
+                                    <a
+                                      key={procedure.id}
+                                      href={`/agendamento?procedure=${procedure.id}`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsOpen(false);
+                                        window.location.href = `/agendamento?procedure=${procedure.id}`;
+                                      }}
+                                      className="block px-4 py-3 text-left bg-white/70 text-gray-700 hover:bg-red-50/80 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/60 hover:border-red-200"
+                                    >
+                                      <div className="flex flex-col">
+                                        <span className="font-medium">{procedure.name}</span>
+                                        {procedure.categories && (
+                                          <span className="text-sm text-gray-500">{procedure.categories.name}</span>
+                                        )}
+                                      </div>
+                                    </a>
+                                  ))
+                                ) : (
+                                  <div className="px-4 py-3 text-gray-500 text-center text-sm">
+                                    Nenhum procedimento favorito
+                                  </div>
+                                )}
                               </div>
                             )}
 

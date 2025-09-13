@@ -422,22 +422,6 @@ const ProceduresManagement = () => {
 
   const toggleFeatured = async (procedureId: string, currentStatus: boolean) => {
     try {
-      // Check if we're trying to feature and already have 4 featured procedures
-      if (!currentStatus) {
-        const { count } = await supabase
-          .from('procedures')
-          .select('*', { count: 'exact', head: true })
-          .eq('is_featured', true);
-
-        if (count && count >= 4) {
-          toast({
-            title: "Limite atingido",
-            description: "Você pode ter no máximo 4 procedimentos em destaque.",
-            variant: "destructive",
-          });
-          return;
-        }
-      }
 
       const { error } = await supabase
         .from('procedures')

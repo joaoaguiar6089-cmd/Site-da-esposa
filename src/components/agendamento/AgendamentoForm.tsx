@@ -42,18 +42,19 @@ interface Procedure {
   subcategory_id?: string;
 }
 
-interface BodyArea {
+interface AreaGroup {
   id: string;
   name: string;
   price: number;
-  coordinates: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
+  shapes: AreaShape[];
 }
 
+interface AreaShape {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 interface AgendamentoFormProps {
   client: Client;
@@ -78,7 +79,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
     appointment_time: "",
     notes: "",
   });
-  const [selectedBodyAreas, setSelectedBodyAreas] = useState<BodyArea[]>([]);
+  const [selectedBodyAreas, setSelectedBodyAreas] = useState<AreaGroup[]>([]);
   const [selectedGender, setSelectedGender] = useState<'male' | 'female'>('female');
   const [totalBodyAreasPrice, setTotalBodyAreasPrice] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -155,7 +156,10 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         .select(`
           *,
           procedures!appointments_procedure_id_fkey(name, duration, price, requires_body_selection, body_selection_type),
-          appointment_body_selections(*)
+          appointment_selected_areas(
+            area_group_id,
+            body_area_groups(id, name, price, shapes, gender)
+          )
         `)
         .eq('id', appointmentId)
         .single();
@@ -171,15 +175,21 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
       });
 
       // Carregar seleções de áreas corporais se existirem
-      if (data.appointment_body_selections) {
-        const bodyAreas: BodyArea[] = data.appointment_body_selections.map((selection: any) => ({
-          id: selection.body_area_id,
-          name: selection.area_name,
-          price: selection.area_price,
-          coordinates: { x: 0, y: 0, width: 0, height: 0 } // Coordenadas não são necessárias aqui
+      if (data.appointment_selected_areas && data.appointment_selected_areas.length > 0) {
+        const bodyAreas: AreaGroup[] = data.appointment_selected_areas.map((selection: any) => ({
+          id: selection.body_area_groups.id,
+          name: selection.body_area_groups.name,
+          price: selection.body_area_groups.price,
+          shapes: selection.body_area_groups.shapes
         }));
         setSelectedBodyAreas(bodyAreas);
         setTotalBodyAreasPrice(data.total_body_areas_price || 0);
+        
+        // Definir o gênero selecionado baseado na primeira seleção
+        const gender = data.appointment_selected_areas[0]?.body_area_groups?.gender;
+        if (gender === 'male' || gender === 'female') {
+          setSelectedGender(gender as "male" | "female");
+        }
       }
 
       if (data.selected_gender) {
@@ -513,21 +523,19 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         // Deletar seleções anteriores se estiver editando
         if (editingId) {
           await supabase
-            .from('appointment_body_selections')
+            .from('appointment_selected_areas')
             .delete()
             .eq('appointment_id', appointmentId);
         }
 
-        // Inserir novas seleções
+        // Inserir novas seleções usando a tabela correta
         const bodySelections = selectedBodyAreas.map(area => ({
           appointment_id: appointmentId,
-          body_area_id: area.id,
-          area_name: area.name,
-          area_price: area.price
+          area_group_id: area.id
         }));
 
         const { error: selectionsError } = await supabase
-          .from('appointment_body_selections')
+          .from('appointment_selected_areas')
           .insert(bodySelections);
 
         if (selectionsError) throw selectionsError;
@@ -1042,13 +1050,7 @@ Para reagendar, entre em contato conosco.`;
                 bodyImageUrl={selectedProcedure.body_image_url}
                 bodyImageUrlMale={selectedProcedure.body_image_url_male}
                 onSelectionChange={(areas, totalPrice, gender) => {
-                  const mapped = areas.map((g) => ({
-                    id: g.id,
-                    name: g.name,
-                    price: g.price,
-                    coordinates: { x: 0, y: 0, width: 0, height: 0 },
-                  }));
-                  setSelectedBodyAreas(mapped);
+                  setSelectedBodyAreas(areas);
                   setTotalBodyAreasPrice(totalPrice);
                   setSelectedGender(gender);
                 }}

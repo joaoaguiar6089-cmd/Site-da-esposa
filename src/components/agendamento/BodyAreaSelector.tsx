@@ -77,7 +77,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
   }, [selectedGroupIds, areaGroups, selectedGender, onSelectionChange]);
 
   const loadAreaGroups = async () => {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('body_area_groups')
       .select('*')
       .eq('procedure_id', procedureId);
@@ -87,7 +87,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
       return;
     }
 
-    const mappedGroups = (data || []).map((group: any) => ({
+    const mappedGroups = (data || []).map(group => ({
       id: group.id,
       name: group.name,
       price: group.price,
@@ -133,9 +133,8 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
         ctx.fillStyle = fillColor;
         ctx.lineWidth = lineWidth;
         
-        if (fillColor !== 'transparent') {
-          ctx.fillRect(x, y, width, height);
-        }
+        // Sempre preenche a área (removido a condição de transparente)
+        ctx.fillRect(x, y, width, height);
         ctx.strokeRect(x, y, width, height);
       });
 

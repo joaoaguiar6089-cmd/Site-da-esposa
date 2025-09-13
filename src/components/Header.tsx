@@ -262,7 +262,7 @@ const Header = () => {
                     featuredProcedures.map((procedure) => (
                       <a
                         key={procedure.id}
-                        href={`/agendamento?procedure=${procedure.id}`}
+                        href={`/categoria/${procedure.category_id}`}
                         className="flex items-center justify-between px-6 py-3 text-gray-700 hover:bg-red-50/80 hover:text-red-600 transition-all duration-300 group"
                       >
                         <div className="flex flex-col">
@@ -406,16 +406,16 @@ const Header = () => {
 
                             {/* Lista de Favoritos */}
                             {expandedMobileCategory === 'favoritos' && (
-                              <div className="ml-3 space-y-2 animate-in slide-in-from-left duration-300 border-l-3 border-red-200/60 pl-4 bg-gradient-to-r from-white/40 to-transparent rounded-r-xl py-3">
+                              <div className="ml-3 space-y-2 animate-in slide-in-from-left duration-300 border-l-3 border-red-200/60 pl-4 bg-gradient-to-r from-white/40 to-transparent rounded-r-xl py-3 max-h-60 overflow-y-auto">
                                 {featuredProcedures.length > 0 ? (
                                   featuredProcedures.map((procedure) => (
                                     <a
                                       key={procedure.id}
-                                      href={`/agendamento?procedure=${procedure.id}`}
+                                      href={`/categoria/${procedure.category_id}`}
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setIsOpen(false);
-                                        window.location.href = `/agendamento?procedure=${procedure.id}`;
+                                        window.location.href = `/categoria/${procedure.category_id}`;
                                       }}
                                       className="block px-4 py-3 text-left bg-white/70 text-gray-700 hover:bg-red-50/80 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/60 hover:border-red-200"
                                     >

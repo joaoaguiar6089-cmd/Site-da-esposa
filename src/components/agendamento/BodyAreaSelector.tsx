@@ -57,7 +57,6 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
       return defaultImages[bodySelectionType as keyof typeof defaultImages];
     }
 
-    // Para tipos que permitem seleção de gênero
     const genderSuffix = selectedGender === 'male' ? 'male' : 'female';
     const baseType = bodySelectionType.includes('face') ? 'face' : 'body';
     return defaultImages[`${baseType}_${genderSuffix}` as keyof typeof defaultImages];
@@ -88,8 +87,6 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
       return;
     }
 
-    // O TS agora vai entender que 'data' tem o formato da sua tabela,
-    // com as propriedades 'name', 'price' e 'shapes'
     const mappedGroups = (data || []).map(group => ({
       id: group.id,
       name: group.name,
@@ -335,11 +332,6 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
               onMouseMove={handleCanvasMouseMove}
               onMouseLeave={() => setHoveredGroupId(null)}
             />
-            <div className="mt-2 text-sm text-muted-foreground space-y-1">
-              <p>• Clique nas áreas numeradas para selecioná-las</p>
-              <p>• Passe o mouse sobre as áreas para ver detalhes</p>
-              <p>• Áreas em verde estão selecionadas</p>
-            </div>
           </div>
         </div>
       </div>

@@ -119,7 +119,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
         lineWidth = 3;
       } else if (isHovered) {
         strokeColor = '#ef4444';
-        fillColor = 'rgba(239, 68, 68, 0.5)';
+        fillColor = 'rgba(239, 68, 68, 0.4)'; // Aumentada de 0.5 para 0.4 para ficar igual ao verde
         lineWidth = 2;
       }
 
@@ -316,22 +316,30 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
               )}
             </div>
           </div>
-          <div className="flex-1 order-2 md:order-1">
-            <img
-              ref={imageRef}
-              src={getImageUrl()}
-              alt="Seleção de procedimentos"
-              className="hidden"
-              onLoad={handleImageLoad}
-              crossOrigin="anonymous"
-            />
-            <canvas
-              ref={canvasRef}
-              className="max-w-full max-h-96 border border-border cursor-pointer w-full"
-              onClick={handleCanvasClick}
-              onMouseMove={handleCanvasMouseMove}
-              onMouseLeave={() => setHoveredGroupId(null)}
-            />
+          <div className="flex-1 order-2 md:order-1 flex justify-center items-start">
+            <div className="relative inline-block">
+              <img
+                ref={imageRef}
+                src={getImageUrl()}
+                alt="Seleção de procedimentos"
+                className="hidden"
+                onLoad={handleImageLoad}
+                crossOrigin="anonymous"
+              />
+              <canvas
+                ref={canvasRef}
+                className="max-w-full max-h-96 border border-border cursor-pointer object-contain"
+                style={{ 
+                  width: 'auto', 
+                  height: 'auto',
+                  maxWidth: '100%',
+                  maxHeight: '24rem'
+                }}
+                onClick={handleCanvasClick}
+                onMouseMove={handleCanvasMouseMove}
+                onMouseLeave={() => setHoveredGroupId(null)}
+              />
+            </div>
           </div>
         </div>
       </div>

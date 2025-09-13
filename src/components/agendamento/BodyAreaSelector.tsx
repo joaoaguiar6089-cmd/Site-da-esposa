@@ -88,7 +88,9 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
       return;
     }
 
-    const mappedGroups: AreaGroup[] = (data || []).map(group => ({
+    // O TS agora vai entender que 'data' tem o formato da sua tabela,
+    // com as propriedades 'name', 'price' e 'shapes'
+    const mappedGroups = (data || []).map(group => ({
       id: group.id,
       name: group.name,
       price: group.price,
@@ -110,10 +112,9 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
       const isSelected = selectedGroupIds.includes(group.id);
       const isHovered = hoveredGroupId === group.id;
       
-      // Determinar cores baseado no estado
-      let strokeColor = 'rgba(239, 68, 68, 0.9)'; // Opacidade aumentada
+      let strokeColor = 'rgba(239, 68, 68, 0.9)';
       let fillColor = 'transparent';
-      let lineWidth = 2; // Espessura da linha aumentada
+      let lineWidth = 2;
       
       if (isSelected) {
         strokeColor = '#22c55e';
@@ -125,7 +126,6 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
         lineWidth = 2;
       }
 
-      // Desenhar todas as formas do grupo
       group.shapes.forEach((shape) => {
         const x = (shape.x / 100) * canvas.width;
         const y = (shape.y / 100) * canvas.height;
@@ -142,33 +142,28 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
         ctx.strokeRect(x, y, width, height);
       });
 
-      // Mostrar label apenas quando hover e apenas uma vez por grupo
       if (isHovered && group.shapes.length > 0) {
         const firstShape = group.shapes[0];
         const x = (firstShape.x / 100) * canvas.width;
         const y = (firstShape.y / 100) * canvas.height;
         
-        // Fundo para o texto
         const textMetrics = ctx.measureText(`${group.name} - R$ ${group.price.toFixed(2)}`);
         const textWidth = textMetrics.width + 10;
-        const textHeight = 22; // Ajustado para a nova fonte
+        const textHeight = 22;
         
         ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
         ctx.fillRect(x, y - textHeight - 5, textWidth, textHeight);
         
-        // Texto
         ctx.fillStyle = '#fff';
-        ctx.font = '16px Arial'; // Fonte maior
+        ctx.font = '16px Arial';
         ctx.fillText(`${group.name} - R$ ${group.price.toFixed(2)}`, x + 5, y - 10);
       }
       
-      // Label numerado sempre visível nas áreas disponíveis
       if (!isSelected && !isHovered && group.shapes.length > 0) {
         const firstShape = group.shapes[0];
         const x = (firstShape.x / 100) * canvas.width;
         const y = (firstShape.y / 100) * canvas.height;
         
-        // Círculo numerado pequeno
         ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
         ctx.beginPath();
         ctx.arc(x + 15, y + 15, 12, 0, 2 * Math.PI);
@@ -178,7 +173,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
         ctx.font = 'bold 10px Arial';
         ctx.textAlign = 'center';
         ctx.fillText((groupIndex + 1).toString(), x + 15, y + 19);
-        ctx.textAlign = 'left'; // Reset text align
+        ctx.textAlign = 'left';
       }
     });
   }, [areaGroups, selectedGroupIds, hoveredGroupId]);

@@ -1205,8 +1205,18 @@ const ProceduresManagement = () => {
       {editingProcedure && (
         <BodyAreasManager
           procedureId={editingProcedure.id}
-          imageUrl={formData.body_selection_type === 'custom' ? (formData.body_image_url || '') : getDefaultBodyImage(formData.body_selection_type)}
-          imageUrlMale={formData.body_selection_type === 'custom' ? (formData.body_image_url_male || '') : getDefaultBodyImage(formData.body_selection_type?.includes('female') ? formData.body_selection_type.replace('female', 'male') : formData.body_selection_type)}
+          imageUrl={formData.body_selection_type === 'custom' 
+            ? (formData.body_image_url || '') 
+            : getDefaultBodyImage(formData.body_selection_type)}
+          imageUrlMale={formData.body_selection_type === 'custom' 
+            ? (formData.body_image_url_male || '') 
+            : (formData.body_selection_type?.includes('female') 
+                ? getDefaultBodyImage(formData.body_selection_type.replace('female', 'male'))
+                : formData.body_selection_type?.includes('body')
+                  ? getDefaultBodyImage('body_male')
+                  : formData.body_selection_type?.includes('face')
+                    ? getDefaultBodyImage('face_male')
+                    : getDefaultBodyImage('body_male'))}
           bodySelectionType={formData.body_selection_type}
           open={bodyAreasManagerOpen}
           onClose={() => setBodyAreasManagerOpen(false)}

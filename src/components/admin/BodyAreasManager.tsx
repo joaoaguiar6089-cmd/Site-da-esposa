@@ -59,10 +59,12 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
   }, [open, procedureId, currentGender]);
 
   const getCurrentImageUrl = useCallback(() => {
+    // Se for tipo customizado, usar as imagens fornecidas
     if (bodySelectionType === 'custom') {
       return currentGender === 'male' && imageUrlMale ? imageUrlMale : imageUrl;
     }
 
+    // Mapas de imagens padrão
     const defaultImages = {
       'face_male': '/images/face-male-default.png',
       'face_female': '/images/face-female-default.png',
@@ -70,16 +72,22 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
       'body_female': '/images/body-female-default.png'
     } as const;
 
-    if (bodySelectionType && (bodySelectionType.includes('male') || bodySelectionType.includes('female'))) {
-      return defaultImages[bodySelectionType as keyof typeof defaultImages] || imageUrl || '';
+    // Se o tipo já especifica gênero, usar diretamente
+    if (bodySelectionType && bodySelectionType.includes('_')) {
+      const imageKey = bodySelectionType as keyof typeof defaultImages;
+      return defaultImages[imageKey] || imageUrl || '';
     }
 
-    // Para tipos de seleção que suportam ambos os gêneros, usar o gênero atual
-    const genderSuffix = currentGender === 'male' ? '_male' : '_female';
-    const baseType = bodySelectionType?.replace('_male', '').replace('_female', '') || 'face';
-    const fullType = `${baseType}${genderSuffix}` as keyof typeof defaultImages;
+    // Para tipos genéricos (body, face), construir baseado no gênero selecionado
+    if (bodySelectionType) {
+      const baseType = bodySelectionType.includes('body') ? 'body' : 'face';
+      const genderSuffix = currentGender;
+      const imageKey = `${baseType}_${genderSuffix}` as keyof typeof defaultImages;
+      return defaultImages[imageKey] || imageUrl || '';
+    }
     
-    return defaultImages[fullType] || imageUrl || '';
+    // Fallback para imagem padrão baseada no gênero
+    return defaultImages[`body_${currentGender}`] || imageUrl || '';
   }, [bodySelectionType, imageUrl, imageUrlMale, currentGender]);
 
   const loadAreaGroups = async () => {
@@ -382,8 +390,10 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
         </DialogHeader>
         
         {/* Seletor de Gênero */}
-        {(bodySelectionType === 'custom' && imageUrlMale) || 
-         (!bodySelectionType || (!bodySelectionType.includes('_male') && !bodySelectionType.includes('_female'))) && (
+        {/* Sempre mostrar seletor de gênero quando não for um tipo específico de gênero fixo */}
+        {!bodySelectionType || 
+         (!bodySelectionType.includes('_male') && !bodySelectionType.includes('_female')) ||
+         bodySelectionType === 'custom' ? (
           <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
             <span className="text-sm font-medium">Configurar áreas para:</span>
             <div className="flex gap-2">
@@ -403,7 +413,7 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
               </Button>
             </div>
           </div>
-        )}
+        ) : null}
         
         <div className="flex gap-6 h-[70vh]">
           <div className="flex-1" ref={containerRef}>

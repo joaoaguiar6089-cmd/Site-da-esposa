@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -384,7 +385,7 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Configurar Áreas do Procedimento</DialogTitle>
         </DialogHeader>
@@ -415,8 +416,8 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
           </div>
         ) : null}
         
-        <div className="flex gap-6 h-[70vh]">
-          <div className="flex-1" ref={containerRef}>
+        <ScrollArea className="flex gap-6 min-h-[70vh] max-h-[75vh] pr-4">
+          <div className="flex-1 overflow-y-auto max-h-[60vh]" ref={containerRef}>
             <div className="mb-4">
               <p className="text-sm text-muted-foreground">
                 Clique e arraste para criar áreas. Você pode criar várias formas para um mesmo grupo de procedimento.
@@ -434,7 +435,7 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
             />
             <canvas
               ref={canvasRef}
-              className="max-w-full max-h-full border border-border cursor-crosshair"
+              className="max-w-full border border-border cursor-crosshair block"
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
@@ -446,7 +447,7 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
             />
           </div>
 
-          <div className="w-80 space-y-4 overflow-y-auto">
+          <div className="w-80 space-y-4 overflow-y-auto max-h-[60vh]">
             {/* Formulário para o grupo atual */}
             {currentShapes.length > 0 && (
               <div className="border border-green-200 bg-green-50 p-4 rounded-lg">
@@ -588,7 +589,7 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
               </Button>
             </div>
           </div>
-        </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );

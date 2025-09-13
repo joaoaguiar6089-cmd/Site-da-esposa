@@ -927,6 +927,10 @@ export type Database = {
         Args: { user_id: string }
         Returns: boolean
       }
+      cleanup_old_appointments: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       columns_match_current_user: {
         Args: Record<PropertyKey, never>
         Returns: boolean

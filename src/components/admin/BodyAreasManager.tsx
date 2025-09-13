@@ -46,6 +46,7 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [dragShapeIndex, setDragShapeIndex] = useState<number | null>(null);
+  const [currentGender, setCurrentGender] = useState<'female' | 'male'>('female');
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -55,11 +56,11 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
     if (open && procedureId) {
       loadAreaGroups();
     }
-  }, [open, procedureId]);
+  }, [open, procedureId, currentGender]);
 
   const getCurrentImageUrl = useCallback(() => {
-    if (bodySelectionType === 'custom' && imageUrl) {
-      return imageUrl;
+    if (bodySelectionType === 'custom') {
+      return currentGender === 'male' && imageUrlMale ? imageUrlMale : imageUrl;
     }
 
     const defaultImages = {
@@ -73,14 +74,20 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
       return defaultImages[bodySelectionType as keyof typeof defaultImages] || imageUrl || '';
     }
 
-    return imageUrl || '';
-  }, [bodySelectionType, imageUrl, imageUrlMale]);
+    // Para tipos de seleção que suportam ambos os gêneros, usar o gênero atual
+    const genderSuffix = currentGender === 'male' ? '_male' : '_female';
+    const baseType = bodySelectionType?.replace('_male', '').replace('_female', '') || 'face';
+    const fullType = `${baseType}${genderSuffix}` as keyof typeof defaultImages;
+    
+    return defaultImages[fullType] || imageUrl || '';
+  }, [bodySelectionType, imageUrl, imageUrlMale, currentGender]);
 
   const loadAreaGroups = async () => {
     const { data, error } = await (supabase as any)
       .from('body_area_groups' as any)
       .select('*')
-      .eq('procedure_id', procedureId);
+      .eq('procedure_id', procedureId)
+      .eq('gender', currentGender);
 
     if (error) {
       console.error('Erro ao carregar grupos de áreas:', error);
@@ -312,11 +319,12 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
 
   const saveAreaGroups = async () => {
     try {
-      // Deletar grupos existentes
+      // Deletar grupos existentes para o gênero atual
       await supabase
         .from('body_area_groups' as any)
         .delete()
-        .eq('procedure_id', procedureId);
+        .eq('procedure_id', procedureId)
+        .eq('gender', currentGender);
 
       // Inserir novos grupos
       if (areaGroups.length > 0) {
@@ -327,14 +335,15 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
               procedure_id: procedureId,
               name: group.name,
               price: group.price,
-              shapes: group.shapes
+              shapes: group.shapes,
+              gender: currentGender
             }))
           );
 
         if (error) throw error;
       }
 
-      toast.success('Grupos de áreas salvos com sucesso!');
+      toast.success(`Grupos de áreas (${currentGender === 'male' ? 'Masculino' : 'Feminino'}) salvos com sucesso!`);
       onClose();
     } catch (error) {
       console.error('Erro ao salvar grupos:', error);
@@ -371,6 +380,30 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
         <DialogHeader>
           <DialogTitle>Configurar Áreas do Procedimento</DialogTitle>
         </DialogHeader>
+        
+        {/* Seletor de Gênero */}
+        {(bodySelectionType === 'custom' && imageUrlMale) || 
+         (!bodySelectionType || (!bodySelectionType.includes('_male') && !bodySelectionType.includes('_female'))) && (
+          <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+            <span className="text-sm font-medium">Configurar áreas para:</span>
+            <div className="flex gap-2">
+              <Button
+                variant={currentGender === 'female' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setCurrentGender('female')}
+              >
+                Feminino
+              </Button>
+              <Button
+                variant={currentGender === 'male' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setCurrentGender('male')}
+              >
+                Masculino
+              </Button>
+            </div>
+          </div>
+        )}
         
         <div className="flex gap-6 h-[70vh]">
           <div className="flex-1" ref={containerRef}>

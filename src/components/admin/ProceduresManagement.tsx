@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ImageEditor } from "./ImageEditor";
 import { Checkbox } from "@/components/ui/checkbox";
 import BodyAreasManager from "./BodyAreasManager";
+import ProcedureDiscountManager from "./ProcedureDiscountManager";
 
 interface Category {
   id: string;
@@ -962,6 +963,14 @@ const ProceduresManagement = () => {
                     </div>
                   )}
                 </div>
+
+                {/* Gerenciador de Promoções por Grupos */}
+                {editingProcedure && (
+                  <ProcedureDiscountManager
+                    procedureId={editingProcedure.id}
+                    requiresBodySelection={formData.requires_body_selection || false}
+                  />
+                )}
 
                 {/* Checkbox destacar */}
                 <div className="flex items-center space-x-2">

@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
+import { useDiscountCalculation } from '@/hooks/useDiscountCalculation';
+import DiscountSummary from './DiscountSummary';
 
 interface AreaShape {
   x: number;
@@ -25,7 +27,7 @@ interface BodyAreaSelectorProps {
   bodySelectionType: string;
   bodyImageUrl?: string;
   bodyImageUrlMale?: string;
-  onSelectionChange: (selectedGroups: AreaGroup[], totalPrice: number, gender: 'male' | 'female') => void;
+  onSelectionChange: (selectedGroups: AreaGroup[], totalPrice: number, selectedGender: 'male' | 'female') => void;
 }
 
 const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
@@ -41,10 +43,14 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
   const [hoveredGroupId, setHoveredGroupId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
+  
+  // Hook para calcular descontos
+  const selectedGroups = areaGroups.filter(group => selectedGroupIds.includes(group.id));
+  const originalTotal = selectedGroups.reduce((sum, group) => sum + group.price, 0);
+  const { discountResult } = useDiscountCalculation(procedureId, selectedGroups.length, originalTotal);
 
   const getImageUrl = useCallback(() => {
     if (bodySelectionType === 'custom') {
-      // Para tipo custom, usar as imagens específicas baseadas no gênero
       if (selectedGender === 'male' && bodyImageUrlMale) {
         return bodyImageUrlMale;
       }
@@ -71,23 +77,22 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
 
   useEffect(() => {
     loadAreaGroups();
-  }, [procedureId]);
+  }, [procedureId, selectedGender]);
 
   useEffect(() => {
     drawCanvas();
   }, [areaGroups, selectedGroupIds, hoveredGroupId, getImageUrl]);
 
   useEffect(() => {
-    const selectedGroups = areaGroups.filter(group => selectedGroupIds.includes(group.id));
-    const totalPrice = selectedGroups.reduce((sum, group) => sum + group.price, 0);
-    onSelectionChange(selectedGroups, totalPrice, selectedGender);
-  }, [selectedGroupIds, areaGroups, selectedGender, onSelectionChange]);
+    onSelectionChange(selectedGroups, discountResult.finalTotal, selectedGender);
+  }, [selectedGroupIds, areaGroups, selectedGender, onSelectionChange, discountResult.finalTotal]);
 
   const loadAreaGroups = async () => {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('body_area_groups')
       .select('*')
-      .eq('procedure_id', procedureId);
+      .eq('procedure_id', procedureId)
+      .eq('gender', selectedGender);
 
     if (error) {
       console.error('Erro ao carregar grupos de áreas:', error);
@@ -113,71 +118,21 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
     ctx.drawImage(imageRef.current, 0, 0, canvas.width, canvas.height);
 
     areaGroups.forEach((group, groupIndex) => {
-      const isSelected = selectedGroupIds.includes(group.id);
-      const isHovered = hoveredGroupId === group.id;
-      
-      let strokeColor = 'rgba(239, 68, 68, 0.9)';
-      let fillColor = 'rgba(239, 68, 68, 0.2)'; // Preenchimento vermelho padrão
-      let lineWidth = 2;
-
-      if (isSelected) {
-        strokeColor = '#22c55e';
-        fillColor = 'rgba(34, 197, 94, 0.4)';
-        lineWidth = 3;
-      } else if (isHovered) {
-        strokeColor = '#ef4444';
-        fillColor = 'rgba(239, 68, 68, 0.4)'; // Vermelho mais intenso no hover
-        lineWidth = 2;
-      }
-
       group.shapes.forEach((shape) => {
         const x = (shape.x / 100) * canvas.width;
         const y = (shape.y / 100) * canvas.height;
         const width = (shape.width / 100) * canvas.width;
         const height = (shape.height / 100) * canvas.height;
 
-        ctx.strokeStyle = strokeColor;
-        ctx.fillStyle = fillColor;
-        ctx.lineWidth = lineWidth;
-        
-        // Sempre preenche a área (removido a condição de transparente)
+        const isSelected = selectedGroupIds.includes(group.id);
+        const isHovered = hoveredGroupId === group.id;
+
+        ctx.strokeStyle = isSelected ? '#22c55e' : isHovered ? '#3b82f6' : '#ef4444';
+        ctx.fillStyle = isSelected ? 'rgba(34, 197, 94, 0.3)' : isHovered ? 'rgba(59, 130, 246, 0.3)' : 'rgba(239, 68, 68, 0.3)';
+        ctx.lineWidth = 2;
         ctx.fillRect(x, y, width, height);
         ctx.strokeRect(x, y, width, height);
       });
-
-      if (isHovered && group.shapes.length > 0) {
-        const firstShape = group.shapes[0];
-        const x = (firstShape.x / 100) * canvas.width;
-        const y = (firstShape.y / 100) * canvas.height;
-        
-        const textMetrics = ctx.measureText(`${group.name} - R$ ${group.price.toFixed(2)}`);
-        const textWidth = textMetrics.width + 10;
-        const textHeight = 22;
-        
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.fillRect(x, y - textHeight - 5, textWidth, textHeight);
-        
-        ctx.fillStyle = '#fff';
-        ctx.font = '16px Arial';
-        ctx.fillText(`${group.name} - R$ ${group.price.toFixed(2)}`, x + 5, y - 10);
-      }
-      
-      if (!isSelected && !isHovered && group.shapes.length > 0) {
-        const firstShape = group.shapes[0];
-        const x = (firstShape.x / 100) * canvas.width;
-        const y = (firstShape.y / 100) * canvas.height;
-        
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
-        ctx.beginPath();
-        ctx.arc(x + 15, y + 15, 12, 0, 2 * Math.PI);
-        ctx.fill();
-        
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 10px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText((groupIndex + 1).toString(), x + 15, y + 19);
-        ctx.textAlign = 'left';
-      }
     });
   }, [areaGroups, selectedGroupIds, hoveredGroupId]);
 
@@ -233,14 +188,9 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
     drawCanvas();
   };
 
-  // Mostrar seleção de gênero apenas se:
-  // 1. O tipo não especifica gênero específico (male/female)
-  // 2. E ambas as imagens estão disponíveis (para tipo custom)
   const needsGenderSelection = !bodySelectionType.includes('male') && 
     !bodySelectionType.includes('female') && 
     (bodySelectionType !== 'custom' || (bodyImageUrl && bodyImageUrlMale));
-  const selectedGroups = areaGroups.filter(group => selectedGroupIds.includes(group.id));
-  const totalPrice = selectedGroups.reduce((sum, group) => sum + group.price, 0);
 
   return (
     <Card className="p-6">
@@ -301,11 +251,16 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
                       </div>
                     ))}
                   </div>
-                  <div className="border-t mt-3 pt-3 font-semibold text-lg">
-                    <div className="flex justify-between">
-                      <span>Total:</span>
-                      <span className="text-green-600">R$ {totalPrice.toFixed(2)}</span>
-                    </div>
+                  
+                  <div className="mt-4">
+                    <DiscountSummary
+                      originalTotal={discountResult.originalTotal}
+                      discountAmount={discountResult.discountAmount}
+                      finalTotal={discountResult.finalTotal}
+                      discountPercentage={discountResult.discountPercentage}
+                      groupsCount={selectedGroups.length}
+                      hasDiscount={discountResult.applicableDiscount !== null}
+                    />
                   </div>
                 </div>
               )}

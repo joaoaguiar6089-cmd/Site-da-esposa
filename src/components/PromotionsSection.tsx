@@ -128,7 +128,7 @@ export default function PromotionsSection() {
         <div className="text-center mb-14 md:mb-16">
           <div className="inline-block">
             <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-6 bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
-              Promoções Especiais
+              Feed da clínica
             </h2>
             <div className="w-24 h-1 bg-gradient-to-r from-primary to-primary/60 rounded-full mx-auto mb-5" />
           </div>

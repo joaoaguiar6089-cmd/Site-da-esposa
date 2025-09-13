@@ -78,7 +78,7 @@ export default function PromotionsSection() {
                   <Card className="group overflow-hidden border-0 bg-card/60 backdrop-blur-xl shadow-2xl hover:shadow-3xl transition-all duration-700 hover:scale-[1.02] animate-fade-in" 
                         style={{ animationDelay: `${index * 0.2}s` }}>
                     <CardContent className="p-0">
-                      <div className="grid lg:grid-cols-2 gap-0 min-h-[600px]">
+                      <div className="grid lg:grid-cols-2 gap-0 min-h-[350px]">
                         {/* Imagem da Promoção */}
                         <div className="relative overflow-hidden order-2 lg:order-1">
                           <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-primary/10 z-10"></div>

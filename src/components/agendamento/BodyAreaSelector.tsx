@@ -110,7 +110,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
       const isHovered = hoveredGroupId === group.id;
       
       let strokeColor = 'rgba(239, 68, 68, 0.9)';
-      let fillColor = 'transparent';
+      let fillColor = 'rgba(239, 68, 68, 0.2)'; // Preenchimento vermelho padrão
       let lineWidth = 2;
 
       if (isSelected) {
@@ -119,7 +119,7 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
         lineWidth = 3;
       } else if (isHovered) {
         strokeColor = '#ef4444';
-        fillColor = 'rgba(239, 68, 68, 0.4)'; // Aumentada de 0.5 para 0.4 para ficar igual ao verde
+        fillColor = 'rgba(239, 68, 68, 0.4)'; // Vermelho mais intenso no hover
         lineWidth = 2;
       }
 
@@ -133,9 +133,8 @@ const BodyAreaSelector: React.FC<BodyAreaSelectorProps> = ({
         ctx.fillStyle = fillColor;
         ctx.lineWidth = lineWidth;
         
-        if (fillColor !== 'transparent') {
-          ctx.fillRect(x, y, width, height);
-        }
+        // Sempre preenche a área (removido a condição de transparente)
+        ctx.fillRect(x, y, width, height);
         ctx.strokeRect(x, y, width, height);
       });
 

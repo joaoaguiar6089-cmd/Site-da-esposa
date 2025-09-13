@@ -1,6 +1,3 @@
-<<<<<<< Updated upstream
-
-=======
 export type Json =
   | string
   | number
@@ -1095,4 +1092,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
->>>>>>> Stashed changes

@@ -35,6 +35,10 @@ interface Appointment {
   professionals?: {
     name: string;
   } | null;
+  appointment_specifications?: {
+    specification_name: string;
+    specification_price: number;
+  }[];
 }
 
 interface Professional {
@@ -88,6 +92,10 @@ const AppointmentsList = () => {
           ),
           professionals (
             name
+          ),
+          appointment_specifications (
+            specification_name,
+            specification_price
           )
         `)
         .gte('appointment_date', today) // Filtro para datas >= hoje

@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { formatDateToBrazil, getCurrentDateBrazil, getCurrentDateTimeBrazil } from '@/utils/dateUtils';
 import type { Client } from "@/types/client";
 import BodyAreaSelector from "./BodyAreaSelector";
+import ProcedureSpecificationSelector from "./ProcedureSpecificationSelector";
+import { useSpecificationCalculation, ProcedureSpecification } from "@/hooks/useSpecificationCalculation";
 
 interface Category {
   id: string;
@@ -35,6 +37,7 @@ interface Procedure {
   duration: number;
   price: number;
   requires_body_selection: boolean;
+  requires_specifications: boolean;
   body_selection_type: string;
   body_image_url: string;
   body_image_url_male: string;
@@ -82,6 +85,8 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
   const [selectedBodyAreas, setSelectedBodyAreas] = useState<AreaGroup[]>([]);
   const [selectedGender, setSelectedGender] = useState<'male' | 'female'>('female');
   const [totalBodyAreasPrice, setTotalBodyAreasPrice] = useState(0);
+  const [selectedSpecifications, setSelectedSpecifications] = useState<ProcedureSpecification[]>([]);
+  const [totalSpecificationsPrice, setTotalSpecificationsPrice] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadingProcedures, setLoadingProcedures] = useState(true);
   const [cancelling, setCancelling] = useState(false);
@@ -93,7 +98,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
       // Carregar procedimentos
       const { data: proceduresData, error: proceduresError } = await supabase
         .from('procedures')
-        .select('id, name, description, duration, price, requires_body_selection, body_selection_type, body_image_url, body_image_url_male, category_id, subcategory_id')
+        .select('id, name, description, duration, price, requires_body_selection, requires_specifications, body_selection_type, body_image_url, body_image_url_male, category_id, subcategory_id')
         .order('name');
 
       if (proceduresError) throw proceduresError;
@@ -444,12 +449,21 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
       return;
     }
 
-    // Verificar se o procedimento requer seleção de áreas corporais
+    // Verificar se o procedimento requer seleção de áreas corporais ou especificações
     const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
     if (selectedProcedure?.requires_body_selection && selectedBodyAreas.length === 0) {
       toast({
         title: "Seleção de áreas obrigatória",
         description: "Por favor, selecione pelo menos uma área corporal para este procedimento.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedProcedure?.requires_specifications && selectedSpecifications.length === 0) {
+      toast({
+        title: "Especificação obrigatória",
+        description: "Por favor, selecione pelo menos uma especificação para este procedimento.",
         variant: "destructive",
       });
       return;
@@ -517,6 +531,34 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
       if (appointmentResult.error) throw appointmentResult.error;
 
       const appointmentId = appointmentResult.data.id;
+
+      // Salvar especificações se houver
+      if (selectedSpecifications.length > 0) {
+        // Deletar especificações anteriores se estiver editando
+        if (editingId) {
+          await supabase
+            .from('appointment_specifications')
+            .delete()
+            .eq('appointment_id', appointmentId);
+        }
+
+        // Inserir novas especificações
+        const specificationsData = selectedSpecifications.map(spec => ({
+          appointment_id: appointmentId,
+          specification_id: spec.id,
+          specification_name: spec.name,
+          specification_price: spec.price
+        }));
+
+        const { error: specsError } = await supabase
+          .from('appointment_specifications')
+          .insert(specificationsData);
+
+        if (specsError) {
+          console.error('Erro ao salvar especificações:', specsError);
+          throw specsError;
+        }
+      }
 
       // Salvar seleções de áreas corporais se houver
       if (selectedBodyAreas.length > 0) {
@@ -692,6 +734,11 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSpecificationChange = (specs: ProcedureSpecification[], totalPrice: number) => {
+    setSelectedSpecifications(specs);
+    setTotalSpecificationsPrice(totalPrice);
   };
 
   const handleCancelAppointment = async () => {
@@ -1040,6 +1087,16 @@ Para reagendar, entre em contato conosco.`;
               required
             />
           </div>
+
+          {/* Especificações do procedimento - só mostra se requer especificações */}
+          {selectedProcedure && selectedProcedure.requires_specifications && (
+            <div className="space-y-4">
+              <ProcedureSpecificationSelector
+                procedureId={selectedProcedure.id}
+                onSelectionChange={handleSpecificationChange}
+              />
+            </div>
+          )}
 
           {/* Seleção de Áreas Corporais - se o procedimento requer */}
           {selectedProcedure?.requires_body_selection && (

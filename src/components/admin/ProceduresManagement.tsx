@@ -545,8 +545,11 @@ const ProceduresManagement = () => {
     return (
       <BodyAreasManager
         procedureId={editingProcedure.id}
-        requiresBodySelection={formData.requires_body_selection}
-        onBack={() => setBodyAreasManagerOpen(false)}
+        imageUrl={formData.body_image_url || '/images/body-female-default.png'}
+        imageUrlMale={formData.body_image_url_male}
+        bodySelectionType={formData.body_selection_type}
+        open={bodyAreasManagerOpen}
+        onClose={() => setBodyAreasManagerOpen(false)}
       />
     );
   }
@@ -1107,17 +1110,17 @@ const ProceduresManagement = () => {
       {/* Image Editor */}
       <ImageEditor
         open={imageEditorOpen}
-        onClose={() => setImageEditorOpen(false)}
+        onCancel={() => setImageEditorOpen(false)}
         onSave={handleImageSave}
         imageFile={selectedImageFile}
-        existingImageUrl={selectedImageFile ? undefined : formData.image_url}
+        imageUrl={selectedImageFile ? undefined : formData.image_url}
       />
 
       {/* Discount Manager */}
       {editingProcedure && (
         <ProcedureDiscountManager
           procedureId={editingProcedure.id}
-          requiresBodySelection={formData.requires_body_selection || false}
+        requiresBodySelection={formData.requires_body_selection || false}
         />
       )}
     </div>

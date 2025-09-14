@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,7 +14,6 @@ import { cn } from "@/lib/utils";
 import { formatDateToBrazil, getCurrentDateBrazil, getCurrentDateTimeBrazil } from '@/utils/dateUtils';
 import type { Client } from "@/types/client";
 import BodyAreaSelector from "./BodyAreaSelector";
-import ProcedureSpecificationSelector from "./ProcedureSpecificationSelector";
 
 interface Category {
   id: string;
@@ -36,7 +35,6 @@ interface Procedure {
   duration: number;
   price: number;
   requires_body_selection: boolean;
-  requires_specifications: boolean;
   body_selection_type: string;
   body_image_url: string;
   body_image_url_male: string;
@@ -84,26 +82,18 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
   const [selectedBodyAreas, setSelectedBodyAreas] = useState<AreaGroup[]>([]);
   const [selectedGender, setSelectedGender] = useState<'male' | 'female'>('female');
   const [totalBodyAreasPrice, setTotalBodyAreasPrice] = useState(0);
-  const [selectedSpecifications, setSelectedSpecifications] = useState<any[]>([]);
-  const [totalSpecificationsPrice, setTotalSpecificationsPrice] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadingProcedures, setLoadingProcedures] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [currentAppointment, setCurrentAppointment] = useState<any>(null);
   const { toast } = useToast();
 
-  // Memoizar a função para evitar loop infinito no ProcedureSpecificationSelector
-  const handleSpecificationChange = useCallback((specifications: any[], totalPrice: number) => {
-    setSelectedSpecifications(specifications);
-    setTotalSpecificationsPrice(totalPrice);
-  }, []);
-
   const loadProcedures = async () => {
     try {
       // Carregar procedimentos
       const { data: proceduresData, error: proceduresError } = await supabase
         .from('procedures')
-        .select('id, name, description, duration, price, requires_body_selection, requires_specifications, body_selection_type, body_image_url, body_image_url_male, category_id, subcategory_id')
+        .select('id, name, description, duration, price, requires_body_selection, body_selection_type, body_image_url, body_image_url_male, category_id, subcategory_id')
         .order('name');
 
       if (proceduresError) throw proceduresError;
@@ -1050,14 +1040,6 @@ Para reagendar, entre em contato conosco.`;
               required
             />
           </div>
-
-          {/* Seleção de Especificações - se o procedimento requer */}
-          {selectedProcedure?.requires_specifications && (
-            <ProcedureSpecificationSelector
-              procedureId={selectedProcedure.id}
-              onSpecificationChange={handleSpecificationChange}
-            />
-          )}
 
           {/* Seleção de Áreas Corporais - se o procedimento requer */}
           {selectedProcedure?.requires_body_selection && (

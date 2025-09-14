@@ -122,48 +122,6 @@ export type Database = {
           },
         ]
       }
-      appointment_specifications: {
-        Row: {
-          appointment_id: string
-          created_at: string | null
-          id: string
-          specification_id: string
-          specification_name: string
-          specification_price: number
-        }
-        Insert: {
-          appointment_id: string
-          created_at?: string | null
-          id?: string
-          specification_id: string
-          specification_name: string
-          specification_price?: number
-        }
-        Update: {
-          appointment_id?: string
-          created_at?: string | null
-          id?: string
-          specification_id?: string
-          specification_name?: string
-          specification_price?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "appointment_specifications_appointment_id_fkey"
-            columns: ["appointment_id"]
-            isOneToOne: false
-            referencedRelation: "appointments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "appointment_specifications_specification_id_fkey"
-            columns: ["specification_id"]
-            isOneToOne: false
-            referencedRelation: "procedure_specifications"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       appointments: {
         Row: {
           appointment_date: string
@@ -475,50 +433,6 @@ export type Database = {
           },
         ]
       }
-      procedure_specifications: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          display_order: number | null
-          id: string
-          is_active: boolean | null
-          name: string
-          price: number
-          procedure_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          display_order?: number | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-          price?: number
-          procedure_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          display_order?: number | null
-          id?: string
-          is_active?: boolean | null
-          name?: string
-          price?: number
-          procedure_id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "procedure_specifications_procedure_id_fkey"
-            columns: ["procedure_id"]
-            isOneToOne: false
-            referencedRelation: "procedures"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       procedures: {
         Row: {
           benefits: string[] | null
@@ -537,7 +451,6 @@ export type Database = {
           price: number | null
           requires_area_selection: boolean | null
           requires_body_selection: boolean | null
-          requires_specifications: boolean | null
           sessions: number
           subcategory_id: string | null
           updated_at: string | null
@@ -559,7 +472,6 @@ export type Database = {
           price?: number | null
           requires_area_selection?: boolean | null
           requires_body_selection?: boolean | null
-          requires_specifications?: boolean | null
           sessions?: number
           subcategory_id?: string | null
           updated_at?: string | null
@@ -581,7 +493,6 @@ export type Database = {
           price?: number | null
           requires_area_selection?: boolean | null
           requires_body_selection?: boolean | null
-          requires_specifications?: boolean | null
           sessions?: number
           subcategory_id?: string | null
           updated_at?: string | null

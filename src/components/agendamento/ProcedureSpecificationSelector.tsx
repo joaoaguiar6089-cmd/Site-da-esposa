@@ -27,7 +27,7 @@ const ProcedureSpecificationSelector: React.FC<ProcedureSpecificationSelectorPro
       specificationResult.selectedSpecifications,
       specificationResult.totalPrice
     );
-  }, [specificationResult, onSpecificationChange]);
+  }, [specificationResult.selectedSpecifications, specificationResult.totalPrice, onSpecificationChange]);
 
   if (loading) {
     return (
@@ -64,15 +64,14 @@ const ProcedureSpecificationSelector: React.FC<ProcedureSpecificationSelectorPro
                   ? 'border-primary bg-primary/5'
                   : 'border-gray-200 hover:border-gray-300'
               }`}
-              onClick={() => toggleSpecification(specification.id)}
             >
               <div className="flex items-start space-x-3">
                 <Checkbox
                   id={`spec-${specification.id}`}
                   checked={selectedSpecificationIds.includes(specification.id)}
-                  onChange={() => toggleSpecification(specification.id)}
+                  onCheckedChange={() => toggleSpecification(specification.id)}
                 />
-                <div className="flex-grow">
+                <div className="flex-grow" onClick={() => toggleSpecification(specification.id)}>
                   <div className="flex items-center justify-between">
                     <Label 
                       htmlFor={`spec-${specification.id}`}

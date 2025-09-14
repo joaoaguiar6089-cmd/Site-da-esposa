@@ -15,6 +15,7 @@ import { ImageEditor } from "./ImageEditor";
 import { Checkbox } from "@/components/ui/checkbox";
 import BodyAreasManager from "./BodyAreasManager";
 import ProcedureDiscountManager from "./ProcedureDiscountManager";
+import ProcedureSpecificationsCard from "./ProcedureSpecificationsCard";
 
 interface Category {
   id: string;
@@ -40,6 +41,7 @@ interface Procedure {
   is_featured: boolean;
   sessions: number;
   indication: string | null;
+  requires_specifications?: boolean;
   categories?: Category;
   subcategories?: {
     name: string;
@@ -73,6 +75,7 @@ const ProceduresManagement = () => {
     sessions: "1",
     indication: "",
     requires_body_selection: false,
+    requires_specifications: false,
     body_selection_type: "",
     body_image_url: "",
     body_image_url_male: ""
@@ -206,6 +209,7 @@ const ProceduresManagement = () => {
         sessions: parseInt(formData.sessions),
         indication: formData.indication || null,
         requires_body_selection: formData.requires_body_selection,
+        requires_specifications: formData.requires_specifications,
         body_selection_type: formData.body_selection_type || null,
         body_image_url: formData.body_image_url || null,
         body_image_url_male: formData.body_image_url_male || null
@@ -249,6 +253,7 @@ const ProceduresManagement = () => {
         sessions: "1", 
         indication: "",
         requires_body_selection: false,
+        requires_specifications: false,
         body_selection_type: "",
         body_image_url: "",
         body_image_url_male: ""
@@ -280,6 +285,7 @@ const ProceduresManagement = () => {
         sessions: procedure.sessions.toString(),
         indication: procedure.indication || "",
         requires_body_selection: (procedure as any).requires_body_selection || false,
+        requires_specifications: (procedure as any).requires_specifications || false,
         body_selection_type: (procedure as any).body_selection_type || "",
         body_image_url: (procedure as any).body_image_url || "",
         body_image_url_male: (procedure as any).body_image_url_male || ""
@@ -327,6 +333,7 @@ const ProceduresManagement = () => {
       sessions: "1", 
       indication: "",
       requires_body_selection: false,
+      requires_specifications: false,
       body_selection_type: "",
       body_image_url: "",
       body_image_url_male: ""
@@ -784,20 +791,33 @@ const ProceduresManagement = () => {
               </div>
 
               <div className="space-y-4">
-                {/* Seleção de Área Corporal */}
-                <div className="border rounded-lg p-4 space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="requires_body_selection"
-                      checked={formData.requires_body_selection || false}
-                      onCheckedChange={(checked) => 
-                        setFormData({ ...formData, requires_body_selection: checked as boolean })
-                      }
-                    />
-                    <Label htmlFor="requires_body_selection" className="text-sm font-medium">
-                      Requer seleção de área corporal
-                    </Label>
-                  </div>
+                 {/* Seleção de Área Corporal */}
+                 <div className="border rounded-lg p-4 space-y-3">
+                   <div className="flex items-center space-x-2">
+                     <Checkbox
+                       id="requires_body_selection"
+                       checked={formData.requires_body_selection || false}
+                       onCheckedChange={(checked) => 
+                         setFormData({ ...formData, requires_body_selection: checked as boolean })
+                       }
+                     />
+                     <Label htmlFor="requires_body_selection" className="text-sm font-medium">
+                       Requer seleção de área corporal
+                     </Label>
+                   </div>
+
+                   <div className="flex items-center space-x-2">
+                     <Checkbox
+                       id="requires_specifications"
+                       checked={formData.requires_specifications || false}
+                       onCheckedChange={(checked) => 
+                         setFormData({ ...formData, requires_specifications: checked as boolean })
+                       }
+                     />
+                     <Label htmlFor="requires_specifications" className="text-sm font-medium">
+                       Requer especificações do procedimento
+                     </Label>
+                   </div>
 
                   {formData.requires_body_selection && (
                     <div className="space-y-3 ml-6">
@@ -964,13 +984,21 @@ const ProceduresManagement = () => {
                   )}
                 </div>
 
-                {/* Gerenciador de Promoções por Grupos */}
-                {editingProcedure && (
-                  <ProcedureDiscountManager
-                    procedureId={editingProcedure.id}
-                    requiresBodySelection={formData.requires_body_selection || false}
-                  />
-                )}
+                 {/* Gerenciador de Promoções por Grupos */}
+                 {editingProcedure && (
+                   <ProcedureDiscountManager
+                     procedureId={editingProcedure.id}
+                     requiresBodySelection={formData.requires_body_selection || false}
+                   />
+                 )}
+
+                 {/* Gerenciador de Especificações */}
+                 {editingProcedure && (
+                   <ProcedureSpecificationsCard
+                     procedureId={editingProcedure.id}
+                     requiresSpecifications={formData.requires_specifications || false}
+                   />
+                 )}
 
                 {/* Checkbox destacar */}
                 <div className="flex items-center space-x-2">

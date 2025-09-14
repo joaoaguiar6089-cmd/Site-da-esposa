@@ -244,12 +244,17 @@ export default function PromotionsManagement() {
   };
 
   if (loading) {
-    return <div>Carregando...</div>;
+    return <div className="flex items-center justify-center h-64">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+        <p>Carregando...</p>
+      </div>
+    </div>;
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 p-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Gerenciar Feed</h2>
           <p className="text-muted-foreground">
@@ -258,14 +263,14 @@ export default function PromotionsManagement() {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={openCreateDialog}>
+            <Button onClick={openCreateDialog} className="w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               Novo Post
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>
+          <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader className="space-y-3">
+              <DialogTitle className="text-xl">
                 {editingPromotion ? "Editar Post" : "Novo Post"}
               </DialogTitle>
               <DialogDescription>
@@ -276,123 +281,163 @@ export default function PromotionsManagement() {
               </DialogDescription>
             </DialogHeader>
             
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Título *</Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="Ex: Novidade na Clínica"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="display_order">Ordem de Exibição</Label>
-                  <Select
-                    value={formData.display_order.toString()}
-                    onValueChange={(value) => setFormData({ ...formData, display_order: parseInt(value) })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1º Posição</SelectItem>
-                      <SelectItem value="2">2º Posição</SelectItem>
-                      <SelectItem value="3">3º Posição</SelectItem>
-                      <SelectItem value="4">4º Posição</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="is_procedure"
-                  checked={formData.is_procedure}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_procedure: !!checked })}
-                />
-                <Label htmlFor="is_procedure">É um procedimento/promoção</Label>
-              </div>
-
-              {formData.is_procedure && (
-                <div className="space-y-2">
-                  <Label htmlFor="procedure">Procedimento</Label>
-                  <Select
-                    value={formData.procedure_id}
-                    onValueChange={(value) => setFormData({ ...formData, procedure_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um procedimento" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Nenhum procedimento</SelectItem>
-                      {procedures.map((procedure) => (
-                        <SelectItem key={procedure.id} value={procedure.id}>
-                          {procedure.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Se selecionado, ao clicar em "Agendar Agora" o procedimento será pré-selecionado
-                  </p>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Descrição *</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Descreva o post..."
-                  rows={4}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="image">Imagem do Post *</Label>
-                <div className="flex items-center gap-4">
-                  <Input
-                    id="image"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    disabled={uploading}
-                  />
-                  {uploading && <span className="text-sm text-muted-foreground">Enviando...</span>}
-                </div>
-                {formData.image_url && (
-                  <div className="mt-2">
-                    <img
-                      src={formData.image_url}
-                      alt="Preview"
-                      className="h-32 w-48 object-cover rounded-md border"
+            <div className="max-h-[60vh] overflow-y-auto px-1">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="title" className="text-sm font-medium">
+                      Título *
+                    </Label>
+                    <Input
+                      id="title"
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      placeholder="Ex: Novidade na Clínica"
+                      className="w-full"
                     />
                   </div>
-                )}
-              </div>
 
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="is_active"
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                />
-                <Label htmlFor="is_active">Ativo</Label>
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="display_order" className="text-sm font-medium">
+                      Ordem de Exibição
+                    </Label>
+                    <Select
+                      value={formData.display_order.toString()}
+                      onValueChange={(value) => setFormData({ ...formData, display_order: parseInt(value) })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1º Posição</SelectItem>
+                        <SelectItem value="2">2º Posição</SelectItem>
+                        <SelectItem value="3">3º Posição</SelectItem>
+                        <SelectItem value="4">4º Posição</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="is_procedure"
+                      checked={formData.is_procedure}
+                      onCheckedChange={(checked) => setFormData({ ...formData, is_procedure: !!checked })}
+                    />
+                    <Label htmlFor="is_procedure" className="text-sm">
+                      É um procedimento/promoção
+                    </Label>
+                  </div>
+
+                  {formData.is_procedure && (
+                    <div className="space-y-2 pl-6 border-l-2 border-primary/20">
+                      <Label htmlFor="procedure" className="text-sm font-medium">
+                        Procedimento
+                      </Label>
+                      <Select
+                        value={formData.procedure_id}
+                        onValueChange={(value) => setFormData({ ...formData, procedure_id: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um procedimento" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Nenhum procedimento</SelectItem>
+                          {procedures.map((procedure) => (
+                            <SelectItem key={procedure.id} value={procedure.id}>
+                              {procedure.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Se selecionado, ao clicar em "Agendar Agora" o procedimento será pré-selecionado
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description" className="text-sm font-medium">
+                    Descrição *
+                  </Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Descreva o post..."
+                    rows={4}
+                    className="resize-none"
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <Label htmlFor="image" className="text-sm font-medium">
+                    Imagem do Post *
+                  </Label>
+                  <div className="space-y-3">
+                    <div className="flex flex-col sm:flex-row items-start gap-3">
+                      <Input
+                        id="image"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={uploading}
+                        className="flex-1"
+                      />
+                      {uploading && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                          Enviando...
+                        </div>
+                      )}
+                    </div>
+                    {formData.image_url && (
+                      <div className="flex justify-center">
+                        <img
+                          src={formData.image_url}
+                          alt="Preview"
+                          className="h-48 w-72 object-cover rounded-lg border shadow-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2 py-2">
+                  <Switch
+                    id="is_active"
+                    checked={formData.is_active}
+                    onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+                  />
+                  <Label htmlFor="is_active" className="text-sm">
+                    Ativo
+                  </Label>
+                </div>
+              </form>
+            </div>
+
+            <DialogFooter className="border-t pt-4 mt-4">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsDialogOpen(false)}
+                  className="w-full sm:w-auto"
+                >
                   Cancelar
                 </Button>
-                <Button type="submit">
+                <Button 
+                  type="submit" 
+                  onClick={handleSubmit}
+                  disabled={!formData.title || !formData.description || !formData.image_url}
+                  className="w-full sm:w-auto"
+                >
                   {editingPromotion ? "Atualizar" : "Criar"}
                 </Button>
-              </DialogFooter>
-            </form>
+              </div>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
@@ -405,80 +450,98 @@ export default function PromotionsManagement() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Imagem</TableHead>
-                <TableHead>Título</TableHead>
-                <TableHead>Descrição</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Procedimento</TableHead>
-                <TableHead>Ordem</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {promotions.map((promotion) => (
-                <TableRow key={promotion.id}>
-                  <TableCell>
-                    <img
-                      src={promotion.image_url}
-                      alt={promotion.title}
-                      className="h-16 w-24 object-cover rounded-md"
-                    />
-                  </TableCell>
-                  <TableCell className="font-medium">{promotion.title}</TableCell>
-                  <TableCell className="max-w-xs truncate">{promotion.description}</TableCell>
-                  <TableCell>
-                    <Badge variant={promotion.is_procedure ? "default" : "secondary"}>
-                      {promotion.is_procedure ? "Procedimento" : "Post Informativo"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {promotion.is_procedure && promotion.procedure_id ? (
-                      <Badge variant="outline">
-                        {procedures.find(p => p.id === promotion.procedure_id)?.name || 'Procedimento'}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>{promotion.display_order}º</TableCell>
-                  <TableCell>
-                    <Badge variant={promotion.is_active ? "default" : "secondary"}>
-                      {promotion.is_active ? "Ativo" : "Inativo"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(promotion)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(promotion.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {promotions.length === 0 && (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    Nenhum post cadastrado
-                  </TableCell>
+                  <TableHead className="w-24">Imagem</TableHead>
+                  <TableHead className="min-w-32">Título</TableHead>
+                  <TableHead className="min-w-48">Descrição</TableHead>
+                  <TableHead className="w-32">Tipo</TableHead>
+                  <TableHead className="w-32">Procedimento</TableHead>
+                  <TableHead className="w-20">Ordem</TableHead>
+                  <TableHead className="w-20">Status</TableHead>
+                  <TableHead className="w-24">Ações</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {promotions.map((promotion) => (
+                  <TableRow key={promotion.id}>
+                    <TableCell>
+                      <img
+                        src={promotion.image_url}
+                        alt={promotion.title}
+                        className="h-16 w-20 object-cover rounded-md"
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      <div className="max-w-32 truncate" title={promotion.title}>
+                        {promotion.title}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="max-w-48 text-sm text-muted-foreground" title={promotion.description}>
+                        {promotion.description.length > 100 
+                          ? `${promotion.description.substring(0, 100)}...` 
+                          : promotion.description}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={promotion.is_procedure ? "default" : "secondary"} className="text-xs">
+                        {promotion.is_procedure ? "Procedimento" : "Informativo"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {promotion.is_procedure && promotion.procedure_id ? (
+                        <Badge variant="outline" className="text-xs">
+                          {procedures.find(p => p.id === promotion.procedure_id)?.name || 'Procedimento'}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">{promotion.display_order}º</TableCell>
+                    <TableCell>
+                      <Badge variant={promotion.is_active ? "default" : "secondary"} className="text-xs">
+                        {promotion.is_active ? "Ativo" : "Inativo"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(promotion)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(promotion.id)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {promotions.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                      <div className="flex flex-col items-center gap-2">
+                        <Upload className="h-8 w-8 opacity-50" />
+                        <p>Nenhum post cadastrado</p>
+                        <p className="text-sm">Clique em "Novo Post" para começar</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

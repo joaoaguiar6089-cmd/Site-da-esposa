@@ -15,6 +15,7 @@ import { ImageEditor } from "./ImageEditor";
 import { Checkbox } from "@/components/ui/checkbox";
 import BodyAreasManager from "./BodyAreasManager";
 import ProcedureDiscountManager from "./ProcedureDiscountManager";
+import ProcedureSpecificationsManager from "./ProcedureSpecificationsManager";
 
 interface Category {
   id: string;
@@ -40,6 +41,11 @@ interface Procedure {
   is_featured: boolean;
   sessions: number;
   indication: string | null;
+  requires_specifications?: boolean;
+  requires_body_selection?: boolean;
+  body_selection_type?: string;
+  body_image_url?: string;
+  body_image_url_male?: string;
   categories?: Category;
   subcategories?: {
     name: string;
@@ -72,6 +78,7 @@ const ProceduresManagement = () => {
     is_featured: false,
     sessions: "1",
     indication: "",
+    requires_specifications: false,
     requires_body_selection: false,
     body_selection_type: "",
     body_image_url: "",
@@ -86,6 +93,7 @@ const ProceduresManagement = () => {
   const [selectedBodyImageFile, setSelectedBodyImageFile] = useState<File | null>(null);
   const [selectedBodyImageMaleFile, setSelectedBodyImageMaleFile] = useState<File | null>(null);
   const [bodyAreasManagerOpen, setBodyAreasManagerOpen] = useState(false);
+  const [specificationsManagerOpen, setSpecificationsManagerOpen] = useState(false);
   const { toast } = useToast();
 
   const loadProcedures = async () => {
@@ -205,6 +213,7 @@ const ProceduresManagement = () => {
         is_featured: formData.is_featured,
         sessions: parseInt(formData.sessions),
         indication: formData.indication || null,
+        requires_specifications: formData.requires_specifications,
         requires_body_selection: formData.requires_body_selection,
         body_selection_type: formData.body_selection_type || null,
         body_image_url: formData.body_image_url || null,
@@ -236,24 +245,7 @@ const ProceduresManagement = () => {
         });
       }
 
-      setFormData({ 
-        name: "", 
-        description: "", 
-        duration: "60", 
-        price: "", 
-        category_id: "", 
-        subcategory_id: "",
-        image_url: "", 
-        benefits: [], 
-        is_featured: false, 
-        sessions: "1", 
-        indication: "",
-        requires_body_selection: false,
-        body_selection_type: "",
-        body_image_url: "",
-        body_image_url_male: ""
-      });
-      setEditingProcedure(null);
+      resetForm();
       setDialogOpen(false);
       loadProcedures();
     } catch (error: any) {
@@ -267,23 +259,24 @@ const ProceduresManagement = () => {
 
   const handleEdit = (procedure: Procedure) => {
     setEditingProcedure(procedure);
-      setFormData({
-        name: procedure.name,
-        description: procedure.description || "",
-        duration: procedure.duration.toString(),
-        price: procedure.price?.toString() || "",
-        category_id: procedure.category_id || "",
-        subcategory_id: procedure.subcategory_id || "",
-        image_url: procedure.image_url || "",
-        benefits: procedure.benefits || [],
-        is_featured: procedure.is_featured,
-        sessions: procedure.sessions.toString(),
-        indication: procedure.indication || "",
-        requires_body_selection: (procedure as any).requires_body_selection || false,
-        body_selection_type: (procedure as any).body_selection_type || "",
-        body_image_url: (procedure as any).body_image_url || "",
-        body_image_url_male: (procedure as any).body_image_url_male || ""
-      });
+    setFormData({
+      name: procedure.name,
+      description: procedure.description || "",
+      duration: procedure.duration.toString(),
+      price: procedure.price?.toString() || "",
+      category_id: procedure.category_id || "",
+      subcategory_id: procedure.subcategory_id || "",
+      image_url: procedure.image_url || "",
+      benefits: procedure.benefits || [],
+      is_featured: procedure.is_featured,
+      sessions: procedure.sessions.toString(),
+      indication: procedure.indication || "",
+      requires_specifications: procedure.requires_specifications || false,
+      requires_body_selection: procedure.requires_body_selection || false,
+      body_selection_type: procedure.body_selection_type || "",
+      body_image_url: procedure.body_image_url || "",
+      body_image_url_male: procedure.body_image_url_male || ""
+    });
     setDialogOpen(true);
   };
 
@@ -326,6 +319,7 @@ const ProceduresManagement = () => {
       is_featured: false, 
       sessions: "1", 
       indication: "",
+      requires_specifications: false,
       requires_body_selection: false,
       body_selection_type: "",
       body_image_url: "",
@@ -423,7 +417,6 @@ const ProceduresManagement = () => {
 
   const toggleFeatured = async (procedureId: string, currentStatus: boolean) => {
     try {
-
       const { error } = await supabase
         .from('procedures')
         .update({ is_featured: !currentStatus })
@@ -476,7 +469,7 @@ const ProceduresManagement = () => {
 
       toast({
         title: "Upload realizado",
-        description: "Imagem corporais enviada com sucesso!",
+        description: "Imagem corporal enviada com sucesso!",
       });
 
       setSelectedBodyImageFile(null);
@@ -520,7 +513,7 @@ const ProceduresManagement = () => {
 
       toast({
         title: "Upload realizado",
-        description: "Imagem masculina enviada com sucesso!",
+        description: "Imagem corporal masculina enviada com sucesso!",
       });
 
       setSelectedBodyImageMaleFile(null);
@@ -536,50 +529,109 @@ const ProceduresManagement = () => {
     }
   };
 
-  const getDefaultBodyImage = (bodySelectionType: string): string => {
-    const defaultImages = {
-      'face_male': '/images/face-male-default.png',
-      'face_female': '/images/face-female-default.png',
-      'body_male': '/images/body-male-default.png',
-      'body_female': '/images/body-female-default.png'
-    };
-    
-    return defaultImages[bodySelectionType as keyof typeof defaultImages] || '/images/face-female-default.png';
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Carregando procedimentos...</p>
+        </div>
+      </div>
+    );
+  }
 
-  if (loading) return <div>Carregando procedimentos...</div>;
+  // If body areas manager is open
+  if (bodyAreasManagerOpen && editingProcedure) {
+    return (
+      <BodyAreasManager
+        procedureId={editingProcedure.id}
+        requiresBodySelection={formData.requires_body_selection}
+        onBack={() => setBodyAreasManagerOpen(false)}
+      />
+    );
+  }
+
+  // If specifications manager is open
+  if (specificationsManagerOpen && editingProcedure) {
+    return (
+      <ProcedureSpecificationsManager
+        procedureId={editingProcedure.id}
+        procedureName={editingProcedure.name}
+        onClose={() => setSpecificationsManagerOpen(false)}
+      />
+    );
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-primary">Procedimentos</h2>
-        <Dialog open={dialogOpen} onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) resetForm();
-        }}>
+        <div>
+          <h1 className="text-3xl font-bold">Gerenciar Procedimentos</h1>
+          <p className="text-muted-foreground">
+            Gerencie os procedimentos disponíveis na clínica
+          </p>
+        </div>
+
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="flex items-center gap-2">
-              <Plus className="w-4 h-4" />
-              Adicionar Procedimento
+            <Button onClick={resetForm}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Procedimento
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingProcedure ? "Editar Procedimento" : "Novo Procedimento"}
               </DialogTitle>
+              <DialogDescription>
+                {editingProcedure 
+                  ? "Atualize as informações do procedimento" 
+                  : "Adicione um novo procedimento à clínica"
+                }
+              </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Basic Information */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="name">Nome</Label>
+                  <Label htmlFor="name">Nome do Procedimento</Label>
                   <Input
                     id="name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Ex: Limpeza de Pele"
                     required
                   />
                 </div>
+
+                <div>
+                  <Label htmlFor="price">Preço (R$)</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    step="0.01"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    placeholder="Ex: 150.00"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="description">Descrição</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Descreva o procedimento..."
+                  rows={3}
+                />
+              </div>
+
+              {/* Categories */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="category">Categoria</Label>
                   <Select value={formData.category_id} onValueChange={(value) => setFormData({ ...formData, category_id: value, subcategory_id: "" })}>
@@ -595,124 +647,28 @@ const ProceduresManagement = () => {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
 
-              {formData.category_id && (
-                <div>
-                  <Label htmlFor="subcategory">Subcategoria</Label>
-                  <Select value={formData.subcategory_id} onValueChange={(value) => setFormData({ ...formData, subcategory_id: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione uma subcategoria (opcional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {subcategories
-                        .filter(sub => sub.category_id === formData.category_id)
-                        .map((subcategory) => (
+                {formData.category_id && (
+                  <div>
+                    <Label htmlFor="subcategory">Subcategoria</Label>
+                    <Select value={formData.subcategory_id} onValueChange={(value) => setFormData({ ...formData, subcategory_id: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione uma subcategoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableSubcategories.map((subcategory) => (
                           <SelectItem key={subcategory.id} value={subcategory.id}>
                             {subcategory.name}
                           </SelectItem>
                         ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div>
-                <Label htmlFor="description">Descrição</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Descrição do procedimento"
-                  rows={3}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="indication">Indicação</Label>
-                <Textarea
-                  id="indication"
-                  value={formData.indication}
-                  onChange={(e) => setFormData({ ...formData, indication: e.target.value })}
-                  placeholder="Para quem é indicado este procedimento"
-                  rows={2}
-                />
-              </div>
-
-              <div>
-                <Label>Imagem do Procedimento</Label>
-                <div className="space-y-3">
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <Label htmlFor="image_url" className="text-sm text-muted-foreground">URL da Imagem</Label>
-                      <Input
-                        id="image_url"
-                        value={formData.image_url}
-                        onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                        placeholder="https://exemplo.com/imagem.jpg"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <Label className="text-sm text-muted-foreground">ou</Label>
-                      <div className="relative">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleImageUpload(file);
-                          }}
-                          className="hidden"
-                          id="image-upload"
-                        />
-                        <label
-                          htmlFor="image-upload"
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-md cursor-pointer hover:bg-secondary/80 transition-colors"
-                        >
-                          {uploadingImage ? (
-                            <>
-                              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                              Processando...
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="w-4 h-4" />
-                              Upload & Ajustar
-                            </>
-                          )}
-                        </label>
-                      </div>
-                    </div>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  
-                  {formData.image_url && (
-                    <div className="mt-2">
-                      <div className="flex items-start gap-3">
-                        <img 
-                          src={formData.image_url} 
-                          alt="Preview" 
-                          className="w-32 h-32 object-cover rounded border"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditExistingImage()}
-                          className="flex items-center gap-2"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                          Ajustar Imagem
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Duration and Sessions */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="duration">Duração (minutos)</Label>
                   <Input
@@ -720,33 +676,177 @@ const ProceduresManagement = () => {
                     type="number"
                     value={formData.duration}
                     onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                    required
+                    min="1"
                   />
                 </div>
+
                 <div>
                   <Label htmlFor="sessions">Número de Sessões</Label>
                   <Input
                     id="sessions"
                     type="number"
-                    min="1"
                     value={formData.sessions}
                     onChange={(e) => setFormData({ ...formData, sessions: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="price">Preço (R$)</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    placeholder="0.00"
+                    min="1"
                   />
                 </div>
               </div>
 
+              {/* Image Upload */}
+              <div>
+                <Label>Imagem do Procedimento</Label>
+                <div className="space-y-2">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => e.target.files && handleImageUpload(e.target.files[0])}
+                  />
+                  {formData.image_url && (
+                    <div className="flex items-center gap-2">
+                      <img src={formData.image_url} alt="Preview" className="w-16 h-16 object-cover rounded" />
+                      <Button type="button" variant="outline" size="sm" onClick={handleEditExistingImage}>
+                        Editar Imagem
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Specifications Section */}
+              <div className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="requires_specifications"
+                    checked={formData.requires_specifications}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, requires_specifications: checked as boolean })
+                    }
+                  />
+                  <Label htmlFor="requires_specifications" className="text-sm font-medium">
+                    Requer especificação
+                  </Label>
+                </div>
+
+                {formData.requires_specifications && (
+                  <div className="space-y-3 ml-6">
+                    {/* Nested checkbox for body area selection */}
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="requires_body_selection"
+                        checked={formData.requires_body_selection}
+                        onCheckedChange={(checked) =>
+                          setFormData({ ...formData, requires_body_selection: checked as boolean })
+                        }
+                      />
+                      <Label htmlFor="requires_body_selection" className="text-sm font-medium">
+                        Requer seleção de área corporal
+                      </Label>
+                    </div>
+
+                    {/* Manage specifications button - always visible when requires specifications */}
+                    {editingProcedure && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setSpecificationsManagerOpen(true)}
+                        className="w-full"
+                      >
+                        Gerenciar Procedimentos
+                      </Button>
+                    )}
+
+                    {/* Body selection options - only visible when requires body selection */}
+                    {formData.requires_body_selection && (
+                      <div className="space-y-3">
+                        <div>
+                          <Label htmlFor="body_selection_type">Tipo de Seleção</Label>
+                          <Select 
+                            value={formData.body_selection_type || ''} 
+                            onValueChange={(value) => setFormData({ ...formData, body_selection_type: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o tipo de área" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="face_male">Rosto Masculino</SelectItem>
+                              <SelectItem value="face_female">Rosto Feminino</SelectItem>
+                              <SelectItem value="body_male">Corpo Masculino</SelectItem>
+                              <SelectItem value="body_female">Corpo Feminino</SelectItem>
+                              <SelectItem value="custom">Imagem Customizada</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {formData.body_selection_type === 'custom' && (
+                          <div className="space-y-4">
+                            <h4 className="font-semibold">Imagens Personalizadas</h4>
+                            
+                            {/* Female Image Upload */}
+                            <div className="space-y-2 p-3 border rounded">
+                              <h5 className="font-medium text-sm">Imagem Feminina</h5>
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => setSelectedBodyImageFile(e.target.files?.[0] || null)}
+                              />
+                              {selectedBodyImageFile && (
+                                <Button
+                                  type="button"
+                                  onClick={() => uploadBodyImage(selectedBodyImageFile)}
+                                  disabled={uploadingBodyImage}
+                                  size="sm"
+                                >
+                                  {uploadingBodyImage ? 'Enviando...' : 'Upload'}
+                                </Button>
+                              )}
+                              {formData.body_image_url && (
+                                <img src={formData.body_image_url} alt="Preview feminino" className="w-16 h-16 object-cover rounded" />
+                              )}
+                            </div>
+
+                            {/* Male Image Upload */}
+                            <div className="space-y-2 p-3 border rounded">
+                              <h5 className="font-medium text-sm">Imagem Masculina (Opcional)</h5>
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => setSelectedBodyImageMaleFile(e.target.files?.[0] || null)}
+                              />
+                              {selectedBodyImageMaleFile && (
+                                <Button
+                                  type="button"
+                                  onClick={() => uploadBodyImageMale(selectedBodyImageMaleFile)}
+                                  disabled={uploadingBodyImageMale}
+                                  size="sm"
+                                >
+                                  {uploadingBodyImageMale ? 'Enviando...' : 'Upload'}
+                                </Button>
+                              )}
+                              {formData.body_image_url_male && (
+                                <img src={formData.body_image_url_male} alt="Preview masculino" className="w-16 h-16 object-cover rounded" />
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Body Areas Manager Button */}
+                        {editingProcedure && formData.body_selection_type && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setBodyAreasManagerOpen(true)}
+                            className="w-full"
+                          >
+                            Gerenciar Áreas Selecionáveis
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Benefits */}
               <div>
                 <Label>Benefícios</Label>
                 <div className="space-y-2">
@@ -754,248 +854,72 @@ const ProceduresManagement = () => {
                     <Input
                       value={newBenefit}
                       onChange={(e) => setNewBenefit(e.target.value)}
-                      placeholder="Adicionar benefício"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addBenefit();
-                        }
-                      }}
+                      placeholder="Adicionar benefício..."
+                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addBenefit())}
                     />
-                    <Button type="button" onClick={addBenefit} variant="outline">
-                      <Plus className="w-4 h-4" />
+                    <Button type="button" onClick={addBenefit} size="sm">
+                      <Plus className="h-4 w-4" />
                     </Button>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {formData.benefits.map((benefit, index) => (
                       <Badge key={index} variant="secondary" className="flex items-center gap-1">
                         {benefit}
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-4 w-4 p-0"
                           onClick={() => removeBenefit(benefit)}
-                          className="ml-1 hover:text-destructive"
                         >
-                          <X className="w-3 h-3" />
-                        </button>
+                          <X className="h-3 w-3" />
+                        </Button>
                       </Badge>
                     ))}
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-4">
-                {/* Seleção de Área Corporal */}
-                <div className="border rounded-lg p-4 space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="requires_body_selection"
-                      checked={formData.requires_body_selection || false}
-                      onCheckedChange={(checked) => 
-                        setFormData({ ...formData, requires_body_selection: checked as boolean })
-                      }
-                    />
-                    <Label htmlFor="requires_body_selection" className="text-sm font-medium">
-                      Requer seleção de área corporal
-                    </Label>
-                  </div>
-
-                  {formData.requires_body_selection && (
-                    <div className="space-y-3 ml-6">
-                      <div>
-                        <Label htmlFor="body_selection_type">Tipo de Seleção</Label>
-                        <Select 
-                          value={formData.body_selection_type || ''} 
-                          onValueChange={(value) => setFormData({ ...formData, body_selection_type: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione o tipo de área" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="face_male">Rosto Masculino</SelectItem>
-                            <SelectItem value="face_female">Rosto Feminino</SelectItem>
-                            <SelectItem value="body_male">Corpo Masculino</SelectItem>
-                            <SelectItem value="body_female">Corpo Feminino</SelectItem>
-                            <SelectItem value="custom">Imagem Customizada</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {formData.body_selection_type === 'custom' && (
-                        <div className="space-y-6">
-                          <h4 className="font-semibold">Imagens Personalizadas</h4>
-                          
-                          {/* Imagem Feminina */}
-                          <div className="space-y-4 p-4 border rounded-lg">
-                            <h5 className="font-medium text-sm">Imagem Feminina</h5>
-                            
-                            {/* Upload de arquivo feminino */}
-                            <div>
-                              <Label htmlFor="body-image-upload-female" className="text-sm text-muted-foreground">
-                                Upload de Arquivo
-                              </Label>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Input
-                                  id="body-image-upload-female"
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={(e) => setSelectedBodyImageFile(e.target.files?.[0] || null)}
-                                  className="flex-1"
-                                />
-                                <Button
-                                  type="button"
-                                  onClick={() => selectedBodyImageFile && uploadBodyImage(selectedBodyImageFile)}
-                                  disabled={!selectedBodyImageFile || uploadingBodyImage}
-                                  size="sm"
-                                >
-                                  {uploadingBodyImage ? 'Enviando...' : 'Upload'}
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* URL da imagem feminina */}
-                            <div>
-                              <Label htmlFor="body_image_url" className="text-sm text-muted-foreground">
-                                URL da Imagem
-                              </Label>
-                              <Input
-                                id="body_image_url"
-                                value={formData.body_image_url || ''}
-                                onChange={(e) => setFormData({ ...formData, body_image_url: e.target.value })}
-                                placeholder="https://exemplo.com/imagem-feminina.jpg"
-                                className="mt-1"
-                              />
-                            </div>
-
-                            {/* Preview da imagem feminina */}
-                            {formData.body_image_url && (
-                              <div className="space-y-2">
-                                <Label className="text-sm text-muted-foreground">Preview Feminino</Label>
-                                <div className="border rounded p-2">
-                                  <img 
-                                    src={formData.body_image_url} 
-                                    alt="Preview da imagem feminina"
-                                    className="max-w-24 max-h-24 object-contain mx-auto"
-                                    onError={(e) => {
-                                      (e.target as HTMLImageElement).style.display = 'none';
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Imagem Masculina */}
-                          <div className="space-y-4 p-4 border rounded-lg">
-                            <h5 className="font-medium text-sm">Imagem Masculina (Opcional)</h5>
-                            
-                            {/* Upload de arquivo masculino */}
-                            <div>
-                              <Label htmlFor="body-image-upload-male" className="text-sm text-muted-foreground">
-                                Upload de Arquivo
-                              </Label>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Input
-                                  id="body-image-upload-male"
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={(e) => setSelectedBodyImageMaleFile(e.target.files?.[0] || null)}
-                                  className="flex-1"
-                                />
-                                <Button
-                                  type="button"
-                                  onClick={() => selectedBodyImageMaleFile && uploadBodyImageMale(selectedBodyImageMaleFile)}
-                                  disabled={!selectedBodyImageMaleFile || uploadingBodyImageMale}
-                                  size="sm"
-                                >
-                                  {uploadingBodyImageMale ? 'Enviando...' : 'Upload'}
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* URL da imagem masculina */}
-                            <div>
-                              <Label htmlFor="body_image_url_male" className="text-sm text-muted-foreground">
-                                URL da Imagem
-                              </Label>
-                              <Input
-                                id="body_image_url_male"
-                                value={formData.body_image_url_male || ''}
-                                onChange={(e) => setFormData({ ...formData, body_image_url_male: e.target.value })}
-                                placeholder="https://exemplo.com/imagem-masculina.jpg"
-                                className="mt-1"
-                              />
-                            </div>
-
-                            {/* Preview da imagem masculina */}
-                            {formData.body_image_url_male && (
-                              <div className="space-y-2">
-                                <Label className="text-sm text-muted-foreground">Preview Masculino</Label>
-                                <div className="border rounded p-2">
-                                  <img 
-                                    src={formData.body_image_url_male} 
-                                    alt="Preview da imagem masculina"
-                                    className="max-w-24 max-h-24 object-contain mx-auto"
-                                    onError={(e) => {
-                                      (e.target as HTMLImageElement).style.display = 'none';
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="text-sm text-muted-foreground bg-muted p-3 rounded">
-                            💡 <strong>Dica:</strong> Se apenas uma imagem for fornecida, não haverá seleção de gênero no agendamento.
-                          </div>
-                        </div>
-                      )}
-
-                      {editingProcedure && formData.requires_body_selection && formData.body_selection_type && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setBodyAreasManagerOpen(true)}
-                          className="w-full"
-                        >
-                          Gerenciar Áreas Selecionáveis
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Gerenciador de Promoções por Grupos */}
-                {editingProcedure && (
-                  <ProcedureDiscountManager
-                    procedureId={editingProcedure.id}
-                    requiresBodySelection={formData.requires_body_selection || false}
-                  />
-                )}
-
-                {/* Checkbox destacar */}
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="is_featured"
-                    checked={formData.is_featured}
-                    onCheckedChange={(checked) => 
-                      setFormData({ ...formData, is_featured: checked as boolean })
-                    }
-                  />
-                  <Label htmlFor="is_featured" className="text-sm font-medium">
-                    Destacar na página inicial (máximo 4)
-                  </Label>
-                </div>
+              {/* Indication */}
+              <div>
+                <Label htmlFor="indication">Indicação</Label>
+                <Textarea
+                  id="indication"
+                  value={formData.indication}
+                  onChange={(e) => setFormData({ ...formData, indication: e.target.value })}
+                  placeholder="Para que é indicado este procedimento..."
+                  rows={2}
+                />
               </div>
 
-              <Button type="submit" className="w-full">
-                {editingProcedure ? "Atualizar" : "Criar"}
-              </Button>
+              {/* Featured */}
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="is_featured"
+                  checked={formData.is_featured}
+                  onCheckedChange={(checked) => 
+                    setFormData({ ...formData, is_featured: checked as boolean })
+                  }
+                />
+                <Label htmlFor="is_featured" className="text-sm font-medium">
+                  Destacar na página inicial (máximo 4)
+                </Label>
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit">
+                  {editingProcedure ? "Atualizar" : "Criar"}
+                </Button>
+              </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Filtros e Pesquisa */}
+      {/* Filters */}
       <Card className="p-4">
         <div className="flex flex-col md:flex-row gap-4 items-end">
           <div className="flex-1">
@@ -1013,213 +937,187 @@ const ProceduresManagement = () => {
               />
             </div>
           </div>
-          
-          <div className="flex gap-2">
-            <div className="min-w-[160px]">
-              <Label htmlFor="filter-category" className="text-sm font-medium">
-                Categoria
+
+          <div className="min-w-[200px]">
+            <Label htmlFor="category-filter" className="text-sm font-medium">
+              Filtrar por Categoria
+            </Label>
+            <Select value={displaySelectedCategory} onValueChange={(value) => setSelectedCategory(value === "all" ? "" : value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todas as categorias" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as categorias</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selectedCategory && (
+            <div className="min-w-[200px]">
+              <Label htmlFor="subcategory-filter" className="text-sm font-medium">
+                Filtrar por Subcategoria
               </Label>
-              <Select value={displaySelectedCategory} onValueChange={(value) => {
-                setSelectedCategory(value === "all" ? "" : value);
-                setSelectedSubcategory(""); // Reset subcategory when category changes
-              }}>
+              <Select value={displaySelectedSubcategory} onValueChange={(value) => setSelectedSubcategory(value === "all" ? "" : value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Todas" />
+                  <SelectValue placeholder="Todas as subcategorias" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas as categorias</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
+                  <SelectItem value="all">Todas as subcategorias</SelectItem>
+                  {availableSubcategories.map((subcategory) => (
+                    <SelectItem key={subcategory.id} value={subcategory.id}>
+                      {subcategory.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            
-            {selectedCategory && (
-              <div className="min-w-[160px]">
-                <Label htmlFor="filter-subcategory" className="text-sm font-medium">
-                  Subcategoria
-                </Label>
-                <Select value={displaySelectedSubcategory} onValueChange={(value) => setSelectedSubcategory(value === "all" ? "" : value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as subcategorias</SelectItem>
-                    {availableSubcategories.map((subcategory) => (
-                      <SelectItem key={subcategory.id} value={subcategory.id}>
-                        {subcategory.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setSearchTerm("");
-                setSelectedCategory("");
-                setSelectedSubcategory("");
-              }}
-              className="mt-6"
-            >
-              <Filter className="w-4 h-4 mr-2" />
-              Limpar
-            </Button>
-          </div>
+          )}
         </div>
       </Card>
 
-      <div className="grid gap-4">
-        {filteredProcedures.map((procedure) => (
-          <Card key={procedure.id} className="p-4">
-            <div className="flex gap-4">
-              {procedure.image_url && (
-                <div className="flex-shrink-0">
-                  <img 
-                    src={procedure.image_url} 
-                    alt={procedure.name}
-                    className="w-24 h-24 object-cover rounded"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
-                </div>
-              )}
-              
-              <div className="flex-grow">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-foreground">{procedure.name}</h3>
-                      {procedure.is_featured && (
-                        <Badge variant="default" className="bg-amber-100 text-amber-800">
-                          <Star className="w-3 h-3 mr-1" />
-                          Destaque
-                        </Badge>
-                      )}
-                    </div>
-                    {procedure.categories && (
-                      <p className="text-sm text-primary font-medium">{procedure.categories.name}</p>
-                    )}
-                    {procedure.subcategories && (
-                      <p className="text-xs text-muted-foreground">{procedure.subcategories.name}</p>
-                    )}
-                    {procedure.description && (
-                      <p className="text-sm text-muted-foreground mt-1">{procedure.description}</p>
-                    )}
-                    {procedure.indication && (
-                      <p className="text-sm text-primary/80 mt-1">
-                        <span className="font-medium">Indicado para:</span> {procedure.indication}
-                      </p>
-                    )}
-                    
-                    {procedure.benefits && procedure.benefits.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Benefícios:</p>
-                        <div className="flex flex-wrap gap-1">
-                          {procedure.benefits.slice(0, 3).map((benefit, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {benefit}
-                            </Badge>
-                          ))}
-                          {procedure.benefits.length > 3 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{procedure.benefits.length - 3} mais
-                            </Badge>
+      {/* Procedures List */}
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            Procedimentos ({filteredProcedures.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {filteredProcedures.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">Nenhum procedimento encontrado.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Categoria</TableHead>
+                  <TableHead>Preço</TableHead>
+                  <TableHead>Duração</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredProcedures.map((procedure) => (
+                  <TableRow key={procedure.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        {procedure.image_url && (
+                          <img 
+                            src={procedure.image_url} 
+                            alt={procedure.name}
+                            className="w-10 h-10 rounded object-cover"
+                          />
+                        )}
+                        <div>
+                          <div className="font-medium">{procedure.name}</div>
+                          {procedure.description && (
+                            <div className="text-sm text-muted-foreground">
+                              {procedure.description.length > 50 
+                                ? `${procedure.description.substring(0, 50)}...` 
+                                : procedure.description}
+                            </div>
                           )}
                         </div>
                       </div>
-                    )}
-                    
-                    <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
-                      <span>Duração: {procedure.duration} min</span>
-                      <span>Sessões: {procedure.sessions}</span>
-                      {procedure.price && (
-                        <span>Preço: R$ {procedure.price.toFixed(2)}</span>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        {procedure.categories?.name && (
+                          <div className="text-sm font-medium">{procedure.categories.name}</div>
+                        )}
+                        {procedure.subcategories?.name && (
+                          <div className="text-xs text-muted-foreground">{procedure.subcategories.name}</div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {procedure.price ? (
+                        <span className="font-medium">
+                          R$ {procedure.price.toFixed(2).replace('.', ',')}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">Não informado</span>
                       )}
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <Button
-                      variant={procedure.is_featured ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => toggleFeatured(procedure.id, procedure.is_featured)}
-                    >
-                      <Star className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEdit(procedure)}
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(procedure.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
-
-      {filteredProcedures.length === 0 && procedures.length > 0 && (
-        <Card className="p-8 text-center">
-          <p className="text-muted-foreground">
-            Nenhum procedimento encontrado com os filtros aplicados.
-          </p>
-        </Card>
-      )}
-
-      {procedures.length === 0 && (
-        <Card className="p-8 text-center">
-          <p className="text-muted-foreground">Nenhum procedimento cadastrado ainda.</p>
-        </Card>
-      )}
+                    </TableCell>
+                    <TableCell>{procedure.duration} min</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {procedure.requires_specifications && (
+                          <Badge variant="outline" className="text-xs">
+                            Especificações
+                          </Badge>
+                        )}
+                        {procedure.requires_body_selection && (
+                          <Badge variant="outline" className="text-xs">
+                            Áreas Corporais
+                          </Badge>
+                        )}
+                        {procedure.is_featured && (
+                          <Badge className="text-xs">
+                            Destaque
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleFeatured(procedure.id, procedure.is_featured)}
+                        >
+                          {procedure.is_featured ? (
+                            <StarOff className="h-4 w-4" />
+                          ) : (
+                            <Star className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(procedure)}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(procedure.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Image Editor */}
       <ImageEditor
-        imageFile={selectedImageFile}
-        imageUrl={!selectedImageFile ? formData.image_url : undefined}
         open={imageEditorOpen}
+        onClose={() => setImageEditorOpen(false)}
         onSave={handleImageSave}
-        onCancel={() => {
-          setImageEditorOpen(false);
-          setSelectedImageFile(null);
-        }}
+        imageFile={selectedImageFile}
+        existingImageUrl={selectedImageFile ? undefined : formData.image_url}
       />
 
-      {/* Body Areas Manager */}
+      {/* Discount Manager */}
       {editingProcedure && (
-        <BodyAreasManager
+        <ProcedureDiscountManager
           procedureId={editingProcedure.id}
-          imageUrl={formData.body_selection_type === 'custom' 
-            ? (formData.body_image_url || '') 
-            : getDefaultBodyImage(formData.body_selection_type)}
-          imageUrlMale={formData.body_selection_type === 'custom' 
-            ? (formData.body_image_url_male || '') 
-            : (formData.body_selection_type?.includes('female') 
-                ? getDefaultBodyImage(formData.body_selection_type.replace('female', 'male'))
-                : formData.body_selection_type?.includes('body')
-                  ? getDefaultBodyImage('body_male')
-                  : formData.body_selection_type?.includes('face')
-                    ? getDefaultBodyImage('face_male')
-                    : getDefaultBodyImage('body_male'))}
-          bodySelectionType={formData.body_selection_type}
-          open={bodyAreasManagerOpen}
-          onClose={() => setBodyAreasManagerOpen(false)}
+          requiresBodySelection={formData.requires_body_selection || false}
         />
       )}
     </div>

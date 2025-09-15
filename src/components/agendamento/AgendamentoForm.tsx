@@ -13,7 +13,6 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatDateToBrazil, getCurrentDateBrazil, getCurrentDateTimeBrazil } from '@/utils/dateUtils';
 import type { Client } from "@/types/client";
-import BodyAreaSelector from "./BodyAreaSelector";
 import ProcedureSpecificationSelector from "./ProcedureSpecificationSelector";
 import { useSpecificationCalculation, ProcedureSpecification } from "@/hooks/useSpecificationCalculation";
 
@@ -736,11 +735,6 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
     }
   };
 
-  const handleSpecificationChange = (specs: ProcedureSpecification[], totalPrice: number) => {
-    setSelectedSpecifications(specs);
-    setTotalSpecificationsPrice(totalPrice);
-  };
-
   const handleCancelAppointment = async () => {
     if (!editingId || !currentAppointment) return;
     
@@ -1088,29 +1082,23 @@ Para reagendar, entre em contato conosco.`;
             />
           </div>
 
-          {/* Especificações do procedimento - só mostra se requer especificações */}
-          {selectedProcedure && selectedProcedure.requires_specifications && (
+          {/* Especificações e Áreas do procedimento - só mostra se requer especificações ou seleção corporal */}
+          {selectedProcedure && (selectedProcedure.requires_specifications || selectedProcedure.requires_body_selection) && (
             <div className="space-y-4">
               <ProcedureSpecificationSelector
                 procedureId={selectedProcedure.id}
-                onSelectionChange={handleSpecificationChange}
-              />
-            </div>
-          )}
-
-          {/* Seleção de Áreas Corporais - se o procedimento requer */}
-          {selectedProcedure?.requires_body_selection && (
-            <div className="space-y-4">
-              <BodyAreaSelector
-                procedureId={selectedProcedure.id}
+                onSelectionChange={(selectedSpecs, totalPrice, selectedAreas, totalAreasPrice, gender) => {
+                  setSelectedSpecifications(selectedSpecs);
+                  setTotalSpecificationsPrice(totalPrice);
+                  if (selectedAreas && totalAreasPrice !== undefined && gender) {
+                    setSelectedBodyAreas(selectedAreas);
+                    setTotalBodyAreasPrice(totalAreasPrice);
+                    setSelectedGender(gender as 'female' | 'male');
+                  }
+                }}
                 bodySelectionType={selectedProcedure.body_selection_type || ''}
                 bodyImageUrl={selectedProcedure.body_image_url}
                 bodyImageUrlMale={selectedProcedure.body_image_url_male}
-                onSelectionChange={(areas, totalPrice, gender) => {
-                  setSelectedBodyAreas(areas);
-                  setTotalBodyAreasPrice(totalPrice);
-                  setSelectedGender(gender);
-                }}
               />
             </div>
           )}

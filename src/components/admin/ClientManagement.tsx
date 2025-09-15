@@ -210,10 +210,32 @@ const ClientManagement = () => {
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!isValidCPF(formData.cpf)) {
+    // Validar campos obrigatórios
+    if (!formData.nome.trim() || !formData.sobrenome.trim() || !formData.celular.trim()) {
       toast({
         title: "Erro",
-        description: "CPF inválido.",
+        description: "Por favor, preencha todos os campos obrigatórios (Nome, Sobrenome e Celular).",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validar CPF apenas se foi fornecido
+    if (formData.cpf.trim() && !isValidCPF(formData.cpf)) {
+      toast({
+        title: "Erro",
+        description: "CPF inválido. Deixe em branco se não quiser informar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validar celular
+    const cleanPhone = formData.celular.replace(/\D/g, '');
+    if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+      toast({
+        title: "Erro",
+        description: "Número de celular inválido.",
         variant: "destructive",
       });
       return;
@@ -221,16 +243,17 @@ const ClientManagement = () => {
 
     try {
       setLoading(true);
-      const { error } = await supabase.from("clients").insert([
-        {
-          nome: formData.nome,
-          sobrenome: formData.sobrenome,
-          cpf: cleanCPF(formData.cpf),
-          celular: formData.celular,
-          data_nascimento: formData.data_nascimento || null,
-          cidade: formData.cidade || null,
-        },
-      ]);
+      
+      const clientData = {
+        nome: formData.nome.trim(),
+        sobrenome: formData.sobrenome.trim(),
+        cpf: formData.cpf.trim() ? cleanCPF(formData.cpf) : `temp_${Date.now()}`,
+        celular: formData.celular.trim(),
+        data_nascimento: formData.data_nascimento.trim() ? formData.data_nascimento : null,
+        cidade: formData.cidade.trim() || null,
+      };
+
+      const { error } = await supabase.from("clients").insert([clientData]);
 
       if (error) throw error;
 
@@ -244,9 +267,19 @@ const ClientManagement = () => {
       loadClients();
     } catch (error: any) {
       console.error("Erro ao criar cliente:", error);
+      let errorMessage = "Erro ao cadastrar cliente.";
+      
+      if (error.code === '23505') {
+        errorMessage = "Este CPF já está cadastrado no sistema.";
+      } else if (error.code === '23514') {
+        errorMessage = "Dados inválidos. Verifique o CPF e outros campos.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Erro",
-        description: error.message || "Erro ao cadastrar cliente.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -272,10 +305,32 @@ const ClientManagement = () => {
 
     if (!editingClient) return;
 
-    if (!isValidCPF(formData.cpf)) {
+    // Validar campos obrigatórios
+    if (!formData.nome.trim() || !formData.sobrenome.trim() || !formData.celular.trim()) {
       toast({
         title: "Erro",
-        description: "CPF inválido.",
+        description: "Por favor, preencha todos os campos obrigatórios (Nome, Sobrenome e Celular).",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validar CPF apenas se foi fornecido
+    if (formData.cpf.trim() && !isValidCPF(formData.cpf)) {
+      toast({
+        title: "Erro",
+        description: "CPF inválido. Deixe em branco se não quiser informar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validar celular
+    const cleanPhone = formData.celular.replace(/\D/g, '');
+    if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+      toast({
+        title: "Erro",
+        description: "Número de celular inválido.",
         variant: "destructive",
       });
       return;
@@ -283,16 +338,19 @@ const ClientManagement = () => {
 
     try {
       setLoading(true);
+      
+      const updateData = {
+        nome: formData.nome.trim(),
+        sobrenome: formData.sobrenome.trim(),
+        cpf: formData.cpf.trim() ? cleanCPF(formData.cpf) : editingClient.cpf,
+        celular: formData.celular.trim(),
+        data_nascimento: formData.data_nascimento.trim() ? formData.data_nascimento : null,
+        cidade: formData.cidade.trim() || null,
+      };
+
       const { error } = await supabase
         .from("clients")
-        .update({
-          nome: formData.nome,
-          sobrenome: formData.sobrenome,
-          cpf: cleanCPF(formData.cpf),
-          celular: formData.celular,
-          data_nascimento: formData.data_nascimento || null,
-          cidade: formData.cidade || null,
-        })
+        .update(updateData)
         .eq('id', editingClient.id);
 
       if (error) throw error;
@@ -308,9 +366,19 @@ const ClientManagement = () => {
       loadClients();
     } catch (error: any) {
       console.error("Erro ao atualizar cliente:", error);
+      let errorMessage = "Erro ao atualizar cliente.";
+      
+      if (error.code === '23505') {
+        errorMessage = "Este CPF já está cadastrado no sistema.";
+      } else if (error.code === '23514') {
+        errorMessage = "Dados inválidos. Verifique o CPF e outros campos.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Erro",
-        description: error.message || "Erro ao atualizar cliente.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -800,17 +868,16 @@ const ClientManagement = () => {
               </div>
             </div>
             <div>
-              <Label htmlFor="cpf">CPF</Label>
+              <Label htmlFor="cpf">CPF (opcional)</Label>
               <Input
                 id="cpf"
                 value={formData.cpf}
                 onChange={(e) => setFormData({...formData, cpf: formatCPF(e.target.value)})}
                 placeholder="000.000.000-00"
-                required
               />
             </div>
             <div>
-              <Label htmlFor="celular">Celular</Label>
+              <Label htmlFor="celular">Celular *</Label>
               <Input
                 id="celular"
                 value={formData.celular}
@@ -820,7 +887,7 @@ const ClientManagement = () => {
               />
             </div>
             <div>
-              <Label htmlFor="data_nascimento">Data de Nascimento</Label>
+              <Label htmlFor="data_nascimento">Data de Nascimento (opcional)</Label>
               <Input
                 id="data_nascimento"
                 type="date"
@@ -829,7 +896,7 @@ const ClientManagement = () => {
               />
             </div>
             <div>
-              <Label htmlFor="cidade">Cidade</Label>
+              <Label htmlFor="cidade">Cidade (opcional)</Label>
               <Input
                 id="cidade"
                 value={formData.cidade}

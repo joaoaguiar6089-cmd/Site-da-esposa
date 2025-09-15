@@ -32,7 +32,9 @@ const NewAppointmentForm = ({ onBack, onSuccess, selectedDate }: NewAppointmentF
     nome: "",
     sobrenome: "",
     celular: "",
-    cpf: ""
+    cpf: "",
+    data_nascimento: "",
+    cidade: ""
   });
   const [sendNotification, setSendNotification] = useState(true);
   const { toast } = useToast();
@@ -110,9 +112,17 @@ const NewAppointmentForm = ({ onBack, onSuccess, selectedDate }: NewAppointmentF
 
   const handleNewClientInputChange = (field: string, value: string) => {
     if (field === 'celular') {
-      value = formatPhone(value);
+      const numbers = value.replace(/\D/g, '');
+      if (numbers.length <= 11) {
+        value = formatPhone(value);
+      } else {
+        return; // Não permite mais de 11 dígitos
+      }
     } else if (field === 'cpf') {
       value = formatCPF(value);
+    } else if (field === 'nome' || field === 'sobrenome') {
+      // Remove números e caracteres especiais, permite apenas letras e espaços
+      value = value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
     }
     
     setNewClientData(prev => ({
@@ -124,14 +134,17 @@ const NewAppointmentForm = ({ onBack, onSuccess, selectedDate }: NewAppointmentF
   const isValidNewClientForm = () => {
     const { nome, sobrenome, celular } = newClientData;
     const phoneNumbers = celular.replace(/\D/g, '');
-    return nome.trim() && sobrenome.trim() && phoneNumbers.length >= 10;
+    return nome.trim().length >= 2 && 
+           sobrenome.trim().length >= 2 && 
+           phoneNumbers.length >= 10 && 
+           phoneNumbers.length <= 11;
   };
 
   const handleNewClientSubmit = async () => {
     if (!isValidNewClientForm()) {
       toast({
         title: "Dados incompletos",
-        description: "Por favor, preencha todos os campos obrigatórios.",
+        description: "Por favor, preencha Nome, Sobrenome e Celular corretamente.",
         variant: "destructive",
       });
       return;
@@ -148,6 +161,7 @@ const NewAppointmentForm = ({ onBack, onSuccess, selectedDate }: NewAppointmentF
           description: "Por favor, insira um CPF válido ou deixe em branco.",
           variant: "destructive",
         });
+        setLoading(false);
         return;
       }
 
@@ -159,8 +173,10 @@ const NewAppointmentForm = ({ onBack, onSuccess, selectedDate }: NewAppointmentF
       const clientData = {
         nome: newClientData.nome.trim(),
         sobrenome: newClientData.sobrenome.trim(),
-        celular: newClientData.celular,
-        cpf: cpfToSave
+        celular: newClientData.celular.trim(),
+        cpf: cpfToSave,
+        data_nascimento: newClientData.data_nascimento.trim() || null,
+        cidade: newClientData.cidade.trim() || null
       };
 
       const { data, error } = await supabase
@@ -178,11 +194,21 @@ const NewAppointmentForm = ({ onBack, onSuccess, selectedDate }: NewAppointmentF
 
       setSelectedClient(data);
       setStep('appointment');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao cadastrar cliente:', error);
+      
+      let errorMessage = "Erro ao cadastrar cliente. Tente novamente.";
+      if (error.code === '23505') {
+        errorMessage = "Este CPF já está cadastrado no sistema.";
+      } else if (error.code === '23514') {
+        errorMessage = "Dados inválidos. Verifique o CPF e outros campos.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Erro",
-        description: "Erro ao cadastrar cliente. Tente novamente.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -248,6 +274,27 @@ const NewAppointmentForm = ({ onBack, onSuccess, selectedDate }: NewAppointmentF
                 value={newClientData.cpf}
                 onChange={(e) => handleNewClientInputChange('cpf', e.target.value)}
                 maxLength={14}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="data_nascimento">Data de Nascimento (opcional)</Label>
+              <Input
+                id="data_nascimento"
+                type="date"
+                value={newClientData.data_nascimento}
+                onChange={(e) => handleNewClientInputChange('data_nascimento', e.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="cidade">Cidade (opcional)</Label>
+              <Input
+                id="cidade"
+                type="text"
+                placeholder="Cidade do cliente"
+                value={newClientData.cidade}
+                onChange={(e) => handleNewClientInputChange('cidade', e.target.value)}
               />
             </div>
             

@@ -386,6 +386,53 @@ const ClientManagement = () => {
     }
   };
 
+  const handleDeleteClient = async (client: Client) => {
+    // Verificar se o cliente tem agendamentos
+    const clientAppointments = getClientAppointments(client.id);
+    
+    if (clientAppointments.length > 0) {
+      toast({
+        title: "Impossível excluir",
+        description: "Este cliente possui agendamentos cadastrados. Cancele ou remova os agendamentos primeiro.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!confirm(`Tem certeza que deseja excluir o cliente ${client.nome} ${client.sobrenome}?`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from("clients")
+        .delete()
+        .eq('id', client.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Cliente excluído com sucesso!",
+      });
+
+      loadClients();
+      if (selectedClient?.id === client.id) {
+        setSelectedClient(null);
+      }
+    } catch (error: any) {
+      console.error("Erro ao excluir cliente:", error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao excluir cliente.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const formatWhatsAppNumber = (phone: string) => {
     // Remove todos os caracteres não numéricos
     const cleanPhone = phone.replace(/\D/g, '');
@@ -648,63 +695,107 @@ const ClientManagement = () => {
         {/* Lista de Clientes */}
         <Card>
           <CardHeader>
-            <CardTitle>Clientes Cadastrados</CardTitle>
+            <CardTitle className="flex items-center justify-between">
+              Clientes Cadastrados
+              <Badge variant="outline">
+                {clients.length} {clients.length === 1 ? 'cliente' : 'clientes'}
+              </Badge>
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4 max-h-96 overflow-y-auto">
+          <CardContent className="space-y-3 max-h-96 overflow-y-auto">
             {loading ? (
-              <div className="text-center py-4">Carregando...</div>
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-2 text-muted-foreground">Carregando...</p>
+              </div>
             ) : clients.length === 0 ? (
-              <div className="text-center py-4 text-muted-foreground">
-                Nenhum cliente cadastrado
+              <div className="text-center py-8">
+                <User className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+                <p className="text-muted-foreground">Nenhum cliente cadastrado</p>
+                <Button 
+                  onClick={() => setShowClientForm(true)} 
+                  className="mt-2"
+                  size="sm"
+                >
+                  Cadastrar primeiro cliente
+                </Button>
               </div>
             ) : (
               clients.map((client) => (
                 <Card 
                   key={client.id}
-                  className={`cursor-pointer transition-colors ${
-                    selectedClient?.id === client.id ? 'ring-2 ring-primary' : ''
+                  className={`cursor-pointer transition-all hover:shadow-md ${
+                    selectedClient?.id === client.id ? 'ring-2 ring-primary shadow-md' : ''
                   }`}
                   onClick={() => setSelectedClient(client)}
                 >
-                  <CardContent className="p-4">
+                  <CardContent className="p-3">
                     <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-semibold">{client.nome} {client.sobrenome}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          CPF: {formatCPF(client.cpf)}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Celular: {client.celular}
-                        </p>
-                        {client.data_nascimento && (
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-base truncate">
+                          {client.nome} {client.sobrenome}
+                        </h4>
+                        <div className="space-y-1 mt-1">
                           <p className="text-sm text-muted-foreground">
-                            Nascimento: {format(new Date(client.data_nascimento), "dd/MM/yyyy")}
+                            📞 {client.celular}
                           </p>
-                        )}
-                        {client.cidade && (
-                          <p className="text-sm text-muted-foreground">
-                            Cidade: {client.cidade}
-                          </p>
-                        )}
+                          {client.cpf && !client.cpf.startsWith('temp_') && (
+                            <p className="text-sm text-muted-foreground">
+                              🆔 {formatCPF(client.cpf)}
+                            </p>
+                          )}
+                          {client.data_nascimento && (
+                            <p className="text-sm text-muted-foreground">
+                              🎂 {format(new Date(client.data_nascimento), "dd/MM/yyyy")}
+                            </p>
+                          )}
+                          {client.cidade && (
+                            <p className="text-sm text-muted-foreground">
+                              📍 {client.cidade}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <Badge variant="secondary">
-                          {getClientAppointments(client.id).length} agendamentos
+                      <div className="flex flex-col items-end gap-2 ml-2">
+                        <Badge variant="secondary" className="text-xs">
+                          {getClientAppointments(client.id).length} procedimentos
                         </Badge>
                         <div className="flex gap-1">
                           <Button 
                             size="sm" 
                             variant="outline"
-                            onClick={() => handleEditClient(client)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditClient(client);
+                            }}
+                            title="Editar cliente"
+                            className="h-8 w-8 p-0"
                           >
-                            <Edit className="w-4 h-4" />
+                            <Edit className="w-3 h-3" />
                           </Button>
                           <Button 
                             size="sm" 
                             variant="outline"
-                            onClick={() => openWhatsApp(client.celular)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openWhatsApp(client.celular);
+                            }}
+                            title="Abrir WhatsApp"
+                            className="h-8 w-8 p-0"
                           >
-                            <MessageCircle className="w-4 h-4" />
+                            <MessageCircle className="w-3 h-3" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteClient(client);
+                            }}
+                            title="Excluir cliente"
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="w-3 h-3" />
                           </Button>
                         </div>
                       </div>

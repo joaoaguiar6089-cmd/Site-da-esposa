@@ -108,16 +108,23 @@ const ProcedureSpecificationSelector = ({
     // Draw background image
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    // Draw areas for selected specifications
+    // Draw areas for all specifications with area selection
     selectedSpecifications
-      .filter(spec => spec.selected && spec.has_area_selection && spec.area_shapes && spec.gender === selectedGender)
+      .filter(spec => spec.has_area_selection && spec.area_shapes && spec.gender === selectedGender)
       .forEach(spec => {
+        const isSelected = spec.selected;
         const isHovered = hoveredSpecId === spec.id;
         
         (spec.area_shapes as any[])?.forEach((shape: any) => {
-          ctx.strokeStyle = '#10B981';
-          ctx.fillStyle = isHovered ? 'rgba(16, 185, 129, 0.4)' : 'rgba(16, 185, 129, 0.3)';
-          ctx.lineWidth = 2;
+          // Different colors for selected vs unselected areas
+          if (isSelected) {
+            ctx.strokeStyle = '#10B981'; // Green for selected
+            ctx.fillStyle = isHovered ? 'rgba(16, 185, 129, 0.5)' : 'rgba(16, 185, 129, 0.3)';
+          } else {
+            ctx.strokeStyle = '#6B7280'; // Gray for unselected
+            ctx.fillStyle = isHovered ? 'rgba(107, 114, 128, 0.3)' : 'rgba(107, 114, 128, 0.1)';
+          }
+          ctx.lineWidth = isSelected ? 3 : 1;
 
           const x = (shape.x / 100) * canvas.width;
           const y = (shape.y / 100) * canvas.height;
@@ -154,8 +161,9 @@ const ProcedureSpecificationSelector = ({
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
+    // Check all specifications with areas, not just selected ones
     const hoveredSpec = selectedSpecifications.find(spec => 
-      spec.selected && isPointInSpecification(x, y, spec)
+      spec.has_area_selection && isPointInSpecification(x, y, spec)
     );
     setHoveredSpecId(hoveredSpec?.id || null);
   };
@@ -206,8 +214,10 @@ const ProcedureSpecificationSelector = ({
     spec.selected && spec.has_area_selection && spec.gender === selectedGender
   );
 
-  // Check if we should show the image (if there are specifications with area selection, even without area_shapes)
-  const shouldShowImage = hasAreaSelection;
+  // Check if we should show the image (if there are specifications with area selection for the current gender)
+  const shouldShowImage = specifications.some(spec => 
+    spec.has_area_selection && spec.gender === selectedGender
+  );
 
   if (loading) {
     return (
@@ -258,7 +268,14 @@ const ProcedureSpecificationSelector = ({
         {/* Specifications Selection */}
         {selectedSpecifications.map((spec, index) => (
           <div key={spec.id}>
-            <div className="flex items-start space-x-3 p-4 rounded-lg border hover:bg-muted/50 transition-colors">
+            <div 
+              className={`flex items-start space-x-3 p-4 rounded-lg border transition-colors cursor-pointer ${
+                spec.selected ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'
+              }`}
+              onMouseEnter={() => spec.has_area_selection && setHoveredSpecId(spec.id)}
+              onMouseLeave={() => setHoveredSpecId(null)}
+              onClick={() => handleSpecificationChange(spec.id, !spec.selected)}
+            >
               <Checkbox
                 id={`spec-${spec.id}`}
                 checked={spec.selected}

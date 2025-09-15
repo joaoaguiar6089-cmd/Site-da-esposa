@@ -536,6 +536,7 @@ export type Database = {
           name: string
           price: number | null
           requires_area_selection: boolean | null
+          requires_body_image_selection: boolean | null
           requires_body_selection: boolean | null
           requires_specifications: boolean | null
           sessions: number
@@ -558,6 +559,7 @@ export type Database = {
           name: string
           price?: number | null
           requires_area_selection?: boolean | null
+          requires_body_image_selection?: boolean | null
           requires_body_selection?: boolean | null
           requires_specifications?: boolean | null
           sessions?: number
@@ -580,6 +582,7 @@ export type Database = {
           name?: string
           price?: number | null
           requires_area_selection?: boolean | null
+          requires_body_image_selection?: boolean | null
           requires_body_selection?: boolean | null
           requires_specifications?: boolean | null
           sessions?: number

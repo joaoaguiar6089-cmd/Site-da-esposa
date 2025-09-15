@@ -730,121 +730,16 @@ const ProceduresManagement = () => {
                   </Label>
                 </div>
 
-                {formData.requires_specifications && (
-                  <div className="space-y-3 ml-6">
-                    {/* Nested checkbox for body area selection */}
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="requires_body_selection"
-                        checked={formData.requires_body_selection}
-                        onCheckedChange={(checked) =>
-                          setFormData({ ...formData, requires_body_selection: checked as boolean })
-                        }
-                      />
-                      <Label htmlFor="requires_body_selection" className="text-sm font-medium">
-                        Requer seleção de área corporal
-                      </Label>
-                    </div>
-
-                    {/* Manage specifications button - always visible when requires specifications */}
-                    {editingProcedure && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setSpecificationsManagerOpen(true)}
-                        className="w-full"
-                      >
-                        Gerenciar Procedimentos
-                      </Button>
-                    )}
-
-                    {/* Body selection options - only visible when requires body selection */}
-                    {formData.requires_body_selection && (
-                      <div className="space-y-3">
-                        <div>
-                          <Label htmlFor="body_selection_type">Tipo de Seleção</Label>
-                          <Select 
-                            value={formData.body_selection_type || ''} 
-                            onValueChange={(value) => setFormData({ ...formData, body_selection_type: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o tipo de área" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="face_male">Rosto Masculino</SelectItem>
-                              <SelectItem value="face_female">Rosto Feminino</SelectItem>
-                              <SelectItem value="body_male">Corpo Masculino</SelectItem>
-                              <SelectItem value="body_female">Corpo Feminino</SelectItem>
-                              <SelectItem value="custom">Imagem Customizada</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {formData.body_selection_type === 'custom' && (
-                          <div className="space-y-4">
-                            <h4 className="font-semibold">Imagens Personalizadas</h4>
-                            
-                            {/* Female Image Upload */}
-                            <div className="space-y-2 p-3 border rounded">
-                              <h5 className="font-medium text-sm">Imagem Feminina</h5>
-                              <Input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => setSelectedBodyImageFile(e.target.files?.[0] || null)}
-                              />
-                              {selectedBodyImageFile && (
-                                <Button
-                                  type="button"
-                                  onClick={() => uploadBodyImage(selectedBodyImageFile)}
-                                  disabled={uploadingBodyImage}
-                                  size="sm"
-                                >
-                                  {uploadingBodyImage ? 'Enviando...' : 'Upload'}
-                                </Button>
-                              )}
-                              {formData.body_image_url && (
-                                <img src={formData.body_image_url} alt="Preview feminino" className="w-16 h-16 object-cover rounded" />
-                              )}
-                            </div>
-
-                            {/* Male Image Upload */}
-                            <div className="space-y-2 p-3 border rounded">
-                              <h5 className="font-medium text-sm">Imagem Masculina (Opcional)</h5>
-                              <Input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => setSelectedBodyImageMaleFile(e.target.files?.[0] || null)}
-                              />
-                              {selectedBodyImageMaleFile && (
-                                <Button
-                                  type="button"
-                                  onClick={() => uploadBodyImageMale(selectedBodyImageMaleFile)}
-                                  disabled={uploadingBodyImageMale}
-                                  size="sm"
-                                >
-                                  {uploadingBodyImageMale ? 'Enviando...' : 'Upload'}
-                                </Button>
-                              )}
-                              {formData.body_image_url_male && (
-                                <img src={formData.body_image_url_male} alt="Preview masculino" className="w-16 h-16 object-cover rounded" />
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Body Areas Manager Button */}
-                        {editingProcedure && formData.body_selection_type && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setBodyAreasManagerOpen(true)}
-                            className="w-full"
-                          >
-                            Gerenciar Áreas Selecionáveis
-                          </Button>
-                        )}
-                      </div>
-                    )}
+                {formData.requires_specifications && editingProcedure && (
+                  <div className="mt-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setSpecificationsManagerOpen(true)}
+                      className="w-full"
+                    >
+                      Gerenciar Especificações
+                    </Button>
                   </div>
                 )}
               </div>

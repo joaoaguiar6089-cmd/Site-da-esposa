@@ -3,13 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Edit2, Trash2, X } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Upload, Image } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import BodyAreasManager from "./BodyAreasManager";
 
 interface ProcedureSpecification {
   id: string;
@@ -33,16 +36,34 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSpec, setEditingSpec] = useState<ProcedureSpecification | null>(null);
+  const [bodyAreasManagerOpen, setBodyAreasManagerOpen] = useState(false);
+  const [editingSpecForAreas, setEditingSpecForAreas] = useState<ProcedureSpecification | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     price: "",
     display_order: "1"
   });
+
+  // Procedure-level settings
+  const [procedureSettings, setProcedureSettings] = useState({
+    requires_body_image_selection: false,
+    body_selection_type: "",
+    body_image_url: "",
+    body_image_url_male: ""
+  });
+
+  // Image uploads
+  const [selectedBodyImageFile, setSelectedBodyImageFile] = useState<File | null>(null);
+  const [selectedBodyImageMaleFile, setSelectedBodyImageMaleFile] = useState<File | null>(null);
+  const [uploadingBodyImage, setUploadingBodyImage] = useState(false);
+  const [uploadingBodyImageMale, setUploadingBodyImageMale] = useState(false);
+
   const { toast } = useToast();
 
   useEffect(() => {
     loadSpecifications();
+    loadProcedureSettings();
   }, [procedureId]);
 
   const loadSpecifications = async () => {
@@ -63,6 +84,124 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadProcedureSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('procedures')
+        .select('requires_body_image_selection, body_selection_type, body_image_url, body_image_url_male')
+        .eq('id', procedureId)
+        .single();
+
+      if (error) throw error;
+      setProcedureSettings({
+        requires_body_image_selection: data?.requires_body_image_selection || false,
+        body_selection_type: data?.body_selection_type || "",
+        body_image_url: data?.body_image_url || "",
+        body_image_url_male: data?.body_image_url_male || ""
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao carregar configurações",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateProcedureSettings = async (settings: Partial<typeof procedureSettings>) => {
+    try {
+      const { error } = await supabase
+        .from('procedures')
+        .update(settings)
+        .eq('id', procedureId);
+
+      if (error) throw error;
+
+      setProcedureSettings(prev => ({ ...prev, ...settings }));
+      
+      toast({
+        title: "Configurações atualizadas",
+        description: "As configurações do procedimento foram atualizadas.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const uploadBodyImage = async (file: File) => {
+    if (!file) return;
+
+    setUploadingBodyImage(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `body-${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('procedure-images')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('procedure-images')
+        .getPublicUrl(fileName);
+
+      await updateProcedureSettings({ body_image_url: publicUrl });
+
+      setSelectedBodyImageFile(null);
+    } catch (error: any) {
+      toast({
+        title: "Erro no upload",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingBodyImage(false);
+    }
+  };
+
+  const uploadBodyImageMale = async (file: File) => {
+    if (!file) return;
+
+    setUploadingBodyImageMale(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `body-male-${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('procedure-images')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('procedure-images')
+        .getPublicUrl(fileName);
+
+      await updateProcedureSettings({ body_image_url_male: publicUrl });
+
+      setSelectedBodyImageMaleFile(null);
+    } catch (error: any) {
+      toast({
+        title: "Erro no upload",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingBodyImageMale(false);
     }
   };
 
@@ -183,6 +322,11 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
     setDialogOpen(true);
   };
 
+  const handleManageAreas = (spec: ProcedureSpecification) => {
+    setEditingSpecForAreas(spec);
+    setBodyAreasManagerOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -191,6 +335,23 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
           <p>Carregando especificações...</p>
         </div>
       </div>
+    );
+  }
+
+  // If body areas manager is open
+  if (bodyAreasManagerOpen && editingSpecForAreas) {
+    return (
+      <BodyAreasManager
+        procedureId={procedureId}
+        imageUrl={procedureSettings.body_image_url || '/images/body-female-default.png'}
+        imageUrlMale={procedureSettings.body_image_url_male}
+        bodySelectionType={procedureSettings.body_selection_type}
+        open={bodyAreasManagerOpen}
+        onClose={() => {
+          setBodyAreasManagerOpen(false);
+          setEditingSpecForAreas(null);
+        }}
+      />
     );
   }
 
@@ -212,6 +373,118 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
           </Button>
         </div>
       </div>
+
+      {/* Procedure Image Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Configurações de Imagem para Seleção de Área</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="requires_body_image_selection"
+              checked={procedureSettings.requires_body_image_selection}
+              onCheckedChange={(checked) => 
+                updateProcedureSettings({ requires_body_image_selection: checked as boolean })
+              }
+            />
+            <Label htmlFor="requires_body_image_selection" className="text-sm font-medium">
+              Requer imagem para seleção de área
+            </Label>
+          </div>
+
+          {procedureSettings.requires_body_image_selection && (
+            <div className="space-y-4 ml-6">
+              <div>
+                <Label htmlFor="body_selection_type">Tipo de Seleção</Label>
+                <Select 
+                  value={procedureSettings.body_selection_type} 
+                  onValueChange={(value) => updateProcedureSettings({ body_selection_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo de área" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="face_male">Rosto Masculino</SelectItem>
+                    <SelectItem value="face_female">Rosto Feminino</SelectItem>
+                    <SelectItem value="body_male">Corpo Masculino</SelectItem>
+                    <SelectItem value="body_female">Corpo Feminino</SelectItem>
+                    <SelectItem value="custom">Imagem Customizada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {procedureSettings.body_selection_type === 'custom' && (
+                <div className="space-y-4">
+                  <h4 className="font-semibold">Imagens Personalizadas</h4>
+                  
+                  {/* Female Image Upload */}
+                  <div className="space-y-2 p-3 border rounded">
+                    <h5 className="font-medium text-sm">Imagem Feminina</h5>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setSelectedBodyImageFile(e.target.files?.[0] || null)}
+                    />
+                    {selectedBodyImageFile && (
+                      <Button
+                        type="button"
+                        onClick={() => uploadBodyImage(selectedBodyImageFile)}
+                        disabled={uploadingBodyImage}
+                        size="sm"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {uploadingBodyImage ? 'Enviando...' : 'Upload'}
+                      </Button>
+                    )}
+                    {procedureSettings.body_image_url && (
+                      <div className="flex items-center gap-2">
+                        <img 
+                          src={procedureSettings.body_image_url} 
+                          alt="Preview feminino" 
+                          className="w-20 h-20 object-contain rounded border" 
+                        />
+                        <Badge variant="secondary">Imagem carregada</Badge>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Male Image Upload */}
+                  <div className="space-y-2 p-3 border rounded">
+                    <h5 className="font-medium text-sm">Imagem Masculina (Opcional)</h5>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setSelectedBodyImageMaleFile(e.target.files?.[0] || null)}
+                    />
+                    {selectedBodyImageMaleFile && (
+                      <Button
+                        type="button"
+                        onClick={() => uploadBodyImageMale(selectedBodyImageMaleFile)}
+                        disabled={uploadingBodyImageMale}
+                        size="sm"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {uploadingBodyImageMale ? 'Enviando...' : 'Upload'}
+                      </Button>
+                    )}
+                    {procedureSettings.body_image_url_male && (
+                      <div className="flex items-center gap-2">
+                        <img 
+                          src={procedureSettings.body_image_url_male} 
+                          alt="Preview masculino" 
+                          className="w-20 h-20 object-contain rounded border" 
+                        />
+                        <Badge variant="secondary">Imagem carregada</Badge>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {specifications.length === 0 ? (
         <Card>
@@ -274,6 +547,15 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex gap-2 justify-end">
+                        {procedureSettings.requires_body_image_selection && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleManageAreas(spec)}
+                          >
+                            <Image className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"
@@ -300,7 +582,7 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
 
       {/* Dialog para criar/editar especificação */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingSpec ? "Editar Especificação" : "Nova Especificação"}
@@ -355,6 +637,28 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
                 />
               </div>
             </div>
+
+            {/* Preview área de seleção - só aparece se requer imagem */}
+            {procedureSettings.requires_body_image_selection && procedureSettings.body_selection_type && (
+              <div className="border rounded-lg p-4">
+                <Label className="text-sm font-medium mb-2 block">Preview da Imagem para Seleção</Label>
+                <div className="flex justify-center">
+                  <img
+                    src={
+                      procedureSettings.body_selection_type === 'custom' 
+                        ? procedureSettings.body_image_url 
+                        : `/images/body-${procedureSettings.body_selection_type.replace('_', '-')}-default.png`
+                    }
+                    alt="Imagem para seleção"
+                    className="max-w-sm max-h-80 object-contain rounded border"
+                    style={{ width: 'auto', height: 'auto' }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                  {editingSpec ? 'Esta imagem será usada para seleção de áreas ao editar esta especificação' : 'Esta imagem será usada para seleção de áreas após criar esta especificação'}
+                </p>
+              </div>
+            )}
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>

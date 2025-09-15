@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +45,16 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
     price: "",
     display_order: "1"
   });
+
+  // Estado para seleção de áreas no formulário
+  const [currentShapes, setCurrentShapes] = useState<any[]>([]);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [currentShape, setCurrentShape] = useState<any | null>(null);
+  const [selectedGender, setSelectedGender] = useState<'female' | 'male'>('female');
+  
+  // Refs para canvas integrado
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
 
   // Procedure-level settings
   const [procedureSettings, setProcedureSettings] = useState({
@@ -218,6 +228,16 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
       return;
     }
 
+    // Validação para novas especificações que requerem área
+    if (!editingSpec && procedureSettings.requires_body_image_selection && currentShapes.length === 0) {
+      toast({
+        title: "Área obrigatória",
+        description: "Selecione pelo menos uma área para esta especificação.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const specData = {
         procedure_id: procedureId,
@@ -247,11 +267,32 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
           description: "A especificação foi atualizada com sucesso.",
         });
       } else {
-        const { error } = await supabase
+        // Criar nova especificação
+        const { data: newSpec, error: specError } = await supabase
           .from('procedure_specifications')
-          .insert([specData]);
+          .insert([specData])
+          .select()
+          .single();
 
-        if (error) throw error;
+        if (specError) throw specError;
+
+        // Se há áreas selecionadas, salvar as áreas
+        if (procedureSettings.requires_body_image_selection && currentShapes.length > 0) {
+          const { error: areasError } = await supabase
+            .from('body_area_groups')
+            .insert([{
+              specification_id: newSpec.id,
+              name: formData.name.trim(),
+              price: parseFloat(formData.price) || 0,
+              shapes: currentShapes,
+              gender: selectedGender
+            }]);
+
+          if (areasError) {
+            console.warn('Erro ao salvar áreas:', areasError);
+            // Não falha completamente se área não salvar
+          }
+        }
         
         toast({
           title: "Especificação criada",
@@ -316,6 +357,177 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
       display_order: "1"
     });
     setEditingSpec(null);
+    setCurrentShapes([]);
+    setCurrentShape(null);
+  };
+
+  // Funções para desenho de áreas no formulário
+  const getCurrentImageUrl = useCallback(() => {
+    if (procedureSettings.body_selection_type === 'custom') {
+      return selectedGender === 'male' && procedureSettings.body_image_url_male 
+        ? procedureSettings.body_image_url_male 
+        : procedureSettings.body_image_url;
+    }
+
+    const defaultImages = {
+      'face_male': '/images/face-male-default.png',
+      'face_female': '/images/face-female-default.png',
+      'body_male': '/images/body-male-default.png',
+      'body_female': '/images/body-female-default.png'
+    } as const;
+
+    if (procedureSettings.body_selection_type && procedureSettings.body_selection_type.includes('_')) {
+      const imageKey = procedureSettings.body_selection_type as keyof typeof defaultImages;
+      return defaultImages[imageKey] || procedureSettings.body_image_url || '';
+    }
+
+    return defaultImages[`body_${selectedGender}`] || procedureSettings.body_image_url || '';
+  }, [procedureSettings, selectedGender]);
+
+  const getCanvasCoordinates = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    return {
+      x: ((e.clientX - rect.left) * scaleX / canvas.width) * 100,
+      y: ((e.clientY - rect.top) * scaleY / canvas.height) * 100
+    };
+  }, []);
+
+  const drawCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx || !imageRef.current) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(imageRef.current, 0, 0, canvas.width, canvas.height);
+
+    // Desenhar formas temporárias
+    currentShapes.forEach((shape) => {
+      const x = (shape.x / 100) * canvas.width;
+      const y = (shape.y / 100) * canvas.height;
+      const width = (shape.width / 100) * canvas.width;
+      const height = (shape.height / 100) * canvas.height;
+
+      ctx.strokeStyle = '#22c55e';
+      ctx.fillStyle = 'rgba(34, 197, 94, 0.3)';
+      ctx.lineWidth = 2;
+      ctx.fillRect(x, y, width, height);
+      ctx.strokeRect(x, y, width, height);
+    });
+
+    // Desenhar forma atual sendo desenhada
+    if (currentShape) {
+      const x = (currentShape.x / 100) * canvas.width;
+      const y = (currentShape.y / 100) * canvas.height;
+      const width = (currentShape.width / 100) * canvas.width;
+      const height = (currentShape.height / 100) * canvas.height;
+
+      ctx.strokeStyle = '#22c55e';
+      ctx.fillStyle = 'rgba(34, 197, 94, 0.3)';
+      ctx.lineWidth = 2;
+      ctx.fillRect(x, y, width, height);
+      ctx.strokeRect(x, y, width, height);
+    }
+  }, [currentShapes, currentShape]);
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const coords = getCanvasCoordinates(e);
+    if (!coords) return;
+
+    setIsDrawing(true);
+    setCurrentShape({
+      x: coords.x,
+      y: coords.y,
+      width: 0,
+      height: 0
+    });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const coords = getCanvasCoordinates(e);
+    if (!coords || !isDrawing || !currentShape) return;
+
+    setCurrentShape({
+      x: Math.min(coords.x, currentShape.x),
+      y: Math.min(coords.y, currentShape.y),
+      width: Math.abs(coords.x - currentShape.x),
+      height: Math.abs(coords.y - currentShape.y)
+    });
+
+    drawCanvas();
+  };
+
+  const handleMouseUp = () => {
+    if (!isDrawing || !currentShape) return;
+
+    if (currentShape.width > 1 && currentShape.height > 1) {
+      setCurrentShapes(prev => [...prev, currentShape]);
+    }
+    
+    setIsDrawing(false);
+    setCurrentShape(null);
+  };
+
+  const handleImageLoad = () => {
+    const canvas = canvasRef.current;
+    const image = imageRef.current;
+    if (!canvas || !image) return;
+
+    const maxWidth = 400;
+    const maxHeight = 400;
+    
+    const aspectRatio = image.naturalWidth / image.naturalHeight;
+    
+    let canvasWidth = maxWidth;
+    let canvasHeight = maxWidth / aspectRatio;
+    
+    if (canvasHeight > maxHeight) {
+      canvasHeight = maxHeight;
+      canvasWidth = maxHeight * aspectRatio;
+    }
+
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+    canvas.style.width = `${canvasWidth}px`;
+    canvas.style.height = `${canvasHeight}px`;
+    
+    drawCanvas();
+  };
+
+  useEffect(() => {
+    drawCanvas();
+  }, [drawCanvas]);
+
+  const finishAreaSelection = () => {
+    if (currentShapes.length === 0) {
+      toast({
+        title: "Área obrigatória",
+        description: "Desenhe pelo menos uma área antes de finalizar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Auto-preencher nome se não estiver preenchido
+    if (!formData.name.trim()) {
+      const areaName = `Área ${selectedGender === 'male' ? 'Masculina' : 'Feminina'}`;
+      setFormData(prev => ({ ...prev, name: areaName }));
+    }
+
+    toast({
+      title: "Área configurada",
+      description: "A área foi configurada com sucesso. Complete os dados e salve.",
+    });
+  };
+
+  const clearCurrentShapes = () => {
+    setCurrentShapes([]);
+    setCurrentShape(null);
   };
 
   const handleNewSpec = () => {
@@ -645,8 +857,91 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
               </div>
             </div>
 
+            {/* Seleção de áreas - só aparece para novos procedimentos que requerem imagem */}
+            {!editingSpec && procedureSettings.requires_body_image_selection && procedureSettings.body_selection_type && (
+              <div className="border rounded-lg p-4 space-y-4">
+                <Label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Selecione as Áreas da Especificação
+                </Label>
+                
+                {/* Seletor de Gênero - só aparece se necessário */}
+                {(!procedureSettings.body_selection_type.includes('_male') && 
+                  !procedureSettings.body_selection_type.includes('_female')) && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">Gênero:</span>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant={selectedGender === 'female' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSelectedGender('female')}
+                      >
+                        Feminino
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={selectedGender === 'male' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSelectedGender('male')}
+                      >
+                        Masculino
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-col items-center space-y-2">
+                  <img
+                    ref={imageRef}
+                    src={getCurrentImageUrl()}
+                    alt="Configuração de áreas"
+                    className="hidden"
+                    onLoad={handleImageLoad}
+                    crossOrigin="anonymous"
+                  />
+                  <canvas
+                    ref={canvasRef}
+                    className="border border-border cursor-crosshair"
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={() => {
+                      setIsDrawing(false);
+                      setCurrentShape(null);
+                    }}
+                  />
+                  
+                  {currentShapes.length > 0 && (
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={finishAreaSelection}
+                      >
+                        Finalizar Seleção ({currentShapes.length} áreas)
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={clearCurrentShapes}
+                      >
+                        Limpar
+                      </Button>
+                    </div>
+                  )}
+                  
+                  <p className="text-xs text-muted-foreground text-center">
+                    Clique e arraste para selecionar as áreas desta especificação
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Preview área de seleção - só aparece se requer imagem */}
-            {procedureSettings.requires_body_image_selection && procedureSettings.body_selection_type && (
+            {procedureSettings.requires_body_image_selection && procedureSettings.body_selection_type && editingSpec && (
               <div className="border rounded-lg p-4">
                 <Label className="text-sm font-medium mb-2 block flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
@@ -665,24 +960,22 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
                   />
                 </div>
                 <p className="text-xs text-muted-foreground text-center mt-2">
-                  {editingSpec ? 'Clique na imagem acima para configurar as áreas de seleção desta especificação' : 'Após criar a especificação, você poderá configurar as áreas de seleção'}
+                  Clique no botão abaixo para configurar as áreas de seleção desta especificação
                 </p>
-                {editingSpec && (
-                  <div className="mt-3 flex justify-center">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleManageAreas(editingSpec);
-                      }}
-                    >
-                      <MapPin className="h-4 w-4 mr-2" />
-                      Configurar Áreas
-                    </Button>
-                  </div>
-                )}
+                <div className="mt-3 flex justify-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleManageAreas(editingSpec);
+                    }}
+                  >
+                    <MapPin className="h-4 w-4 mr-2" />
+                    Configurar Áreas
+                  </Button>
+                </div>
               </div>
             )}
 

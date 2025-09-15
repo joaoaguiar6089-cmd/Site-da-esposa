@@ -323,11 +323,11 @@ const ProcedureSpecificationSelector = ({
               <Label className="text-sm font-medium">
                 {hasSelectedAreaForGender ? 'Áreas selecionadas:' : 'Imagem para seleção de áreas:'}
               </Label>
-              <div className="relative border rounded-md overflow-hidden bg-muted/30">
+              <div className="relative border rounded-md overflow-hidden bg-muted/30 max-w-xs mx-auto">
                 <canvas
                   ref={canvasRef}
-                  width={400}
-                  height={600}
+                  width={300}
+                  height={400}
                   className="w-full cursor-crosshair"
                   onMouseMove={handleCanvasMouseMove}
                   onClick={(e) => {

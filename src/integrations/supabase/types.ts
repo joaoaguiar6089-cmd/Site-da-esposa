@@ -245,8 +245,9 @@ export type Database = {
           id: string
           name: string
           price: number
-          procedure_id: string
+          procedure_id: string | null
           shapes: Json
+          specification_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -255,8 +256,9 @@ export type Database = {
           id?: string
           name: string
           price?: number
-          procedure_id: string
+          procedure_id?: string | null
           shapes: Json
+          specification_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -265,11 +267,19 @@ export type Database = {
           id?: string
           name?: string
           price?: number
-          procedure_id?: string
+          procedure_id?: string | null
           shapes?: Json
+          specification_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "body_area_groups_specification_id_fkey"
+            columns: ["specification_id"]
+            isOneToOne: false
+            referencedRelation: "procedure_specifications"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fk_procedure"
             columns: ["procedure_id"]

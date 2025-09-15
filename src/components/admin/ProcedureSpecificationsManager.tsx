@@ -9,10 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Edit2, Trash2, X, Upload, Image } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Upload, Image, MapPin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import BodyAreasManager from "./BodyAreasManager";
+import SpecificationBodyAreasManager from "./SpecificationBodyAreasManager";
+import ProcedureDiscountManager from "./ProcedureDiscountManager";
 
 interface ProcedureSpecification {
   id: string;
@@ -341,8 +342,8 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
   // If body areas manager is open
   if (bodyAreasManagerOpen && editingSpecForAreas) {
     return (
-      <BodyAreasManager
-        procedureId={procedureId}
+      <SpecificationBodyAreasManager
+        specificationId={editingSpecForAreas.id}
         imageUrl={procedureSettings.body_image_url || '/images/body-female-default.png'}
         imageUrlMale={procedureSettings.body_image_url_male}
         bodySelectionType={procedureSettings.body_selection_type}
@@ -580,6 +581,12 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
         </Card>
       )}
 
+      {/* Sistema de Promoções */}
+      <ProcedureDiscountManager 
+        procedureId={procedureId}
+        requiresBodySelection={procedureSettings.requires_body_image_selection}
+      />
+
       {/* Dialog para criar/editar especificação */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -641,7 +648,10 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
             {/* Preview área de seleção - só aparece se requer imagem */}
             {procedureSettings.requires_body_image_selection && procedureSettings.body_selection_type && (
               <div className="border rounded-lg p-4">
-                <Label className="text-sm font-medium mb-2 block">Preview da Imagem para Seleção</Label>
+                <Label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Configurar Áreas de Seleção
+                </Label>
                 <div className="flex justify-center">
                   <img
                     src={
@@ -655,8 +665,24 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
                   />
                 </div>
                 <p className="text-xs text-muted-foreground text-center mt-2">
-                  {editingSpec ? 'Esta imagem será usada para seleção de áreas ao editar esta especificação' : 'Esta imagem será usada para seleção de áreas após criar esta especificação'}
+                  {editingSpec ? 'Clique na imagem acima para configurar as áreas de seleção desta especificação' : 'Após criar a especificação, você poderá configurar as áreas de seleção'}
                 </p>
+                {editingSpec && (
+                  <div className="mt-3 flex justify-center">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleManageAreas(editingSpec);
+                      }}
+                    >
+                      <MapPin className="h-4 w-4 mr-2" />
+                      Configurar Áreas
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
 

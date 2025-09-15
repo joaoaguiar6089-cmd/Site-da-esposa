@@ -849,7 +849,7 @@ const ClientManagement = () => {
           <form onSubmit={handleCreateClient} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="nome">Nome</Label>
+                <Label htmlFor="nome">Nome *</Label>
                 <Input
                   id="nome"
                   value={formData.nome}
@@ -858,7 +858,7 @@ const ClientManagement = () => {
                 />
               </div>
               <div>
-                <Label htmlFor="sobrenome">Sobrenome</Label>
+                <Label htmlFor="sobrenome">Sobrenome *</Label>
                 <Input
                   id="sobrenome"
                   value={formData.sobrenome}
@@ -944,17 +944,16 @@ const ClientManagement = () => {
               </div>
             </div>
             <div>
-              <Label htmlFor="edit-cpf">CPF</Label>
+              <Label htmlFor="edit-cpf">CPF (opcional)</Label>
               <Input
                 id="edit-cpf"
                 value={formData.cpf}
                 onChange={(e) => setFormData({...formData, cpf: formatCPF(e.target.value)})}
                 placeholder="000.000.000-00"
-                required
               />
             </div>
             <div>
-              <Label htmlFor="edit-celular">Celular</Label>
+              <Label htmlFor="edit-celular">Celular *</Label>
               <Input
                 id="edit-celular"
                 value={formData.celular}
@@ -964,7 +963,7 @@ const ClientManagement = () => {
               />
             </div>
             <div>
-              <Label htmlFor="edit-data_nascimento">Data de Nascimento</Label>
+              <Label htmlFor="edit-data_nascimento">Data de Nascimento (opcional)</Label>
               <Input
                 id="edit-data_nascimento"
                 type="date"
@@ -973,7 +972,7 @@ const ClientManagement = () => {
               />
             </div>
             <div>
-              <Label htmlFor="edit-cidade">Cidade</Label>
+              <Label htmlFor="edit-cidade">Cidade (opcional)</Label>
               <Input
                 id="edit-cidade"
                 value={formData.cidade}

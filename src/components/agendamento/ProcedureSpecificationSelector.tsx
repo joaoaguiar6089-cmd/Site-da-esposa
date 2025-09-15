@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -59,14 +59,18 @@ const ProcedureSpecificationSelector = ({
     loadSpecifications();
   }, [procedureId]);
 
-  // Update total when selections change
-  useEffect(() => {
+  // Update total when selections change - use useCallback to prevent infinite loops
+  const notifySelectionChange = useCallback(() => {
     onSelectionChange?.({
       selectedSpecifications: getSelectedSpecifications(),
       totalPrice,
       selectedGender
     });
-  }, [selectedSpecifications, totalPrice, selectedGender]);
+  }, [selectedSpecifications, totalPrice, selectedGender, getSelectedSpecifications]);
+
+  useEffect(() => {
+    notifySelectionChange();
+  }, [notifySelectionChange]);
 
   const loadSpecifications = async () => {
     try {

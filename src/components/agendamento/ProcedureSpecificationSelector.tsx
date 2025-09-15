@@ -70,6 +70,7 @@ const ProcedureSpecificationSelector = ({
 
   const loadSpecifications = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('procedure_specifications')
         .select('*')
@@ -78,14 +79,16 @@ const ProcedureSpecificationSelector = ({
         .order('display_order');
 
       if (error) throw error;
+      console.log('Especificações carregadas:', data);
       setSpecifications(data || []);
     } catch (error: any) {
       console.error('Erro ao carregar especificações:', error);
       toast({
         title: "Erro",
-        description: "Erro ao carregar especificações do procedimento.",
+        description: "Erro ao carregar especificações do procedimento. Verifique sua conexão.",
         variant: "destructive",
       });
+      setSpecifications([]); // Garante que há um array vazio
     } finally {
       setLoading(false);
     }
@@ -220,9 +223,14 @@ const ProcedureSpecificationSelector = ({
     return (
       <Card>
         <CardContent className="py-8">
-          <p className="text-center text-muted-foreground">
-            Nenhuma especificação disponível para este procedimento.
-          </p>
+          <div className="text-center space-y-2">
+            <p className="text-muted-foreground">
+              Nenhuma especificação cadastrada para este procedimento.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Você pode prosseguir sem selecionar especificações.
+            </p>
+          </div>
         </CardContent>
       </Card>
     );

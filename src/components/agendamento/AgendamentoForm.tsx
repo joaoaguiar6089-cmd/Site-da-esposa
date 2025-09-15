@@ -1048,12 +1048,23 @@ Para reagendar, entre em contato conosco.`;
             />
           </div>
 
-          {/* Especificações e Áreas do procedimento - só mostra se requer especificações ou seleção corporal */}
-          {selectedProcedure && (selectedProcedure.requires_specifications || selectedProcedure.requires_body_selection) && (
+          {/* Especificações e Áreas do procedimento - sempre mostra para procedimentos */}
+          {selectedProcedure && (
             <div className="space-y-4">
+              {/* Mostra informações do procedimento */}
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <h3 className="font-medium text-sm mb-1">Procedimento selecionado:</h3>
+                <p className="text-sm text-muted-foreground">{selectedProcedure.name}</p>
+                {selectedProcedure.price && (
+                  <p className="text-sm font-medium">Preço base: R$ {selectedProcedure.price.toFixed(2).replace('.', ',')}</p>
+                )}
+              </div>
+
+              {/* Sempre renderiza o componente de especificações */}
               <ProcedureSpecificationSelector
                 procedureId={selectedProcedure.id}
                 onSelectionChange={(data) => {
+                  console.log('Seleção de especificações mudou:', data);
                   setSelectedSpecifications(data.selectedSpecifications);
                   setTotalSpecificationsPrice(data.totalPrice);
                   if (data.selectedGender) {

@@ -265,6 +265,28 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
 
         if (error) throw error;
         
+        // Atualizando especificação existente - atualizar áreas se necessário
+        if (procedureSettings.requires_body_image_selection) {
+          const areaUpdateData = currentShapes.length > 0 ? {
+            has_area_selection: true,
+            area_shapes: currentShapes,
+            gender: selectedGender
+          } : {
+            has_area_selection: false,
+            area_shapes: null,
+            gender: selectedGender
+          };
+
+          const { error: areasError } = await supabase
+            .from('procedure_specifications')
+            .update(areaUpdateData)
+            .eq('id', editingSpec.id);
+
+          if (areasError) {
+            console.warn('Erro ao salvar áreas:', areasError);
+          }
+        }
+        
         toast({
           title: "Especificação atualizada",
           description: "A especificação foi atualizada com sucesso.",
@@ -321,6 +343,15 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
       price: spec.price.toString(),
       display_order: spec.display_order.toString()
     });
+    
+    // Carregar áreas existentes se houver
+    if (spec.has_area_selection && spec.area_shapes) {
+      setCurrentShapes(spec.area_shapes as any[]);
+      setSelectedGender(spec.gender as 'female' | 'male');
+    } else {
+      setCurrentShapes([]);
+    }
+    
     setDialogOpen(true);
   };
 
@@ -436,42 +467,85 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
     }
   }, [currentShapes, currentShape]);
 
+  // Handle area selection - adicionar funcionalidade de arrastar formas existentes
+  const [draggedShape, setDraggedShape] = useState<{ index: number; offset: { x: number; y: number } } | null>(null);
+
+  const getShapeAtPoint = (x: number, y: number) => {
+    for (let i = currentShapes.length - 1; i >= 0; i--) {
+      const shape = currentShapes[i];
+      if (x >= shape.x && x <= shape.x + shape.width &&
+          y >= shape.y && y <= shape.y + shape.height) {
+        return i;
+      }
+    }
+    return -1;
+  };
+
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const coords = getCanvasCoordinates(e);
     if (!coords) return;
 
-    setIsDrawing(true);
-    setCurrentShape({
-      x: coords.x,
-      y: coords.y,
-      width: 0,
-      height: 0
-    });
+    // Verificar se está clicando em uma forma existente
+    const shapeIndex = getShapeAtPoint(coords.x, coords.y);
+    
+    if (shapeIndex >= 0) {
+      // Iniciar drag da forma existente
+      const shape = currentShapes[shapeIndex];
+      setDraggedShape({
+        index: shapeIndex,
+        offset: {
+          x: coords.x - shape.x,
+          y: coords.y - shape.y
+        }
+      });
+    } else {
+      // Criar nova forma
+      setIsDrawing(true);
+      setCurrentShape({
+        x: coords.x,
+        y: coords.y,
+        width: 0,
+        height: 0
+      });
+    }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const coords = getCanvasCoordinates(e);
-    if (!coords || !isDrawing || !currentShape) return;
+    if (!coords) return;
 
-    setCurrentShape({
-      x: Math.min(coords.x, currentShape.x),
-      y: Math.min(coords.y, currentShape.y),
-      width: Math.abs(coords.x - currentShape.x),
-      height: Math.abs(coords.y - currentShape.y)
-    });
-
-    drawCanvas();
+    if (draggedShape !== null) {
+      // Arrastar forma existente
+      const newShapes = [...currentShapes];
+      newShapes[draggedShape.index] = {
+        ...newShapes[draggedShape.index],
+        x: coords.x - draggedShape.offset.x,
+        y: coords.y - draggedShape.offset.y
+      };
+      setCurrentShapes(newShapes);
+      drawCanvas();
+    } else if (isDrawing && currentShape) {
+      // Criar nova forma
+      setCurrentShape({
+        x: Math.min(coords.x, currentShape.x),
+        y: Math.min(coords.y, currentShape.y),
+        width: Math.abs(coords.x - currentShape.x),
+        height: Math.abs(coords.y - currentShape.y)
+      });
+      drawCanvas();
+    }
   };
 
   const handleMouseUp = () => {
-    if (!isDrawing || !currentShape) return;
-
-    if (currentShape.width > 1 && currentShape.height > 1) {
-      setCurrentShapes(prev => [...prev, currentShape]);
+    if (draggedShape !== null) {
+      setDraggedShape(null);
+    } else if (isDrawing && currentShape) {
+      if (currentShape.width > 1 && currentShape.height > 1) {
+        setCurrentShapes(prev => [...prev, currentShape]);
+      }
+      setIsDrawing(false);
+      setCurrentShape(null);
     }
-    
-    setIsDrawing(false);
-    setCurrentShape(null);
   };
 
   const handleImageLoad = () => {
@@ -753,15 +827,6 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex gap-2 justify-end">
-                        {procedureSettings.requires_body_image_selection && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleManageAreas(spec)}
-                          >
-                            <Image className="h-4 w-4" />
-                          </Button>
-                        )}
                         <Button
                           variant="outline"
                           size="sm"
@@ -850,8 +915,8 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
               </div>
             </div>
 
-            {/* Seleção de áreas - só aparece para novos procedimentos que requerem imagem */}
-            {!editingSpec && procedureSettings.requires_body_image_selection && procedureSettings.body_selection_type && (
+            {/* Seleção de áreas - aparece quando o procedimento requer imagem */}
+            {procedureSettings.requires_body_image_selection && procedureSettings.body_selection_type && (
               <div className="border rounded-lg p-4 space-y-4">
                 <Label className="text-sm font-medium mb-2 block flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
@@ -929,45 +994,6 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
                   <p className="text-xs text-muted-foreground text-center">
                     Clique e arraste para selecionar as áreas desta especificação
                   </p>
-                </div>
-              </div>
-            )}
-
-            {/* Preview área de seleção - só aparece se requer imagem */}
-            {procedureSettings.requires_body_image_selection && procedureSettings.body_selection_type && editingSpec && (
-              <div className="border rounded-lg p-4">
-                <Label className="text-sm font-medium mb-2 block flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  Configurar Áreas de Seleção
-                </Label>
-                <div className="flex justify-center">
-                  <img
-                    src={
-                      procedureSettings.body_selection_type === 'custom' 
-                        ? procedureSettings.body_image_url 
-                        : `/images/body-${procedureSettings.body_selection_type.replace('_', '-')}-default.png`
-                    }
-                    alt="Imagem para seleção"
-                    className="max-w-sm max-h-80 object-contain rounded border"
-                    style={{ width: 'auto', height: 'auto' }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground text-center mt-2">
-                  Clique no botão abaixo para configurar as áreas de seleção desta especificação
-                </p>
-                <div className="mt-3 flex justify-center">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleManageAreas(editingSpec);
-                    }}
-                  >
-                    <MapPin className="h-4 w-4 mr-2" />
-                    Configurar Áreas
-                  </Button>
                 </div>
               </div>
             )}

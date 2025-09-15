@@ -193,8 +193,13 @@ const ProcedureSpecificationSelector = ({
     }
   };
 
-  // Check if any selected specification has area selection
-  const hasAreaSelection = selectedSpecifications.some(spec => 
+  // Check if any specification has area selection (regardless of being selected)
+  const hasAreaSelection = specifications.some(spec => 
+    spec.has_area_selection && spec.area_shapes
+  );
+  
+  // Check if any selected specification has area selection for the current gender
+  const hasSelectedAreaForGender = selectedSpecifications.some(spec => 
     spec.selected && spec.has_area_selection && spec.area_shapes && spec.gender === selectedGender
   );
 
@@ -303,25 +308,27 @@ const ProcedureSpecificationSelector = ({
             </div>
 
             {/* Interactive Canvas */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Áreas selecionadas:</Label>
-              <div className="relative border rounded-md overflow-hidden">
-                <canvas
-                  ref={canvasRef}
-                  width={400}
-                  height={600}
-                  className="w-full"
-                  onMouseMove={handleCanvasMouseMove}
-                />
-                <img
-                  ref={imageRef}
-                  src={getImageUrl()}
-                  alt="Áreas selecionadas"
-                  className="hidden"
-                  onLoad={handleImageLoad}
-                />
+            {hasSelectedAreaForGender && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Áreas selecionadas:</Label>
+                <div className="relative border rounded-md overflow-hidden">
+                  <canvas
+                    ref={canvasRef}
+                    width={400}
+                    height={600}
+                    className="w-full"
+                    onMouseMove={handleCanvasMouseMove}
+                  />
+                  <img
+                    ref={imageRef}
+                    src={getImageUrl()}
+                    alt="Áreas selecionadas"
+                    className="hidden"
+                    onLoad={handleImageLoad}
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 

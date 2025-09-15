@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Edit2, Trash2, X, Upload, Image, MapPin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import SpecificationBodyAreasManager from "./SpecificationBodyAreasManager";
+
 import ProcedureDiscountManager from "./ProcedureDiscountManager";
 
 interface ProcedureSpecification {
@@ -22,6 +22,9 @@ interface ProcedureSpecification {
   price: number;
   display_order: number;
   is_active: boolean;
+  has_area_selection: boolean;
+  area_shapes: any;
+  gender: string;
   created_at: string;
   updated_at: string;
 }
@@ -276,21 +279,19 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
 
         if (specError) throw specError;
 
-        // Se há áreas selecionadas, salvar as áreas
+        // Se há áreas selecionadas, atualizar a especificação com as áreas
         if (procedureSettings.requires_body_image_selection && currentShapes.length > 0) {
           const { error: areasError } = await supabase
-            .from('body_area_groups')
-            .insert([{
-              specification_id: newSpec.id,
-              name: formData.name.trim(),
-              price: parseFloat(formData.price) || 0,
-              shapes: currentShapes,
+            .from('procedure_specifications')
+            .update({
+              has_area_selection: true,
+              area_shapes: currentShapes,
               gender: selectedGender
-            }]);
+            })
+            .eq('id', newSpec.id);
 
           if (areasError) {
             console.warn('Erro ao salvar áreas:', areasError);
-            // Não falha completamente se área não salvar
           }
         }
         
@@ -551,20 +552,12 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
     );
   }
 
-  // If body areas manager is open
+  // If body areas manager is open - no longer used
   if (bodyAreasManagerOpen && editingSpecForAreas) {
     return (
-      <SpecificationBodyAreasManager
-        specificationId={editingSpecForAreas.id}
-        imageUrl={procedureSettings.body_image_url || '/images/body-female-default.png'}
-        imageUrlMale={procedureSettings.body_image_url_male}
-        bodySelectionType={procedureSettings.body_selection_type}
-        open={bodyAreasManagerOpen}
-        onClose={() => {
-          setBodyAreasManagerOpen(false);
-          setEditingSpecForAreas(null);
-        }}
-      />
+      <div>
+        <p>Body areas management is now integrated into the specification form.</p>
+      </div>
     );
   }
 

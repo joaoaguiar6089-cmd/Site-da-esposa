@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -16,16 +16,13 @@ interface AreaShape {
   height: number;
 }
 
-interface AreaGroup {
-  id: string;
-  name: string;
-  price: number;
-  shapes: AreaShape[];
-}
-
 interface ProcedureSpecificationSelectorProps {
   procedureId: string;
-  onSelectionChange: (selectedSpecs: ProcedureSpecification[], totalPrice: number, selectedAreas?: any[], totalAreasPrice?: number, selectedGender?: string) => void;
+  onSelectionChange: (data: {
+    selectedSpecifications: ProcedureSpecification[];
+    totalPrice: number;
+    selectedGender?: string;
+  }) => void;
   initialSelections?: string[];
   bodySelectionType?: string;
   bodyImageUrl?: string;
@@ -42,10 +39,8 @@ const ProcedureSpecificationSelector = ({
 }: ProcedureSpecificationSelectorProps) => {
   const [specifications, setSpecifications] = useState<ProcedureSpecification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [areaGroups, setAreaGroups] = useState<AreaGroup[]>([]);
-  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
   const [selectedGender, setSelectedGender] = useState<'female' | 'male'>('female');
-  const [hoveredGroupId, setHoveredGroupId] = useState<string | null>(null);
+  const [hoveredSpecId, setHoveredSpecId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const { toast } = useToast();
@@ -64,13 +59,14 @@ const ProcedureSpecificationSelector = ({
     loadSpecifications();
   }, [procedureId]);
 
+  // Update total when selections change
   useEffect(() => {
-    // Notify parent component of selection changes
-    const selected = getSelectedSpecifications();
-    const selectedAreas = areaGroups.filter(group => selectedGroupIds.includes(group.id));
-    const totalAreasPrice = selectedAreas.reduce((sum, area) => sum + area.price, 0);
-    onSelectionChange(selected, totalPrice, selectedAreas, totalAreasPrice, selectedGender);
-  }, [selectedSpecifications, totalPrice, selectedGroupIds, areaGroups, selectedGender, onSelectionChange, getSelectedSpecifications]);
+    onSelectionChange?.({
+      selectedSpecifications: getSelectedSpecifications(),
+      totalPrice,
+      selectedGender
+    });
+  }, [selectedSpecifications, totalPrice, selectedGender]);
 
   const loadSpecifications = async () => {
     try {
@@ -83,9 +79,6 @@ const ProcedureSpecificationSelector = ({
 
       if (error) throw error;
       setSpecifications(data || []);
-      
-      // Load area groups for specifications that have image selection
-      await loadAreaGroups();
     } catch (error: any) {
       console.error('Erro ao carregar especificações:', error);
       toast({
@@ -98,120 +91,56 @@ const ProcedureSpecificationSelector = ({
     }
   };
 
-  const loadAreaGroups = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('body_area_groups')
-        .select('*')
-        .or(`procedure_id.eq.${procedureId},specification_id.in.(${specifications.map(s => s.id).join(',') || 'null'})`)
-        .eq('gender', selectedGender);
-
-      if (error) throw error;
-      
-      const groups: AreaGroup[] = (data || []).map(group => ({
-        id: group.id,
-        name: group.name,
-        price: Number(group.price),
-        shapes: (group.shapes as any) as AreaShape[]
-      }));
-      
-      setAreaGroups(groups);
-    } catch (error: any) {
-      console.error('Erro ao carregar áreas:', error);
-    }
-  };
-
-  const handleSpecificationChange = (specId: string, checked: boolean) => {
-    selectSpecification(specId, checked);
-  };
-
-  // Load area groups when gender changes
-  useEffect(() => {
-    if (specifications.length > 0) {
-      loadAreaGroups();
-    }
-  }, [selectedGender, specifications]);
-
-  // Canvas drawing functions
-  const getImageUrl = () => {
-    if (bodySelectionType === 'both') {
-      return selectedGender === 'male' ? bodyImageUrlMale : bodyImageUrl;
-    }
-    return bodyImageUrl;
-  };
-
   const drawCanvas = () => {
     const canvas = canvasRef.current;
-    const image = imageRef.current;
-    if (!canvas || !image) return;
+    const img = imageRef.current;
+    if (!canvas || !img || !img.complete) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw image
-    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-    // Draw areas
-    areaGroups.forEach(group => {
-      const isSelected = selectedGroupIds.includes(group.id);
-      const isHovered = hoveredGroupId === group.id;
-      
-      group.shapes.forEach(shape => {
-        ctx.fillStyle = isSelected 
-          ? 'rgba(34, 197, 94, 0.4)' 
-          : isHovered 
-            ? 'rgba(59, 130, 246, 0.3)' 
-            : 'rgba(239, 68, 68, 0.2)';
-        ctx.strokeStyle = isSelected 
-          ? 'rgba(34, 197, 94, 0.8)' 
-          : isHovered 
-            ? 'rgba(59, 130, 246, 0.6)' 
-            : 'rgba(239, 68, 68, 0.5)';
-        ctx.lineWidth = 2;
+    // Draw background image
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    // Draw areas for selected specifications
+    selectedSpecifications
+      .filter(spec => spec.selected && spec.has_area_selection && spec.area_shapes && spec.gender === selectedGender)
+      .forEach(spec => {
+        const isHovered = hoveredSpecId === spec.id;
         
-        const x = (shape.x / 100) * canvas.width;
-        const y = (shape.y / 100) * canvas.height;
-        const width = (shape.width / 100) * canvas.width;
-        const height = (shape.height / 100) * canvas.height;
-        
-        ctx.fillRect(x, y, width, height);
-        ctx.strokeRect(x, y, width, height);
+        (spec.area_shapes as any[])?.forEach((shape: any) => {
+          ctx.strokeStyle = '#10B981';
+          ctx.fillStyle = isHovered ? 'rgba(16, 185, 129, 0.4)' : 'rgba(16, 185, 129, 0.3)';
+          ctx.lineWidth = 2;
+
+          const x = (shape.x / 100) * canvas.width;
+          const y = (shape.y / 100) * canvas.height;
+          const width = (shape.width / 100) * canvas.width;
+          const height = (shape.height / 100) * canvas.height;
+
+          ctx.fillRect(x, y, width, height);
+          ctx.strokeRect(x, y, width, height);
+        });
       });
-    });
   };
 
-  const isPointInGroup = (x: number, y: number, group: AreaGroup): boolean => {
+  const isPointInSpecification = (x: number, y: number, spec: any) => {
+    if (!spec.area_shapes || spec.gender !== selectedGender) return false;
     const canvas = canvasRef.current;
     if (!canvas) return false;
-
-    return group.shapes.some(shape => {
+    
+    return (spec.area_shapes as any[]).some((shape: any) => {
       const shapeX = (shape.x / 100) * canvas.width;
       const shapeY = (shape.y / 100) * canvas.height;
       const shapeWidth = (shape.width / 100) * canvas.width;
       const shapeHeight = (shape.height / 100) * canvas.height;
       
-      return x >= shapeX && x <= shapeX + shapeWidth && 
+      return x >= shapeX && x <= shapeX + shapeWidth &&
              y >= shapeY && y <= shapeY + shapeHeight;
     });
-  };
-
-  const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-
-    for (const group of areaGroups) {
-      if (isPointInGroup(x, y, group)) {
-        toggleGroupSelection(group.id);
-        break;
-      }
-    }
   };
 
   const handleCanvasMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -222,24 +151,14 @@ const ProcedureSpecificationSelector = ({
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    let foundGroup: string | null = null;
-    for (const group of areaGroups) {
-      if (isPointInGroup(x, y, group)) {
-        foundGroup = group.id;
-        break;
-      }
-    }
-    
-    setHoveredGroupId(foundGroup);
-    canvas.style.cursor = foundGroup ? 'pointer' : 'default';
+    const hoveredSpec = selectedSpecifications.find(spec => 
+      spec.selected && isPointInSpecification(x, y, spec)
+    );
+    setHoveredSpecId(hoveredSpec?.id || null);
   };
 
-  const toggleGroupSelection = (groupId: string) => {
-    setSelectedGroupIds(prev => 
-      prev.includes(groupId) 
-        ? prev.filter(id => id !== groupId)
-        : [...prev, groupId]
-    );
+  const handleSpecificationChange = (specId: string, checked: boolean) => {
+    selectSpecification(specId, checked);
   };
 
   const handleImageLoad = () => {
@@ -258,13 +177,26 @@ const ProcedureSpecificationSelector = ({
 
   useEffect(() => {
     drawCanvas();
-  }, [areaGroups, selectedGroupIds, hoveredGroupId]);
+  }, [selectedSpecifications, selectedGender, hoveredSpecId]);
 
-  const getTotalAreasPrice = () => {
-    return areaGroups
-      .filter(group => selectedGroupIds.includes(group.id))
-      .reduce((sum, group) => sum + group.price, 0);
+  const getImageUrl = () => {
+    if (!bodySelectionType) return '';
+    
+    if (bodySelectionType === 'face') {
+      return selectedGender === 'male' 
+        ? '/images/face-male-default.png'
+        : '/images/face-female-default.png';
+    } else {
+      return selectedGender === 'male'
+        ? bodyImageUrlMale || '/images/body-male-default.png'
+        : bodyImageUrl || '/images/body-female-default.png';
+    }
   };
+
+  // Check if any selected specification has area selection
+  const hasAreaSelection = selectedSpecifications.some(spec => 
+    spec.selected && spec.has_area_selection && spec.area_shapes && spec.gender === selectedGender
+  );
 
   if (loading) {
     return (
@@ -296,9 +228,9 @@ const ProcedureSpecificationSelector = ({
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>Procedimentos Disponíveis</span>
-          {(totalPrice > 0 || getTotalAreasPrice() > 0) && (
+          {totalPrice > 0 && (
             <Badge variant="secondary" className="text-lg px-3 py-1">
-              Total: R$ {(totalPrice + getTotalAreasPrice()).toFixed(2).replace('.', ',')}
+              Total: R$ {totalPrice.toFixed(2).replace('.', ',')}
             </Badge>
           )}
         </CardTitle>
@@ -344,86 +276,60 @@ const ProcedureSpecificationSelector = ({
           </div>
         ))}
 
-        {/* Body Areas Selection */}
-        {areaGroups.length > 0 && bodySelectionType && (
-          <div className="space-y-4 mt-6">
-            <Separator />
-            <div>
-              <h4 className="text-lg font-semibold mb-4">Selecione as áreas</h4>
-              
-              {/* Gender Selection */}
-              {bodySelectionType === 'both' && (
-                <div className="mb-4">
-                  <label className="text-sm font-medium mb-2 block">Gênero</label>
-                  <RadioGroup 
-                    value={selectedGender} 
-                    onValueChange={(value: 'female' | 'male') => setSelectedGender(value)}
-                    className="flex gap-6"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="female" id="female" />
-                      <Label htmlFor="female">Feminino</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="male" id="male" />
-                      <Label htmlFor="male">Masculino</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-              )}
-
-              {/* Area Groups List */}
-              <div className="mb-4 space-y-2">
-                {areaGroups.map((group) => (
-                  <div key={group.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Checkbox
-                        id={`area-${group.id}`}
-                        checked={selectedGroupIds.includes(group.id)}
-                        onCheckedChange={() => toggleGroupSelection(group.id)}
-                      />
-                      <label
-                        htmlFor={`area-${group.id}`}
-                        className="text-sm font-medium cursor-pointer"
-                      >
-                        {group.name}
-                      </label>
-                    </div>
-                    <Badge variant="outline">
-                      R$ {group.price.toFixed(2).replace('.', ',')}
-                    </Badge>
-                  </div>
-                ))}
+        {/* Area Selection for specifications */}
+        {hasAreaSelection && (
+          <div className="space-y-4">
+            {/* Gender Selection */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Selecione o gênero:</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={selectedGender === 'female' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedGender('female')}
+                >
+                  Feminino
+                </Button>
+                <Button
+                  type="button" 
+                  variant={selectedGender === 'male' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedGender('male')}
+                >
+                  Masculino
+                </Button>
               </div>
+            </div>
 
-              {/* Canvas for body image */}
-              <div className="flex justify-center">
-                <div className="relative">
-                  <img
-                    ref={imageRef}
-                    src={getImageUrl()}
-                    alt="Seleção de área corporal"
-                    className="hidden"
-                    onLoad={handleImageLoad}
-                  />
-                  <canvas
-                    ref={canvasRef}
-                    onClick={handleCanvasClick}
-                    onMouseMove={handleCanvasMouseMove}
-                    className="border rounded-lg shadow-sm max-w-full"
-                  />
-                </div>
+            {/* Interactive Canvas */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Áreas selecionadas:</Label>
+              <div className="relative border rounded-md overflow-hidden">
+                <canvas
+                  ref={canvasRef}
+                  width={400}
+                  height={600}
+                  className="w-full"
+                  onMouseMove={handleCanvasMouseMove}
+                />
+                <img
+                  ref={imageRef}
+                  src={getImageUrl()}
+                  alt="Áreas selecionadas"
+                  className="hidden"
+                  onLoad={handleImageLoad}
+                />
               </div>
             </div>
           </div>
         )}
 
         {/* Selection Summary */}
-        {(getSelectedSpecifications().length > 0 || selectedGroupIds.length > 0) && (
+        {getSelectedSpecifications().length > 0 && (
           <div className="mt-6 p-4 bg-muted rounded-lg">
             <h4 className="font-medium mb-2">Selecionados:</h4>
             <div className="space-y-1">
-              {/* Show selected specifications */}
               {getSelectedSpecifications().map((spec) => (
                 <div key={spec.id} className="flex justify-between text-sm">
                   <span>{spec.name}</span>
@@ -436,23 +342,12 @@ const ProcedureSpecificationSelector = ({
                 </div>
               ))}
               
-              {/* Show selected areas */}
-              {areaGroups
-                .filter(group => selectedGroupIds.includes(group.id))
-                .map((group) => (
-                  <div key={group.id} className="flex justify-between text-sm">
-                    <span>{group.name}</span>
-                    <span>R$ {group.price.toFixed(2).replace('.', ',')}</span>
-                  </div>
-                ))}
-              
-              {/* Total */}
-              {(totalPrice > 0 || getTotalAreasPrice() > 0) && (
+              {totalPrice > 0 && (
                 <>
                   <Separator className="my-2" />
                   <div className="flex justify-between font-medium">
                     <span>Total:</span>
-                    <span>R$ {(totalPrice + getTotalAreasPrice()).toFixed(2).replace('.', ',')}</span>
+                    <span>R$ {totalPrice.toFixed(2).replace('.', ',')}</span>
                   </div>
                 </>
               )}

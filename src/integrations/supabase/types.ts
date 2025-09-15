@@ -86,42 +86,6 @@ export type Database = {
           },
         ]
       }
-      appointment_selected_areas: {
-        Row: {
-          appointment_id: string
-          area_group_id: string
-          id: string
-          selected_at: string | null
-        }
-        Insert: {
-          appointment_id: string
-          area_group_id: string
-          id?: string
-          selected_at?: string | null
-        }
-        Update: {
-          appointment_id?: string
-          area_group_id?: string
-          id?: string
-          selected_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_appointment"
-            columns: ["appointment_id"]
-            isOneToOne: false
-            referencedRelation: "appointments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_area_group"
-            columns: ["area_group_id"]
-            isOneToOne: false
-            referencedRelation: "body_area_groups"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       appointment_specifications: {
         Row: {
           appointment_id: string
@@ -234,57 +198,6 @@ export type Database = {
             columns: ["professional_id"]
             isOneToOne: false
             referencedRelation: "professionals_public"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      body_area_groups: {
-        Row: {
-          created_at: string | null
-          gender: string | null
-          id: string
-          name: string
-          price: number
-          procedure_id: string | null
-          shapes: Json
-          specification_id: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          gender?: string | null
-          id?: string
-          name: string
-          price?: number
-          procedure_id?: string | null
-          shapes: Json
-          specification_id?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          gender?: string | null
-          id?: string
-          name?: string
-          price?: number
-          procedure_id?: string | null
-          shapes?: Json
-          specification_id?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "body_area_groups_specification_id_fkey"
-            columns: ["specification_id"]
-            isOneToOne: false
-            referencedRelation: "procedure_specifications"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_procedure"
-            columns: ["procedure_id"]
-            isOneToOne: false
-            referencedRelation: "procedures"
             referencedColumns: ["id"]
           },
         ]
@@ -487,9 +400,12 @@ export type Database = {
       }
       procedure_specifications: {
         Row: {
+          area_shapes: Json | null
           created_at: string | null
           description: string | null
           display_order: number | null
+          gender: string | null
+          has_area_selection: boolean | null
           id: string
           is_active: boolean | null
           name: string
@@ -498,9 +414,12 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          area_shapes?: Json | null
           created_at?: string | null
           description?: string | null
           display_order?: number | null
+          gender?: string | null
+          has_area_selection?: boolean | null
           id?: string
           is_active?: boolean | null
           name: string
@@ -509,9 +428,12 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          area_shapes?: Json | null
           created_at?: string | null
           description?: string | null
           display_order?: number | null
+          gender?: string | null
+          has_area_selection?: boolean | null
           id?: string
           is_active?: boolean | null
           name?: string

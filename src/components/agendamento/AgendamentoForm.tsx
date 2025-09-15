@@ -160,10 +160,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         .select(`
           *,
           procedures!appointments_procedure_id_fkey(name, duration, price, requires_body_selection, body_selection_type),
-          appointment_selected_areas(
-            area_group_id,
-            body_area_groups(id, name, price, shapes, gender)
-          )
+          appointment_specifications(specification_id, specification_name, specification_price)
         `)
         .eq('id', appointmentId)
         .single();
@@ -178,22 +175,20 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         notes: data.notes || "",
       });
 
-      // Carregar seleções de áreas corporais se existirem
-      if (data.appointment_selected_areas && data.appointment_selected_areas.length > 0) {
-        const bodyAreas: AreaGroup[] = data.appointment_selected_areas.map((selection: any) => ({
-          id: selection.body_area_groups.id,
-          name: selection.body_area_groups.name,
-          price: selection.body_area_groups.price,
-          shapes: selection.body_area_groups.shapes
+      // Carregar especificações selecionadas se existirem
+      if (data.appointment_specifications && data.appointment_specifications.length > 0) {
+        const specs: ProcedureSpecification[] = data.appointment_specifications.map((spec: any) => ({
+          id: spec.specification_id,
+          name: spec.specification_name,
+          price: spec.specification_price,
+          description: null,
+          display_order: 0,
+          is_active: true,
+          has_area_selection: false,
+          area_shapes: null,
+          gender: 'female'
         }));
-        setSelectedBodyAreas(bodyAreas);
-        setTotalBodyAreasPrice(data.total_body_areas_price || 0);
-        
-        // Definir o gênero selecionado baseado na primeira seleção
-        const gender = data.appointment_selected_areas[0]?.body_area_groups?.gender;
-        if (gender === 'male' || gender === 'female') {
-          setSelectedGender(gender as "male" | "female");
-        }
+        setSelectedSpecifications(specs);
       }
 
       if (data.selected_gender) {
@@ -448,17 +443,8 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
       return;
     }
 
-    // Verificar se o procedimento requer seleção de áreas corporais ou especificações
+    // Verificar se o procedimento requer especificações
     const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
-    if (selectedProcedure?.requires_body_selection && selectedBodyAreas.length === 0) {
-      toast({
-        title: "Seleção de áreas obrigatória",
-        description: "Por favor, selecione pelo menos uma área corporal para este procedimento.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (selectedProcedure?.requires_specifications && selectedSpecifications.length === 0) {
       toast({
         title: "Especificação obrigatória",
@@ -559,28 +545,8 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         }
       }
 
-      // Salvar seleções de áreas corporais se houver
-      if (selectedBodyAreas.length > 0) {
-        // Deletar seleções anteriores se estiver editando
-        if (editingId) {
-          await supabase
-            .from('appointment_selected_areas')
-            .delete()
-            .eq('appointment_id', appointmentId);
-        }
-
-        // Inserir novas seleções usando a tabela correta
-        const bodySelections = selectedBodyAreas.map(area => ({
-          appointment_id: appointmentId,
-          area_group_id: area.id
-        }));
-
-        const { error: selectionsError } = await supabase
-          .from('appointment_selected_areas')
-          .insert(bodySelections);
-
-        if (selectionsError) throw selectionsError;
-      }
+      // Since we removed body area selections, no need for additional processing
+      // Only specifications are now stored in appointment_specifications
 
       // Enviar notificações e dados para webhook
       try {

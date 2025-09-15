@@ -92,16 +92,9 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
   }, [bodySelectionType, imageUrl, imageUrlMale, currentGender]);
 
   const loadAreaGroups = async () => {
-    const { data, error } = await (supabase as any)
-      .from('body_area_groups' as any)
-      .select('*')
-      .eq('procedure_id', procedureId)
-      .eq('gender', currentGender);
-
-    if (error) {
-      console.error('Erro ao carregar grupos de áreas:', error);
-      return;
-    }
+    // Since body_area_groups table was removed, this function is now a placeholder
+    console.log('Area groups management has been moved to specifications');
+  };
 
     const mappedGroups: AreaGroup[] = (data || []).map(group => ({
       id: group.id,
@@ -328,35 +321,21 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
 
   const saveAreaGroups = async () => {
     try {
-      // Deletar grupos existentes para o gênero atual
-      await supabase
-        .from('body_area_groups' as any)
-        .delete()
-        .eq('procedure_id', procedureId)
-        .eq('gender', currentGender);
-
-      // Inserir novos grupos
-      if (areaGroups.length > 0) {
-        const { error } = await supabase
-          .from('body_area_groups' as any)
-          .insert(
-            areaGroups.map(group => ({
-              procedure_id: procedureId,
-              name: group.name,
-              price: group.price,
-              shapes: group.shapes,
-              gender: currentGender
-            }))
-          );
-
-        if (error) throw error;
-      }
-
-      toast.success(`Grupos de áreas (${currentGender === 'male' ? 'Masculino' : 'Feminino'}) salvos com sucesso!`);
-      onClose();
-    } catch (error) {
-      console.error('Erro ao salvar grupos:', error);
-      toast.error('Erro ao salvar grupos de áreas');
+      // Since body_area_groups table was removed, this is now a placeholder
+      console.log('Area groups are now managed per specification');
+      
+      toast({
+        title: "Informação",
+        description: "O gerenciamento de áreas foi movido para as especificações individuais.",
+        variant: "default",
+      });
+    } catch (error: any) {
+      console.error('Erro:', error);
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -593,6 +572,4 @@ const BodyAreasManager: React.FC<BodyAreasManagerProps> = ({
       </DialogContent>
     </Dialog>
   );
-};
-
 export default BodyAreasManager;

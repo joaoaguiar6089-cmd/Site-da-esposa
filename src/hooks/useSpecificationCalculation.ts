@@ -7,6 +7,9 @@ export interface ProcedureSpecification {
   price: number;
   display_order: number;
   is_active: boolean;
+  has_area_selection?: boolean;
+  area_shapes?: any;
+  gender?: string;
 }
 
 export interface SelectedSpecification extends ProcedureSpecification {

@@ -198,13 +198,16 @@ const ProcedureSpecificationSelector = ({
 
   // Check if any specification has area selection (regardless of being selected)
   const hasAreaSelection = specifications.some(spec => 
-    spec.has_area_selection && spec.area_shapes
+    spec.has_area_selection
   );
   
   // Check if any selected specification has area selection for the current gender
   const hasSelectedAreaForGender = selectedSpecifications.some(spec => 
-    spec.selected && spec.has_area_selection && spec.area_shapes && spec.gender === selectedGender
+    spec.selected && spec.has_area_selection && spec.gender === selectedGender
   );
+
+  // Check if we should show the image (if there are specifications with area selection, even without area_shapes)
+  const shouldShowImage = hasAreaSelection;
 
   if (loading) {
     return (
@@ -290,7 +293,7 @@ const ProcedureSpecificationSelector = ({
         ))}
 
         {/* Area Selection for specifications */}
-        {hasAreaSelection && (
+        {shouldShowImage && (
           <div className="space-y-4">
             {/* Gender Selection */}
             <div className="space-y-2">
@@ -315,28 +318,51 @@ const ProcedureSpecificationSelector = ({
               </div>
             </div>
 
-            {/* Interactive Canvas */}
-            {hasSelectedAreaForGender && (
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Áreas selecionadas:</Label>
-                <div className="relative border rounded-md overflow-hidden">
-                  <canvas
-                    ref={canvasRef}
-                    width={400}
-                    height={600}
-                    className="w-full"
-                    onMouseMove={handleCanvasMouseMove}
-                  />
-                  <img
-                    ref={imageRef}
-                    src={getImageUrl()}
-                    alt="Áreas selecionadas"
-                    className="hidden"
-                    onLoad={handleImageLoad}
-                  />
-                </div>
+            {/* Interactive Canvas - Sempre mostra se há especificações com seleção de área */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                {hasSelectedAreaForGender ? 'Áreas selecionadas:' : 'Imagem para seleção de áreas:'}
+              </Label>
+              <div className="relative border rounded-md overflow-hidden bg-muted/30">
+                <canvas
+                  ref={canvasRef}
+                  width={400}
+                  height={600}
+                  className="w-full cursor-crosshair"
+                  onMouseMove={handleCanvasMouseMove}
+                  onClick={(e) => {
+                    // Permite clicar nas áreas para selecionar especificações
+                    const canvas = canvasRef.current;
+                    if (!canvas) return;
+
+                    const rect = canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+
+                    // Procura especificações que têm área clicável nesta posição
+                    const clickedSpec = selectedSpecifications.find(spec => 
+                      spec.has_area_selection && isPointInSpecification(x, y, spec)
+                    );
+                    
+                    if (clickedSpec) {
+                      handleSpecificationChange(clickedSpec.id, !clickedSpec.selected);
+                    }
+                  }}
+                />
+                <img
+                  ref={imageRef}
+                  src={getImageUrl()}
+                  alt="Áreas para seleção"
+                  className="hidden"
+                  onLoad={handleImageLoad}
+                />
               </div>
-            )}
+              {!hasSelectedAreaForGender && hasAreaSelection && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Selecione um procedimento acima para ver as áreas disponíveis na imagem
+                </p>
+              )}
+            </div>
           </div>
         )}
 

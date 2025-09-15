@@ -1053,13 +1053,11 @@ Para reagendar, entre em contato conosco.`;
             <div className="space-y-4">
               <ProcedureSpecificationSelector
                 procedureId={selectedProcedure.id}
-                onSelectionChange={(selectedSpecs, totalPrice, selectedAreas, totalAreasPrice, gender) => {
-                  setSelectedSpecifications(selectedSpecs);
-                  setTotalSpecificationsPrice(totalPrice);
-                  if (selectedAreas && totalAreasPrice !== undefined && gender) {
-                    setSelectedBodyAreas(selectedAreas);
-                    setTotalBodyAreasPrice(totalAreasPrice);
-                    setSelectedGender(gender as 'female' | 'male');
+                onSelectionChange={(data) => {
+                  setSelectedSpecifications(data.selectedSpecifications);
+                  setTotalSpecificationsPrice(data.totalPrice);
+                  if (data.selectedGender) {
+                    setSelectedGender(data.selectedGender as 'male' | 'female');
                   }
                 }}
                 bodySelectionType={selectedProcedure.body_selection_type || ''}

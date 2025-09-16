@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -8,275 +8,267 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+type Gender = "female" | "male";
+
 interface AreaShape {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+  x: number; // % left
+  y: number; // % top
+  width: number; // % width
+  height: number; // % height
 }
 
-interface ProcedureSpecification {
+export interface ProcedureSpecification {
   id: string;
   name: string;
   description: string | null;
   price: number;
   display_order: number;
   is_active: boolean;
-  has_area_selection?: boolean;
-  area_shapes?: AreaShape[];
-  gender?: string;
+  has_area_selection: boolean;
+  gender: Gender;
+  area_shapes?: AreaShape[] | null;
 }
 
 interface ProcedureSpecificationSelectorProps {
   procedureId: string;
-  onSelectionChange: (data: {
+  onSelectionChange?: (data: {
     selectedSpecifications: ProcedureSpecification[];
     totalPrice: number;
-    selectedGender?: string;
+    selectedGender: Gender;
   }) => void;
   initialSelections?: string[];
-  bodySelectionType?: string;
-  bodyImageUrl?: string;
-  bodyImageUrlMale?: string;
+  bodySelectionType?: string | null;
+  bodyImageUrl?: string | null;
+  bodyImageUrlMale?: string | null;
 }
 
-const ProcedureSpecificationSelector = ({ 
-  procedureId, 
-  onSelectionChange, 
+const currency = (value: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+    value || 0
+  );
+
+const normalizeGender = (g: any): Gender =>
+  String(g || "female").toLowerCase().startsWith("m") ? "male" : "female";
+
+const normalizeShapes = (raw: any): AreaShape[] | undefined => {
+  if (!raw) return undefined;
+  try {
+    const arr = Array.isArray(raw)
+      ? raw
+      : typeof raw === "string"
+      ? JSON.parse(raw)
+      : [raw];
+    return arr
+      .filter(Boolean)
+      .map((s: any) => ({
+        x: Number(s?.x ?? 0),
+        y: Number(s?.y ?? 0),
+        width: Number(s?.width ?? 0),
+        height: Number(s?.height ?? 0),
+      }));
+  } catch {
+    return undefined;
+  }
+};
+
+const ProcedureSpecificationSelector = ({
+  procedureId,
+  onSelectionChange,
   initialSelections = [],
   bodySelectionType,
   bodyImageUrl,
-  bodyImageUrlMale
+  bodyImageUrlMale,
 }: ProcedureSpecificationSelectorProps) => {
   const [specifications, setSpecifications] = useState<ProcedureSpecification[]>([]);
-  const [selectedSpecs, setSelectedSpecs] = useState<Set<string>>(new Set(initialSelections));
-  const [loading, setLoading] = useState(true);
-  const [selectedGender, setSelectedGender] = useState<'female' | 'male'>('female');
+  const [selectedSpecs, setSelectedSpecs] = useState<Set<string>>(
+    new Set(initialSelections)
+  );
+  const [selectedGender, setSelectedGender] = useState<Gender>("female");
+  const [loading, setLoading] = useState<boolean>(true);
   const [hoveredSpecId, setHoveredSpecId] = useState<string | null>(null);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    loadSpecifications();
-  }, [procedureId]);
-
-  // Calculate total price and notify parent when selections change
-  useEffect(() => {
-    const selectedSpecifications = specifications.filter(spec => selectedSpecs.has(spec.id));
-    const totalPrice = selectedSpecifications.reduce((sum, spec) => sum + spec.price, 0);
-    
-    onSelectionChange?.({
-      selectedSpecifications,
-      totalPrice,
-      selectedGender
-    });
-  }, [selectedSpecs, specifications, selectedGender]); // Removed onSelectionChange from dependencies
-
-  const loadSpecifications = async () => {
-    try {
+    let cancelled = false;
+    const run = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('procedure_specifications')
-        .select('*')
-        .eq('procedure_id', procedureId)
-        .eq('is_active', true)
-        .order('display_order');
+      try {
+        const { data, error } = await supabase
+          .from("procedure_specifications")
+          .select("*")
+          .eq("procedure_id", procedureId)
+          .eq("is_active", true)
+          .order("display_order", { ascending: true });
 
-      if (error) throw error;
-      
-      // Process and convert the data to match our interface
-      const processedData: ProcedureSpecification[] = (data || []).map(spec => {
-        let areaShapes: AreaShape[] | undefined = undefined;
-        
-        if (spec.area_shapes) {
-          try {
-            // Handle area_shapes conversion safely
-            const shapes = Array.isArray(spec.area_shapes) ? spec.area_shapes : [spec.area_shapes];
-            areaShapes = shapes.map((shape: any) => ({
-              x: shape.x || 0,
-              y: shape.y || 0,
-              width: shape.width || 0,
-              height: shape.height || 0
-            }));
-          } catch (e) {
-            console.error('Erro ao processar area_shapes:', e);
-            areaShapes = undefined;
-          }
+        if (error) throw error;
+
+        const processed: ProcedureSpecification[] = (data ?? []).map((row: any) => ({
+          id: String(row.id),
+          name: String(row.name ?? ""),
+          description: row.description ?? null,
+          price: Number(row.price ?? 0),
+          display_order: Number(row.display_order ?? 0),
+          is_active: Boolean(row.is_active),
+          has_area_selection: Boolean(row.has_area_selection),
+          gender: normalizeGender(row.gender),
+          area_shapes: normalizeShapes(row.area_shapes),
+        }));
+
+        if (!cancelled) setSpecifications(processed);
+      } catch (e) {
+        if (!cancelled) {
+          toast({
+            title: "Erro",
+            description: "Falha ao carregar especificações do procedimento.",
+            variant: "destructive",
+          });
+          setSpecifications([]);
+          console.error("Erro ao carregar especificações:", e);
         }
-        
-        return {
-          id: spec.id,
-          name: spec.name,
-          description: spec.description,
-          price: spec.price,
-          display_order: spec.display_order || 0,
-          is_active: spec.is_active,
-          has_area_selection: spec.has_area_selection || false,
-          gender: spec.gender || 'female',
-          area_shapes: areaShapes
-        };
-      });
-      
-      console.log('Especificações carregadas:', processedData);
-      setSpecifications(processedData);
-    } catch (error: any) {
-      console.error('Erro ao carregar especificações:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar especificações do procedimento. Verifique sua conexão.",
-        variant: "destructive",
-      });
-      setSpecifications([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [procedureId, toast]);
 
+  // Total & notify parent
+  useEffect(() => {
+    const selected = specifications.filter((s) => selectedSpecs.has(s.id));
+    const total = selected.reduce((sum, s) => sum + (s.price || 0), 0);
+    onSelectionChange?.({
+      selectedSpecifications: selected,
+      totalPrice: total,
+      selectedGender,
+    });
+  }, [specifications, selectedSpecs, selectedGender, onSelectionChange]);
+
+  // Image URL for current gender
+  const imageUrl = useMemo(() => {
+    if (selectedGender === "male") {
+      return bodyImageUrlMale || "/images/body-male-default.png";
+    }
+    return bodyImageUrl || "/images/body-female-default.png";
+  }, [selectedGender, bodyImageUrl, bodyImageUrlMale]);
+
+  // Draw helpers
   const drawCanvas = () => {
     const canvas = canvasRef.current;
     const img = imageRef.current;
     if (!canvas || !img || !img.complete) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Clear canvas
+    // Clear
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Draw background image
+    // Draw image
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    // Draw areas for ALL specifications with area selection for current gender
-    specifications
-      .filter(spec => spec.has_area_selection && spec.area_shapes && spec.gender === selectedGender)
-      .forEach(spec => {
-        const isSelected = selectedSpecs.has(spec.id);
-        const isHovered = hoveredSpecId === spec.id;
-        
-        if (Array.isArray(spec.area_shapes)) {
-          spec.area_shapes.forEach((shape: AreaShape) => {
-            // Different colors for selected vs unselected areas
-            if (isSelected) {
-              ctx.strokeStyle = '#10B981'; // Green for selected
-              ctx.fillStyle = isHovered ? 'rgba(16, 185, 129, 0.5)' : 'rgba(16, 185, 129, 0.3)';
-            } else {
-              ctx.strokeStyle = '#6B7280'; // Gray for unselected
-              ctx.fillStyle = isHovered ? 'rgba(107, 114, 128, 0.3)' : 'rgba(107, 114, 128, 0.1)';
-            }
-            ctx.lineWidth = isSelected ? 3 : 1;
+    // Draw all areas for current gender
+    const specsWithAreas = specifications.filter(
+      (s) => s.has_area_selection && s.area_shapes && s.gender === selectedGender
+    );
 
-            const x = (shape.x / 100) * canvas.width;
-            const y = (shape.y / 100) * canvas.height;
-            const width = (shape.width / 100) * canvas.width;
-            const height = (shape.height / 100) * canvas.height;
+    specsWithAreas.forEach((spec) => {
+      const isSelected = selectedSpecs.has(spec.id);
+      const isHovered = hoveredSpecId === spec.id;
 
-            ctx.fillRect(x, y, width, height);
-            ctx.strokeRect(x, y, width, height);
-          });
-        }
+      (spec.area_shapes ?? []).forEach((shape) => {
+        const x = (shape.x / 100) * canvas.width;
+        const y = (shape.y / 100) * canvas.height;
+        const w = (shape.width / 100) * canvas.width;
+        const h = (shape.height / 100) * canvas.height;
+
+        // Fill
+        ctx.fillStyle = isSelected
+          ? isHovered
+            ? "rgba(16,185,129,0.5)"
+            : "rgba(16,185,129,0.3)"
+          : isHovered
+          ? "rgba(107,114,128,0.3)"
+          : "rgba(107,114,128,0.1)";
+        ctx.fillRect(x, y, w, h);
+
+        // Stroke
+        ctx.lineWidth = isSelected ? 3 : 1;
+        ctx.strokeStyle = isSelected ? "#10B981" : "#6B7280";
+        ctx.strokeRect(x, y, w, h);
       });
+    });
   };
 
-  const isPointInSpecification = (x: number, y: number, spec: ProcedureSpecification) => {
-    if (!spec.area_shapes || spec.gender !== selectedGender || !Array.isArray(spec.area_shapes)) return false;
+  // Scale mouse to canvas coordinates regardless of CSS scaling
+  const getCanvasXY = (evt: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (evt.clientX - rect.left) * scaleX;
+    const y = (evt.clientY - rect.top) * scaleY;
+    return { x, y };
+  };
+
+  const pointInSpec = (x: number, y: number, spec: ProcedureSpecification) => {
+    if (!spec.area_shapes || spec.gender !== selectedGender) return false;
     const canvas = canvasRef.current;
     if (!canvas) return false;
-    
-    return spec.area_shapes.some((shape: AreaShape) => {
-      const shapeX = (shape.x / 100) * canvas.width;
-      const shapeY = (shape.y / 100) * canvas.height;
-      const shapeWidth = (shape.width / 100) * canvas.width;
-      const shapeHeight = (shape.height / 100) * canvas.height;
-      
-      return x >= shapeX && x <= shapeX + shapeWidth &&
-             y >= shapeY && y <= shapeY + shapeHeight;
+    return (spec.area_shapes ?? []).some((shape) => {
+      const sx = (shape.x / 100) * canvas.width;
+      const sy = (shape.y / 100) * canvas.height;
+      const sw = (shape.width / 100) * canvas.width;
+      const sh = (shape.height / 100) * canvas.height;
+      return x >= sx && x <= sx + sw && y >= sy && y <= sy + sh;
     });
   };
 
-  const handleCanvasMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-
-    // Check ALL specifications with areas for current gender (not just selected ones)
-    const hoveredSpec = specifications.find(spec => 
-      spec.has_area_selection && spec.gender === selectedGender && isPointInSpecification(x, y, spec)
+  const onCanvasMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const { x, y } = getCanvasXY(e);
+    const hovered = specifications.find(
+      (s) => s.has_area_selection && s.gender === selectedGender && pointInSpec(x, y, s)
     );
-    setHoveredSpecId(hoveredSpec?.id || null);
+    setHoveredSpecId(hovered?.id || null);
   };
 
-  const handleSpecificationChange = (specId: string, checked: boolean) => {
-    setSelectedSpecs(prev => {
-      const newSet = new Set(prev);
-      if (checked) {
-        newSet.add(specId);
-      } else {
-        newSet.delete(specId);
-      }
-      return newSet;
-    });
+  const onCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const { x, y } = getCanvasXY(e);
+    const clicked = specifications.find(
+      (s) => s.has_area_selection && s.gender === selectedGender && pointInSpec(x, y, s)
+    );
+    if (clicked) {
+      setSelectedSpecs((prev) => {
+        const next = new Set(prev);
+        if (next.has(clicked.id)) next.delete(clicked.id);
+        else next.add(clicked.id);
+        return next;
+      });
+    }
   };
 
-  const handleImageLoad = () => {
+  const onImageLoad = () => {
     const canvas = canvasRef.current;
-    const image = imageRef.current;
-    if (!canvas || !image) return;
-
-    // Set canvas size to match image aspect ratio
+    const img = imageRef.current;
+    if (!canvas || !img) return;
     const maxWidth = 400;
-    const aspectRatio = image.naturalHeight / image.naturalWidth;
+    const ratio = img.naturalHeight / img.naturalWidth || 4 / 3;
     canvas.width = maxWidth;
-    canvas.height = maxWidth * aspectRatio;
-    
+    canvas.height = Math.round(maxWidth * ratio);
     drawCanvas();
   };
 
   useEffect(() => {
     drawCanvas();
-  }, [specifications, selectedSpecs, selectedGender, hoveredSpecId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageUrl, selectedGender, specifications, selectedSpecs, hoveredSpecId]);
 
-  const getImageUrl = () => {
-    if (!bodySelectionType) return '';
-    
-    if (bodySelectionType === 'face') {
-      return selectedGender === 'male' 
-        ? '/images/face-male-default.png'
-        : '/images/face-female-default.png';
-    } else {
-      return selectedGender === 'male'
-        ? bodyImageUrlMale || '/images/body-male-default.png'
-        : bodyImageUrl || '/images/body-female-default.png';
-    }
-  };
-
-  // Check if any specification has area selection (regardless of being selected)
-  const hasAreaSelection = specifications.some(spec => 
-    spec.has_area_selection
-  );
-  
-  // Check if any selected specification has area selection for the current gender
-  const hasSelectedAreaForGender = specifications.some(spec => 
-    selectedSpecs.has(spec.id) && spec.has_area_selection && spec.gender === selectedGender
-  );
-
-  // Check if we should show the image (if there are specifications with area selection for the current gender)
-  const shouldShowImage = specifications.some(spec => 
-    spec.has_area_selection && spec.gender === selectedGender
-  );
-
-  // Get current total price
-  const totalPrice = specifications
-    .filter(spec => selectedSpecs.has(spec.id))
-    .reduce((sum, spec) => sum + spec.price, 0);
-
-  // Get selected specifications for display
-  const getSelectedSpecifications = () => 
-    specifications.filter(spec => selectedSpecs.has(spec.id));
-
+  // Render
   if (loading) {
     return (
       <Card>
@@ -295,178 +287,148 @@ const ProcedureSpecificationSelector = ({
       <Card>
         <CardContent className="py-8">
           <div className="text-center space-y-2">
-            <p className="text-muted-foreground">
-              Nenhuma especificação cadastrada para este procedimento.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Você pode prosseguir sem selecionar especificações.
-            </p>
+            <p className="text-muted-foreground">Nenhuma especificação ativa para este procedimento.</p>
           </div>
         </CardContent>
       </Card>
     );
   }
 
+  const hasAnyArea = specifications.some((s) => s.has_area_selection);
+  const total = specifications
+    .filter((s) => selectedSpecs.has(s.id))
+    .reduce((sum, s) => sum + (s.price || 0), 0);
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>Procedimentos Disponíveis</span>
-          {totalPrice > 0 && (
-            <Badge variant="secondary" className="text-lg px-3 py-1">
-              Total: R$ {totalPrice.toFixed(2).replace('.', ',')}
-            </Badge>
-          )}
-        </CardTitle>
-        <CardDescription>
-          Selecione os procedimentos desejados
-        </CardDescription>
+        <CardTitle className="text-base">Especificações do procedimento</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Specifications Selection */}
-        {specifications.map((spec, index) => (
-          <div key={spec.id}>
-            <div 
-              className={`flex items-start space-x-3 p-4 rounded-lg border transition-colors cursor-pointer ${
-                selectedSpecs.has(spec.id) ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'
-              }`}
-              onMouseEnter={() => spec.has_area_selection && setHoveredSpecId(spec.id)}
-              onMouseLeave={() => setHoveredSpecId(null)}
-              onClick={() => handleSpecificationChange(spec.id, !selectedSpecs.has(spec.id))}
-            >
-              <Checkbox
-                id={`spec-${spec.id}`}
-                checked={selectedSpecs.has(spec.id)}
-                onCheckedChange={(checked) => 
-                  handleSpecificationChange(spec.id, checked as boolean)
-                }
-                className="mt-1"
-              />
-              <div className="flex-1 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label 
-                    htmlFor={`spec-${spec.id}`}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    {spec.name}
-                  </label>
-                  {spec.price > 0 && (
-                    <Badge variant="outline">
-                      R$ {spec.price.toFixed(2).replace('.', ',')}
-                    </Badge>
-                  )}
-                </div>
-                {spec.description && (
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {spec.description}
-                  </p>
-                )}
-              </div>
-            </div>
-            {index < specifications.length - 1 && <Separator className="my-2" />}
-          </div>
-        ))}
-
-        {/* Area Selection for specifications */}
-        {shouldShowImage && (
-          <div className="space-y-4">
-            {/* Gender Selection */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Selecione o gênero:</Label>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant={selectedGender === 'female' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setSelectedGender('female')}
-                >
-                  Feminino
-                </Button>
-                <Button
-                  type="button" 
-                  variant={selectedGender === 'male' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setSelectedGender('male')}
-                >
-                  Masculino
-                </Button>
-              </div>
-            </div>
-
-            {/* Interactive Canvas - Sempre mostra se há especificações com seleção de área */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">
-                {hasSelectedAreaForGender ? 'Áreas selecionadas:' : 'Imagem para seleção de áreas:'}
-              </Label>
-              <div className="relative border rounded-md overflow-hidden bg-muted/30 max-w-xs mx-auto">
-                <canvas
-                  ref={canvasRef}
-                  width={300}
-                  height={400}
-                  className="w-full cursor-crosshair"
-                  onMouseMove={handleCanvasMouseMove}
-                  onClick={(e) => {
-                    // Allow clicking on areas to select specifications
-                    const canvas = canvasRef.current;
-                    if (!canvas) return;
-
-                    const rect = canvas.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
-
-                    // Find specifications that have clickable area at this position
-                    const clickedSpec = specifications.find(spec => 
-                      spec.has_area_selection && spec.gender === selectedGender && isPointInSpecification(x, y, spec)
-                    );
-                    
-                    if (clickedSpec) {
-                      handleSpecificationChange(clickedSpec.id, !selectedSpecs.has(clickedSpec.id));
-                    }
-                  }}
-                />
-                <img
-                  ref={imageRef}
-                  src={getImageUrl()}
-                  alt="Áreas para seleção"
-                  className="hidden"
-                  onLoad={handleImageLoad}
-                />
-              </div>
-              {!hasSelectedAreaForGender && specifications.some(spec => spec.has_area_selection) && (
-                <p className="text-xs text-muted-foreground text-center">
-                  Selecione um procedimento acima para ver as áreas disponíveis na imagem
-                </p>
-              )}
+        {/* Gender Toggle if area selection is used */}
+        {hasAnyArea && (
+          <div className="flex items-center gap-2">
+            <Label className="text-sm">Gênero para a imagem:</Label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={selectedGender === "female" ? "default" : "outline"}
+                onClick={() => setSelectedGender("female")}
+                size="sm"
+              >
+                Feminino
+              </Button>
+              <Button
+                type="button"
+                variant={selectedGender === "male" ? "default" : "outline"}
+                onClick={() => setSelectedGender("male")}
+                size="sm"
+              >
+                Masculino
+              </Button>
             </div>
           </div>
         )}
 
-        {/* Selection Summary */}
-        {getSelectedSpecifications().length > 0 && (
-          <div className="mt-6 p-4 bg-muted rounded-lg">
-            <h4 className="font-medium mb-2">Selecionados:</h4>
-            <div className="space-y-1">
-              {getSelectedSpecifications().map((spec) => (
-                <div key={spec.id} className="flex justify-between text-sm">
-                  <span>{spec.name}</span>
-                  <span>
-                    {spec.price > 0 
-                      ? `R$ ${spec.price.toFixed(2).replace('.', ',')}` 
-                      : 'Gratuito'
-                    }
-                  </span>
-                </div>
-              ))}
-              
-              {totalPrice > 0 && (
-                <>
-                  <Separator className="my-2" />
-                  <div className="flex justify-between font-medium">
-                    <span>Total:</span>
-                    <span>R$ {totalPrice.toFixed(2).replace('.', ',')}</span>
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* List */}
+          <div className="space-y-3">
+            {specifications.map((spec) => {
+              const selected = selectedSpecs.has(spec.id);
+              return (
+                <div
+                  key={spec.id}
+                  className="rounded-md border p-3 flex items-start justify-between gap-3"
+                >
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id={`spec-${spec.id}`}
+                      checked={selected}
+                      onCheckedChange={(c: boolean) =>
+                        setSelectedSpecs((prev) => {
+                          const next = new Set(prev);
+                          if (c) next.add(spec.id);
+                          else next.delete(spec.id);
+                          return next;
+                        })
+                      }
+                    />
+                    <div>
+                      <Label htmlFor={`spec-${spec.id}`} className="cursor-pointer">
+                        {spec.name}
+                      </Label>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {spec.price > 0 ? currency(spec.price) : "Sem custo adicional"}
+                      </div>
+                      {spec.has_area_selection && (
+                        <div className="mt-1">
+                          <Badge variant="secondary" className="mr-2">seleção de área</Badge>
+                          <Badge variant="outline">{spec.gender === "male" ? "masculino" : "feminino"}</Badge>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </>
-              )}
+                </div>
+              );
+            })}
+
+            <Separator className="my-2" />
+            <div className="flex justify-between font-medium">
+              <span>Total:</span>
+              <span>{currency(total)}</span>
+            </div>
+          </div>
+
+          {/* Image + Canvas */}
+          {hasAnyArea && (
+            <div>
+              <Label className="text-sm mb-2 block">
+                {specifications.some((s) => selectedSpecs.has(s.id) && s.has_area_selection && s.gender === selectedGender)
+                  ? "Áreas selecionadas:"
+                  : "Imagem para seleção de áreas:"}
+              </Label>
+              <div className="relative border rounded-md overflow-hidden bg-muted/30 max-w-xs mx-auto">
+                <canvas
+                  ref={canvasRef}
+                  className="w-full cursor-crosshair"
+                  onMouseMove={onCanvasMove}
+                  onClick={onCanvasClick}
+                />
+                <img
+                  ref={imageRef}
+                  src={imageUrl || ""}
+                  alt="Mapa corporal"
+                  className="absolute inset-0 w-px h-px opacity-0 pointer-events-none"
+                  onLoad={onImageLoad}
+                  onError={() => {
+                    toast({
+                      title: "Imagem indisponível",
+                      description:
+                        "Não foi possível carregar a imagem de apoio. Você ainda pode selecionar pela lista.",
+                    });
+                  }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Dica: clique nas áreas destacadas para (de)selecionar a aplicação correspondente.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Summary */}
+        {Array.from(selectedSpecs).length > 0 && (
+          <div className="mt-4 p-3 bg-muted rounded-md">
+            <h4 className="font-medium mb-1 text-sm">Selecionados:</h4>
+            <div className="space-y-0.5 text-sm">
+              {specifications
+                .filter((s) => selectedSpecs.has(s.id))
+                .map((s) => (
+                  <div key={s.id} className="flex justify-between">
+                    <span>{s.name}</span>
+                    <span>{s.price > 0 ? currency(s.price) : "Sem custo"}</span>
+                  </div>
+                ))}
             </div>
           </div>
         )}

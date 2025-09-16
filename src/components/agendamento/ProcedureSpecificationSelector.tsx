@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,7 @@ interface ProcedureSpecification {
   display_order: number;
   is_active: boolean;
   has_area_selection?: boolean;
-  area_shapes?: any; // Changed back to any to handle JSON from database
+  area_shapes?: AreaShape[];
   gender?: string;
 }
 
@@ -61,8 +61,8 @@ const ProcedureSpecificationSelector = ({
     loadSpecifications();
   }, [procedureId]);
 
-  // Calculate total price and notify parent when selections change
-  useEffect(() => {
+  // Stable callback function to prevent infinite re-renders
+  const notifyParent = useCallback(() => {
     const selectedSpecifications = specifications.filter(spec => selectedSpecs.has(spec.id));
     const totalPrice = selectedSpecifications.reduce((sum, spec) => sum + spec.price, 0);
     
@@ -71,7 +71,12 @@ const ProcedureSpecificationSelector = ({
       totalPrice,
       selectedGender
     });
-  }, [selectedSpecs, specifications, selectedGender, onSelectionChange]);
+  }, [specifications, selectedSpecs, selectedGender, onSelectionChange]);
+
+  // Calculate total price and notify parent when selections change
+  useEffect(() => {
+    notifyParent();
+  }, [notifyParent]);
 
   const loadSpecifications = async () => {
     try {
@@ -84,8 +89,42 @@ const ProcedureSpecificationSelector = ({
         .order('display_order');
 
       if (error) throw error;
-      console.log('Especificações carregadas:', data);
-      setSpecifications(data || []);
+      
+      // Process and convert the data to match our interface
+      const processedData: ProcedureSpecification[] = (data || []).map(spec => {
+        let areaShapes: AreaShape[] | undefined = undefined;
+        
+        if (spec.area_shapes) {
+          try {
+            // Handle area_shapes conversion safely
+            const shapes = Array.isArray(spec.area_shapes) ? spec.area_shapes : [spec.area_shapes];
+            areaShapes = shapes.map((shape: any) => ({
+              x: shape.x || 0,
+              y: shape.y || 0,
+              width: shape.width || 0,
+              height: shape.height || 0
+            }));
+          } catch (e) {
+            console.error('Erro ao processar area_shapes:', e);
+            areaShapes = undefined;
+          }
+        }
+        
+        return {
+          id: spec.id,
+          name: spec.name,
+          description: spec.description,
+          price: spec.price,
+          display_order: spec.display_order || 0,
+          is_active: spec.is_active,
+          has_area_selection: spec.has_area_selection || false,
+          gender: spec.gender || 'female',
+          area_shapes: areaShapes
+        };
+      });
+      
+      console.log('Especificações carregadas:', processedData);
+      setSpecifications(processedData);
     } catch (error: any) {
       console.error('Erro ao carregar especificações:', error);
       toast({
@@ -93,7 +132,7 @@ const ProcedureSpecificationSelector = ({
         description: "Erro ao carregar especificações do procedimento. Verifique sua conexão.",
         variant: "destructive",
       });
-      setSpecifications([]); // Garante que há um array vazio
+      setSpecifications([]);
     } finally {
       setLoading(false);
     }
@@ -113,41 +152,43 @@ const ProcedureSpecificationSelector = ({
     // Draw background image
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    // Draw areas for specifications with area selection for current gender
+    // Draw areas for ALL specifications with area selection for current gender
     specifications
       .filter(spec => spec.has_area_selection && spec.area_shapes && spec.gender === selectedGender)
       .forEach(spec => {
         const isSelected = selectedSpecs.has(spec.id);
         const isHovered = hoveredSpecId === spec.id;
         
-        spec.area_shapes?.forEach((shape: any) => {
-          // Different colors for selected vs unselected areas
-          if (isSelected) {
-            ctx.strokeStyle = '#10B981'; // Green for selected
-            ctx.fillStyle = isHovered ? 'rgba(16, 185, 129, 0.5)' : 'rgba(16, 185, 129, 0.3)';
-          } else {
-            ctx.strokeStyle = '#6B7280'; // Gray for unselected
-            ctx.fillStyle = isHovered ? 'rgba(107, 114, 128, 0.3)' : 'rgba(107, 114, 128, 0.1)';
-          }
-          ctx.lineWidth = isSelected ? 3 : 1;
+        if (Array.isArray(spec.area_shapes)) {
+          spec.area_shapes.forEach((shape: AreaShape) => {
+            // Different colors for selected vs unselected areas
+            if (isSelected) {
+              ctx.strokeStyle = '#10B981'; // Green for selected
+              ctx.fillStyle = isHovered ? 'rgba(16, 185, 129, 0.5)' : 'rgba(16, 185, 129, 0.3)';
+            } else {
+              ctx.strokeStyle = '#6B7280'; // Gray for unselected
+              ctx.fillStyle = isHovered ? 'rgba(107, 114, 128, 0.3)' : 'rgba(107, 114, 128, 0.1)';
+            }
+            ctx.lineWidth = isSelected ? 3 : 1;
 
-          const x = (shape.x / 100) * canvas.width;
-          const y = (shape.y / 100) * canvas.height;
-          const width = (shape.width / 100) * canvas.width;
-          const height = (shape.height / 100) * canvas.height;
+            const x = (shape.x / 100) * canvas.width;
+            const y = (shape.y / 100) * canvas.height;
+            const width = (shape.width / 100) * canvas.width;
+            const height = (shape.height / 100) * canvas.height;
 
-          ctx.fillRect(x, y, width, height);
-          ctx.strokeRect(x, y, width, height);
-        });
+            ctx.fillRect(x, y, width, height);
+            ctx.strokeRect(x, y, width, height);
+          });
+        }
       });
   };
 
   const isPointInSpecification = (x: number, y: number, spec: ProcedureSpecification) => {
-    if (!spec.area_shapes || spec.gender !== selectedGender) return false;
+    if (!spec.area_shapes || spec.gender !== selectedGender || !Array.isArray(spec.area_shapes)) return false;
     const canvas = canvasRef.current;
     if (!canvas) return false;
     
-    return spec.area_shapes.some((shape: any) => {
+    return spec.area_shapes.some((shape: AreaShape) => {
       const shapeX = (shape.x / 100) * canvas.width;
       const shapeY = (shape.y / 100) * canvas.height;
       const shapeWidth = (shape.width / 100) * canvas.width;
@@ -166,7 +207,7 @@ const ProcedureSpecificationSelector = ({
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    // Check all specifications with areas for current gender
+    // Check ALL specifications with areas for current gender (not just selected ones)
     const hoveredSpec = specifications.find(spec => 
       spec.has_area_selection && spec.gender === selectedGender && isPointInSpecification(x, y, spec)
     );
@@ -370,7 +411,7 @@ const ProcedureSpecificationSelector = ({
                   className="w-full cursor-crosshair"
                   onMouseMove={handleCanvasMouseMove}
                   onClick={(e) => {
-                    // Permite clicar nas áreas para selecionar especificações
+                    // Allow clicking on areas to select specifications
                     const canvas = canvasRef.current;
                     if (!canvas) return;
 
@@ -378,7 +419,7 @@ const ProcedureSpecificationSelector = ({
                     const x = e.clientX - rect.left;
                     const y = e.clientY - rect.top;
 
-                    // Procura especificações que têm área clicável nesta posição
+                    // Find specifications that have clickable area at this position
                     const clickedSpec = specifications.find(spec => 
                       spec.has_area_selection && spec.gender === selectedGender && isPointInSpecification(x, y, spec)
                     );

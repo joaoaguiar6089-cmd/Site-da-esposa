@@ -128,7 +128,16 @@ const ProcedureSpecificationSelector = ({
           gender: normalizeGender(row.gender),
           area_shapes: normalizeShapes(row.area_shapes),
         }));
-        if (!cancelled) setSpecifications(processed);
+        if (!cancelled) {
+          setSpecifications(processed);
+          console.log("Especificações carregadas:", processed.map(s => ({ 
+            id: s.id, 
+            name: s.name, 
+            gender: s.gender, 
+            has_area_selection: s.has_area_selection,
+            areas: s.area_shapes?.length || 0 
+          })));
+        }
       } catch (e) {
         if (!cancelled) {
           toast({
@@ -183,7 +192,7 @@ const ProcedureSpecificationSelector = ({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    // Draw ALL areas for ALL specifications (regardless of gender filter)
+    // Draw ALL areas for ALL specifications with area selection
     const allSpecsWithAreas = specifications.filter(
       (s) => s.has_area_selection && s.area_shapes && s.area_shapes.length > 0
     );
@@ -192,46 +201,74 @@ const ProcedureSpecificationSelector = ({
       id: s.id, 
       name: s.name, 
       gender: s.gender, 
-      areas: s.area_shapes?.length || 0 
+      areas: s.area_shapes?.length || 0,
+      selectedGender: selectedGender
     })));
     
+    // Draw areas for all specifications that match the current gender or have no gender specified
     allSpecsWithAreas.forEach((spec) => {
       const isSelected = selectedSpecs.has(spec.id);
       const isHovered = hoveredSpecId === spec.id;
       
-      // Only show areas for current gender or if no gender specified
-      if (spec.gender && spec.gender !== selectedGender) {
+      // Show areas for current gender or unisex specifications
+      const shouldShowArea = !spec.gender || spec.gender === selectedGender;
+      if (!shouldShowArea) {
+        console.log(`Skipping spec ${spec.name} - gender mismatch: ${spec.gender} !== ${selectedGender}`);
         return;
       }
       
+      console.log(`Drawing areas for spec: ${spec.name} (${spec.area_shapes?.length || 0} areas)`);
+      
       (spec.area_shapes ?? []).forEach((shape, shapeIndex) => {
-        console.log(`Drawing shape ${shapeIndex} for spec ${spec.name}:`, shape);
-        
         const x = (shape.x / 100) * canvas.width;
         const y = (shape.y / 100) * canvas.height;
         const w = (shape.width / 100) * canvas.width;
         const h = (shape.height / 100) * canvas.height;
         
+        // Different colors for different specifications to help identify them
+        const colors = [
+          { fill: "rgba(16,185,129,", stroke: "#10B981" }, // Green
+          { fill: "rgba(59,130,246,", stroke: "#3B82F6" }, // Blue  
+          { fill: "rgba(239,68,68,", stroke: "#EF4444" }, // Red
+          { fill: "rgba(245,158,11,", stroke: "#F59E0B" }, // Amber
+          { fill: "rgba(139,92,246,", stroke: "#8B5CF6" }, // Purple
+        ];
+        
+        const colorIndex = allSpecsWithAreas.findIndex(s => s.id === spec.id) % colors.length;
+        const color = colors[colorIndex];
+        
         // Fill area
         ctx.fillStyle = isSelected
           ? isHovered
-            ? "rgba(16,185,129,0.5)"
-            : "rgba(16,185,129,0.3)"
+            ? color.fill + "0.6)"
+            : color.fill + "0.4)"
           : isHovered
-          ? "rgba(107,114,128,0.3)"
-          : "rgba(107,114,128,0.1)";
+          ? color.fill + "0.3)"
+          : color.fill + "0.15)";
         ctx.fillRect(x, y, w, h);
         
         // Draw border
-        ctx.lineWidth = isSelected ? 3 : 1;
-        ctx.strokeStyle = isSelected ? "#10B981" : "#6B7280";
+        ctx.lineWidth = isSelected ? 3 : 2;
+        ctx.strokeStyle = isSelected ? color.stroke : color.stroke + "80";
         ctx.strokeRect(x, y, w, h);
         
-        // Add label for better visibility during debugging
+        // Add specification name label
         if (isHovered || isSelected) {
-          ctx.fillStyle = "#000";
-          ctx.font = "12px Arial";
+          ctx.fillStyle = "#FFFFFF";
+          ctx.font = "bold 11px Arial";
           ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          
+          // Add background for text
+          const textWidth = ctx.measureText(spec.name).width;
+          const textHeight = 14;
+          const textX = x + w/2 - textWidth/2 - 4;
+          const textY = y + h/2 - textHeight/2;
+          
+          ctx.fillStyle = "rgba(0,0,0,0.8)";
+          ctx.fillRect(textX, textY, textWidth + 8, textHeight);
+          
+          ctx.fillStyle = "#FFFFFF";
           ctx.fillText(spec.name, x + w/2, y + h/2);
         }
       });
@@ -249,7 +286,7 @@ const ProcedureSpecificationSelector = ({
 
   const pointInSpec = (x: number, y: number, spec: ProcedureSpecification) => {
     if (!spec.area_shapes) return false;
-    // Allow any gender or match current gender
+    // Only check specifications that match current gender or have no gender specified
     if (spec.gender && spec.gender !== selectedGender) return false;
     
     const canvas = canvasRef.current;
@@ -282,13 +319,19 @@ const ProcedureSpecificationSelector = ({
              pointInSpec(x, y, s)
     );
     if (clicked) {
-      console.log('Clicked on specification:', clicked.name);
+      console.log('Clicked on specification:', clicked.name, 'Gender:', clicked.gender);
       setSelectedSpecs((prev) => {
         const next = new Set(prev);
-        if (next.has(clicked.id)) next.delete(clicked.id);
-        else next.add(clicked.id);
+        if (next.has(clicked.id)) {
+          next.delete(clicked.id);
+        } else {
+          next.add(clicked.id);
+        }
+        console.log('Updated selections:', Array.from(next));
         return next;
       });
+    } else {
+      console.log('No specification found at click position:', { x, y });
     }
   };
 

@@ -61,8 +61,8 @@ const ProcedureSpecificationSelector = ({
     loadSpecifications();
   }, [procedureId]);
 
-  // Stable callback function to prevent infinite re-renders
-  const notifyParent = useCallback(() => {
+  // Calculate total price and notify parent when selections change
+  useEffect(() => {
     const selectedSpecifications = specifications.filter(spec => selectedSpecs.has(spec.id));
     const totalPrice = selectedSpecifications.reduce((sum, spec) => sum + spec.price, 0);
     
@@ -71,12 +71,7 @@ const ProcedureSpecificationSelector = ({
       totalPrice,
       selectedGender
     });
-  }, [specifications, selectedSpecs, selectedGender, onSelectionChange]);
-
-  // Calculate total price and notify parent when selections change
-  useEffect(() => {
-    notifyParent();
-  }, [notifyParent]);
+  }, [selectedSpecs, specifications, selectedGender]); // Removed onSelectionChange from dependencies
 
   const loadSpecifications = async () => {
     try {

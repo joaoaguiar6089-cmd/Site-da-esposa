@@ -332,7 +332,6 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         return;
       }
 
-      // Buscar agendamentos existentes com detalhes do procedimento
       const { data: appointments, error } = await supabase
         .from('appointments')
         .select(`
@@ -346,47 +345,33 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
 
       if (error) throw error;
 
-      // Obter duração do procedimento selecionado
       const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
       const selectedDuration = selectedProcedure?.duration || 60;
 
-      // Filtrar horários considerando conflitos de duração e horário atual se for hoje
       let available = allTimes.filter(time => {
-        // Converter horário para minutos para facilitar cálculos
         const [hour, minute] = time.split(':').map(Number);
         const timeInMinutes = hour * 60 + minute;
         
-        // Se for hoje, verificar se o horário é futuro (considerando fuso brasileiro)
         const today = getCurrentDateBrazil();
         if (date === today) {
           const nowBrazil = getCurrentDateTimeBrazil();
           const currentTimeInMinutes = nowBrazil.getHours() * 60 + nowBrazil.getMinutes();
-          
-          // Adicionar uma margem de pelo menos 30 minutos a partir do horário atual
           if (timeInMinutes <= currentTimeInMinutes + 30) {
             return false;
           }
         }
         
-        // Verificar se este horário conflita com agendamentos existentes
         const hasConflict = appointments?.some(apt => {
           const [aptHour, aptMinute] = apt.appointment_time.split(':').map(Number);
           const aptTimeInMinutes = aptHour * 60 + aptMinute;
           const aptDuration = apt.procedures?.duration || 60;
           
-          // Verificar sobreposição:
-          // 1. Novo agendamento começa durante um existente
           const startsInExisting = timeInMinutes >= aptTimeInMinutes && 
                                    timeInMinutes < (aptTimeInMinutes + aptDuration);
-          
-          // 2. Novo agendamento termina durante um existente  
           const endsInExisting = (timeInMinutes + selectedDuration) > aptTimeInMinutes && 
                                  (timeInMinutes + selectedDuration) <= (aptTimeInMinutes + aptDuration);
-          
-          // 3. Novo agendamento engloba um existente
           const engulfsExisting = timeInMinutes <= aptTimeInMinutes && 
                                   (timeInMinutes + selectedDuration) >= (aptTimeInMinutes + aptDuration);
-          
           return startsInExisting || endsInExisting || engulfsExisting;
         });
 
@@ -396,7 +381,6 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
       setAvailableTimes(available);
     } catch (error) {
       console.error('Erro ao carregar horários:', error);
-      // Fallback mais conservador em caso de erro
       const fallbackTimes: string[] = [];
       for (let hour = 8; hour <= 17; hour++) {
         const timeString = `${hour.toString().padStart(2, '0')}:00`;
@@ -864,9 +848,11 @@ Para reagendar, entre em contato conosco.`;
                                 setSelectedCategoryId('');
                                 setSelectedSubcategoryId('');
                                 setSearchQuery('');
+                                
                                 // Resetar seleções de áreas corporais se mudar o procedimento
                                 setSelectedBodyAreas([]);
                                 setTotalBodyAreasPrice(0);
+                                
                                 // Recarregar horários se uma data já estiver selecionada
                                 if (formData.appointment_date) {
                                   loadAvailableTimes(formData.appointment_date);
@@ -1122,6 +1108,39 @@ Para reagendar, entre em contato conosco.`;
             />
           </div>
           
+          
+          {/* Resumo e promoções (mobile-friendly) */}
+          <div className="md:hidden mt-4 sticky bottom-2 z-10">
+            <div className="rounded-xl border bg-background/90 backdrop-blur p-4 shadow-lg">
+              <div className="flex items-center justify-between">
+                <div className="text-sm">
+                  <div className="text-muted-foreground">Subtotal</div>
+                  <div className="font-medium">
+                    {new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(
+                      (totalSpecificationsPrice || 0) + (totalBodyAreasPrice || 0) + (selectedProcedure?.price || 0)
+                    )}
+                  </div>
+                </div>
+                <div className="text-right text-sm">
+                  <div className="text-muted-foreground">Promoções</div>
+                  <div className="font-medium">
+                    {/* TODO: mostrar desconto aplicado */}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold">Total</span>
+                  <span className="font-bold">
+                    {new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(
+                      (totalSpecificationsPrice || 0) + (totalBodyAreasPrice || 0) + (selectedProcedure?.price || 0)
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="flex gap-2 pt-2">
             <Button
               type="button"

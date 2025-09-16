@@ -183,18 +183,36 @@ const ProcedureSpecificationSelector = ({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    // Draw ALL areas for CURRENT gender (selected or not)
-    const specsWithAreas = specifications.filter(
-      (s) => s.has_area_selection && s.area_shapes && s.gender === selectedGender
+    // Draw ALL areas for ALL specifications (regardless of gender filter)
+    const allSpecsWithAreas = specifications.filter(
+      (s) => s.has_area_selection && s.area_shapes && s.area_shapes.length > 0
     );
-    specsWithAreas.forEach((spec) => {
+    
+    console.log('Drawing areas for specifications:', allSpecsWithAreas.map(s => ({ 
+      id: s.id, 
+      name: s.name, 
+      gender: s.gender, 
+      areas: s.area_shapes?.length || 0 
+    })));
+    
+    allSpecsWithAreas.forEach((spec) => {
       const isSelected = selectedSpecs.has(spec.id);
       const isHovered = hoveredSpecId === spec.id;
-      (spec.area_shapes ?? []).forEach((shape) => {
+      
+      // Only show areas for current gender or if no gender specified
+      if (spec.gender && spec.gender !== selectedGender) {
+        return;
+      }
+      
+      (spec.area_shapes ?? []).forEach((shape, shapeIndex) => {
+        console.log(`Drawing shape ${shapeIndex} for spec ${spec.name}:`, shape);
+        
         const x = (shape.x / 100) * canvas.width;
         const y = (shape.y / 100) * canvas.height;
         const w = (shape.width / 100) * canvas.width;
         const h = (shape.height / 100) * canvas.height;
+        
+        // Fill area
         ctx.fillStyle = isSelected
           ? isHovered
             ? "rgba(16,185,129,0.5)"
@@ -203,9 +221,19 @@ const ProcedureSpecificationSelector = ({
           ? "rgba(107,114,128,0.3)"
           : "rgba(107,114,128,0.1)";
         ctx.fillRect(x, y, w, h);
+        
+        // Draw border
         ctx.lineWidth = isSelected ? 3 : 1;
         ctx.strokeStyle = isSelected ? "#10B981" : "#6B7280";
         ctx.strokeRect(x, y, w, h);
+        
+        // Add label for better visibility during debugging
+        if (isHovered || isSelected) {
+          ctx.fillStyle = "#000";
+          ctx.font = "12px Arial";
+          ctx.textAlign = "center";
+          ctx.fillText(spec.name, x + w/2, y + h/2);
+        }
       });
     });
   };
@@ -220,9 +248,13 @@ const ProcedureSpecificationSelector = ({
   };
 
   const pointInSpec = (x: number, y: number, spec: ProcedureSpecification) => {
-    if (!spec.area_shapes || spec.gender !== selectedGender) return false;
+    if (!spec.area_shapes) return false;
+    // Allow any gender or match current gender
+    if (spec.gender && spec.gender !== selectedGender) return false;
+    
     const canvas = canvasRef.current;
     if (!canvas) return false;
+    
     return (spec.area_shapes ?? []).some((shape) => {
       const sx = (shape.x / 100) * canvas.width;
       const sy = (shape.y / 100) * canvas.height;
@@ -235,7 +267,9 @@ const ProcedureSpecificationSelector = ({
   const onCanvasMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = getCanvasXY(e);
     const hovered = specifications.find(
-      (s) => s.has_area_selection && s.gender === selectedGender && pointInSpec(x, y, s)
+      (s) => s.has_area_selection && s.area_shapes && 
+             (!s.gender || s.gender === selectedGender) && 
+             pointInSpec(x, y, s)
     );
     setHoveredSpecId(hovered?.id || null);
   };
@@ -243,9 +277,12 @@ const ProcedureSpecificationSelector = ({
   const onCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = getCanvasXY(e);
     const clicked = specifications.find(
-      (s) => s.has_area_selection && s.gender === selectedGender && pointInSpec(x, y, s)
+      (s) => s.has_area_selection && s.area_shapes && 
+             (!s.gender || s.gender === selectedGender) && 
+             pointInSpec(x, y, s)
     );
     if (clicked) {
+      console.log('Clicked on specification:', clicked.name);
       setSelectedSpecs((prev) => {
         const next = new Set(prev);
         if (next.has(clicked.id)) next.delete(clicked.id);

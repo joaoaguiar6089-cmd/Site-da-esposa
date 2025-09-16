@@ -1050,42 +1050,6 @@ Para reagendar, entre em contato conosco.`;
                 />
               </div>
 
-              {/* Especificações e Áreas do procedimento - sempre mostra para procedimentos */}
-              {selectedProcedure && (
-                <div className="space-y-6">
-                  {/* Mostra informações do procedimento */}
-                  <div className="p-4 bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl border border-primary/20">
-                    <h3 className="font-semibold text-sm mb-2 text-primary">Procedimento selecionado:</h3>
-                    <p className="font-medium text-foreground">{selectedProcedure.name}</p>
-                    {selectedProcedure.description && (
-                      <p className="text-sm text-muted-foreground mt-1">{selectedProcedure.description}</p>
-                    )}
-                    {selectedProcedure.price && (
-                      <p className="text-sm font-medium mt-2 text-primary">
-                        Preço base: {new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(selectedProcedure.price)}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Sempre renderiza o componente de especificações */}
-                  <ProcedureSpecificationSelector
-                    procedureId={selectedProcedure.id}
-                    onSelectionChange={(data) => {
-                      console.log('Seleção de especificações mudou:', data);
-                      setSelectedSpecifications(data.selectedSpecifications);
-                      setTotalSpecificationsPrice(data.totalPrice);
-                      setDiscountInfo(data.discountInfo);
-                      if (data.selectedGender) {
-                        setSelectedGender(data.selectedGender as 'male' | 'female');
-                      }
-                    }}
-                    bodySelectionType={selectedProcedure.body_selection_type || ''}
-                    bodyImageUrl={selectedProcedure.body_image_url}
-                    bodyImageUrlMale={selectedProcedure.body_image_url_male}
-                  />
-                </div>
-              )}
-
               <div className="space-y-2">
                 <label htmlFor="time" className="text-sm font-semibold text-foreground">
                   Horário <span className="text-destructive">*</span>
@@ -1117,6 +1081,59 @@ Para reagendar, entre em contato conosco.`;
                 </Select>
               </div>
 
+              {/* Box com informações do procedimento selecionado */}
+              {selectedProcedure && (
+                <div className="p-6 bg-gradient-to-br from-primary/5 via-primary/3 to-background rounded-2xl border-2 border-primary/20 shadow-sm">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-8 bg-gradient-to-b from-primary to-primary/60 rounded-full"></div>
+                      <div>
+                        <h3 className="font-bold text-lg text-primary">Procedimento Selecionado</h3>
+                        <p className="text-sm text-muted-foreground">Confirme os detalhes do seu agendamento</p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-3 pl-6">
+                      <div>
+                        <h4 className="font-semibold text-foreground text-base">{selectedProcedure.name}</h4>
+                        {selectedProcedure.description && (
+                          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{selectedProcedure.description}</p>
+                        )}
+                      </div>
+                      
+                      {/* Só mostra preço base se NÃO houver especificações */}
+                      {selectedProcedure.price > 0 && !selectedProcedure.requires_specifications && (
+                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full">
+                          <span className="text-xs font-medium text-primary">Valor:</span>
+                          <span className="font-bold text-primary">
+                            {new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(selectedProcedure.price)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Especificações do procedimento */}
+              {selectedProcedure && selectedProcedure.requires_specifications && (
+                <ProcedureSpecificationSelector
+                  procedureId={selectedProcedure.id}
+                  onSelectionChange={(data) => {
+                    console.log('Seleção de especificações mudou:', data);
+                    setSelectedSpecifications(data.selectedSpecifications);
+                    setTotalSpecificationsPrice(data.totalPrice);
+                    setDiscountInfo(data.discountInfo);
+                    if (data.selectedGender) {
+                      setSelectedGender(data.selectedGender as 'male' | 'female');
+                    }
+                  }}
+                  bodySelectionType={selectedProcedure.body_selection_type || ''}
+                  bodyImageUrl={selectedProcedure.body_image_url}
+                  bodyImageUrlMale={selectedProcedure.body_image_url_male}
+                />
+              )}
+
               <div className="space-y-2">
                 <label htmlFor="notes" className="text-sm font-semibold text-foreground">
                   Observações
@@ -1142,7 +1159,7 @@ Para reagendar, entre em contato conosco.`;
                       <span className="text-muted-foreground">Subtotal:</span>
                       <span className="font-medium">
                         {new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(
-                          discountInfo.originalTotal + (selectedProcedure?.price || 0)
+                          selectedProcedure?.requires_specifications ? discountInfo.originalTotal : (selectedProcedure?.price || 0)
                         )}
                       </span>
                     </div>
@@ -1162,7 +1179,7 @@ Para reagendar, entre em contato conosco.`;
                       <span>Total:</span>
                       <span className="text-primary">
                         {new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(
-                          discountInfo.finalTotal + (selectedProcedure?.price || 0)
+                          selectedProcedure?.requires_specifications ? discountInfo.finalTotal : (selectedProcedure?.price || 0)
                         )}
                       </span>
                     </div>

@@ -208,6 +208,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
   };
 
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+  const [loadingTimes, setLoadingTimes] = useState(false);
   const [procedureSearchOpen, setProcedureSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -322,7 +323,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
       setAvailableTimes([]);
       return;
     }
-
+    setLoadingTimes(true);
     try {
       const allTimes = await generateTimeOptions();
       
@@ -396,14 +397,14 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
     } catch (error) {
       console.error('Erro ao carregar horários:', error);
       // Fallback mais conservador em caso de erro
-      const fallbackTimes = [];
+      const fallbackTimes: string[] = [];
       for (let hour = 8; hour <= 17; hour++) {
-        for (let minute = 0; minute < 60; minute += 60) {
-          const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-          fallbackTimes.push(timeString);
-        }
+        const timeString = `${hour.toString().padStart(2, '0')}:00`;
+        fallbackTimes.push(timeString);
       }
       setAvailableTimes(fallbackTimes);
+    } finally {
+      setLoadingTimes(false);
     }
   };
 
@@ -863,11 +864,9 @@ Para reagendar, entre em contato conosco.`;
                                 setSelectedCategoryId('');
                                 setSelectedSubcategoryId('');
                                 setSearchQuery('');
-                                
                                 // Resetar seleções de áreas corporais se mudar o procedimento
                                 setSelectedBodyAreas([]);
                                 setTotalBodyAreasPrice(0);
-                                
                                 // Recarregar horários se uma data já estiver selecionada
                                 if (formData.appointment_date) {
                                   loadAvailableTimes(formData.appointment_date);
@@ -1086,8 +1085,12 @@ Para reagendar, entre em contato conosco.`;
               value={formData.appointment_time}
               onValueChange={(value) => setFormData(prev => ({ ...prev, appointment_time: value }))}
             >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Selecione um horário" />
+              <SelectTrigger className="mt-1" disabled={loadingTimes || availableTimes.length === 0}>
+                <SelectValue placeholder={
+                  loadingTimes 
+                    ? "Carregando horários..." 
+                    : (formData.appointment_date ? "Selecione um horário" : "Selecione uma data primeiro")
+                } />
               </SelectTrigger>
               <SelectContent>
                 {availableTimes.length > 0 ? (

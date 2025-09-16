@@ -40,8 +40,6 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSpec, setEditingSpec] = useState<ProcedureSpecification | null>(null);
-  const [bodyAreasManagerOpen, setBodyAreasManagerOpen] = useState(false);
-  const [editingSpecForAreas, setEditingSpecForAreas] = useState<ProcedureSpecification | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -54,6 +52,15 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentShape, setCurrentShape] = useState<any | null>(null);
   const [selectedGender, setSelectedGender] = useState<'female' | 'male'>('female');
+  
+  // Estado para armazenar áreas por gênero separadamente
+  const [areasByGender, setAreasByGender] = useState<{
+    female: any[];
+    male: any[];
+  }>({
+    female: [],
+    male: []
+  });
   
   // Refs para canvas integrado
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -219,6 +226,38 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
     }
   };
 
+  // Salvar áreas do gênero atual
+  const saveCurrentGenderAreas = () => {
+    setAreasByGender(prev => ({
+      ...prev,
+      [selectedGender]: currentShapes
+    }));
+    
+    toast({
+      title: "Áreas salvas",
+      description: `Áreas do gênero ${selectedGender === 'female' ? 'feminino' : 'masculino'} foram salvas.`,
+    });
+  };
+
+  // Trocar de gênero carregando as áreas salvas
+  const switchGender = (newGender: 'female' | 'male') => {
+    // Salvar áreas atuais antes de trocar
+    setAreasByGender(prev => ({
+      ...prev,
+      [selectedGender]: currentShapes
+    }));
+    
+    // Trocar para o novo gênero e carregar suas áreas
+    setSelectedGender(newGender);
+    setCurrentShapes(areasByGender[newGender]);
+    setCurrentShape(null);
+  };
+
+  const clearCurrentShapes = () => {
+    setCurrentShapes([]);
+    setCurrentShape(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -267,9 +306,11 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
         
         // Atualizando especificação existente - atualizar áreas se necessário
         if (procedureSettings.requires_body_image_selection) {
-          const areaUpdateData = currentShapes.length > 0 ? {
+          const finalAreas = currentShapes.length > 0 ? currentShapes : areasByGender[selectedGender];
+          
+          const areaUpdateData = finalAreas && finalAreas.length > 0 ? {
             has_area_selection: true,
-            area_shapes: currentShapes,
+            area_shapes: finalAreas,
             gender: selectedGender
           } : {
             has_area_selection: false,
@@ -302,18 +343,22 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
         if (specError) throw specError;
 
         // Se há áreas selecionadas, atualizar a especificação com as áreas
-        if (procedureSettings.requires_body_image_selection && currentShapes.length > 0) {
-          const { error: areasError } = await supabase
-            .from('procedure_specifications')
-            .update({
-              has_area_selection: true,
-              area_shapes: currentShapes,
-              gender: selectedGender
-            })
-            .eq('id', newSpec.id);
+        if (procedureSettings.requires_body_image_selection) {
+          const finalAreas = currentShapes.length > 0 ? currentShapes : areasByGender[selectedGender];
+          
+          if (finalAreas && finalAreas.length > 0) {
+            const { error: areasError } = await supabase
+              .from('procedure_specifications')
+              .update({
+                has_area_selection: true,
+                area_shapes: finalAreas,
+                gender: selectedGender
+              })
+              .eq('id', newSpec.id);
 
-          if (areasError) {
-            console.warn('Erro ao salvar áreas:', areasError);
+            if (areasError) {
+              console.warn('Erro ao salvar áreas:', areasError);
+            }
           }
         }
         
@@ -346,11 +391,22 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
     
     // Carregar áreas existentes se houver para o gênero específico
     if (spec.has_area_selection && spec.area_shapes) {
+      const specGender = spec.gender as 'female' | 'male';
+      setSelectedGender(specGender);
       setCurrentShapes(spec.area_shapes as any[]);
-      setSelectedGender(spec.gender as 'female' | 'male');
+      
+      // Atualizar o estado das áreas por gênero
+      setAreasByGender(prev => ({
+        ...prev,
+        [specGender]: spec.area_shapes as any[]
+      }));
     } else {
       setCurrentShapes([]);
       setSelectedGender('female'); // Default para feminino
+      setAreasByGender({
+        female: [],
+        male: []
+      });
     }
     
     setDialogOpen(true);
@@ -392,6 +448,11 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
     setEditingSpec(null);
     setCurrentShapes([]);
     setCurrentShape(null);
+    setAreasByGender({
+      female: [],
+      male: []
+    });
+    setSelectedGender('female');
   };
 
   // Funções para desenho de áreas no formulário
@@ -468,7 +529,7 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
     }
   }, [currentShapes, currentShape]);
 
-  // Handle area selection - adicionar funcionalidade de arrastar formas existentes
+  // Handle area selection
   const [draggedShape, setDraggedShape] = useState<{ index: number; offset: { x: number; y: number } } | null>(null);
 
   const getShapeAtPoint = (x: number, y: number) => {
@@ -486,11 +547,9 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
     const coords = getCanvasCoordinates(e);
     if (!coords) return;
 
-    // Verificar se está clicando em uma forma existente
     const shapeIndex = getShapeAtPoint(coords.x, coords.y);
     
     if (shapeIndex >= 0) {
-      // Iniciar drag da forma existente
       const shape = currentShapes[shapeIndex];
       setDraggedShape({
         index: shapeIndex,
@@ -500,7 +559,6 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
         }
       });
     } else {
-      // Criar nova forma
       setIsDrawing(true);
       setCurrentShape({
         x: coords.x,
@@ -516,7 +574,6 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
     if (!coords) return;
 
     if (draggedShape !== null) {
-      // Arrastar forma existente
       const newShapes = [...currentShapes];
       newShapes[draggedShape.index] = {
         ...newShapes[draggedShape.index],
@@ -526,7 +583,6 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
       setCurrentShapes(newShapes);
       drawCanvas();
     } else if (isDrawing && currentShape) {
-      // Criar nova forma
       setCurrentShape({
         x: Math.min(coords.x, currentShape.x),
         y: Math.min(coords.y, currentShape.y),
@@ -579,41 +635,9 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
     drawCanvas();
   }, [drawCanvas]);
 
-  const finishAreaSelection = () => {
-    if (currentShapes.length === 0) {
-      toast({
-        title: "Área obrigatória",
-        description: "Desenhe pelo menos uma área antes de finalizar.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Auto-preencher nome se não estiver preenchido
-    if (!formData.name.trim()) {
-      const areaName = `Área ${selectedGender === 'male' ? 'Masculina' : 'Feminina'}`;
-      setFormData(prev => ({ ...prev, name: areaName }));
-    }
-
-    toast({
-      title: "Área configurada",
-      description: "A área foi configurada com sucesso. Complete os dados e salve.",
-    });
-  };
-
-  const clearCurrentShapes = () => {
-    setCurrentShapes([]);
-    setCurrentShape(null);
-  };
-
   const handleNewSpec = () => {
     resetForm();
     setDialogOpen(true);
-  };
-
-  const handleManageAreas = (spec: ProcedureSpecification) => {
-    setEditingSpecForAreas(spec);
-    setBodyAreasManagerOpen(true);
   };
 
   if (loading) {
@@ -623,15 +647,6 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p>Carregando especificações...</p>
         </div>
-      </div>
-    );
-  }
-
-  // If body areas manager is open - no longer used
-  if (bodyAreasManagerOpen && editingSpecForAreas) {
-    return (
-      <div>
-        <p>Body areas management is now integrated into the specification form.</p>
       </div>
     );
   }
@@ -924,41 +939,31 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
                   Selecione as Áreas da Especificação
                 </Label>
                 
-                 {/* Seletor de Gênero - só aparece para imagens customizadas com ambos os gêneros */}
-                 {(procedureSettings.body_selection_type === 'custom' && 
-                   procedureSettings.body_image_url && procedureSettings.body_image_url_male) && (
-                   <div className="flex items-center gap-2">
-                     <span className="text-sm">Gênero:</span>
-                     <div className="flex gap-2">
-                       <Button
-                         type="button"
-                         variant={selectedGender === 'female' ? 'default' : 'outline'}
-                         size="sm"
-                         onClick={() => {
-                           setSelectedGender('female');
-                           // Limpar áreas ao trocar de gênero - as áreas são independentes
-                           setCurrentShapes([]);
-                           setCurrentShape(null);
-                         }}
-                       >
-                         Feminino
-                       </Button>
-                       <Button
-                         type="button"
-                         variant={selectedGender === 'male' ? 'default' : 'outline'}
-                         size="sm"
-                         onClick={() => {
-                           setSelectedGender('male');
-                           // Limpar áreas ao trocar de gênero - as áreas são independentes
-                           setCurrentShapes([]);
-                           setCurrentShape(null);
-                         }}
-                       >
-                         Masculino
-                       </Button>
-                     </div>
-                   </div>
-                 )}
+                {/* Seletor de Gênero - só aparece para imagens customizadas com ambos os gêneros */}
+                {(procedureSettings.body_selection_type === 'custom' && 
+                  procedureSettings.body_image_url && procedureSettings.body_image_url_male) && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">Gênero:</span>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant={selectedGender === 'female' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => switchGender('female')}
+                      >
+                        Feminino
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={selectedGender === 'male' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => switchGender('male')}
+                      >
+                        Masculino
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex flex-col items-center space-y-2">
                   <img
@@ -977,34 +982,52 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
                     onMouseUp={handleMouseUp}
                     onMouseLeave={() => {
                       setIsDrawing(false);
-                      setCurrentShape(null);
+                      setDraggedShape(null);
                     }}
                   />
                   
                   {currentShapes.length > 0 && (
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={finishAreaSelection}
-                      >
-                        Finalizar Seleção ({currentShapes.length} áreas)
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={clearCurrentShapes}
-                      >
-                        Limpar
-                      </Button>
+                    <div className="text-xs text-muted-foreground">
+                      {currentShapes.length} área(s) desenhada(s). Use "Salvar Áreas" para confirmar.
                     </div>
                   )}
-                  
-                  <p className="text-xs text-muted-foreground text-center">
-                    Clique e arraste para selecionar as áreas desta especificação
-                  </p>
+                </div>
+
+                <div className="flex gap-2 flex-wrap">
+                  <Button 
+                    type="button" 
+                    onClick={saveCurrentGenderAreas} 
+                    variant="default" 
+                    size="sm"
+                    disabled={currentShapes.length === 0}
+                  >
+                    <MapPin className="h-4 w-4 mr-1" />
+                    Salvar Áreas ({selectedGender === 'female' ? 'Feminino' : 'Masculino'})
+                  </Button>
+                  <Button 
+                    type="button" 
+                    onClick={clearCurrentShapes} 
+                    variant="outline" 
+                    size="sm"
+                  >
+                    Limpar Áreas
+                  </Button>
+                </div>
+                
+                {/* Indicador de áreas salvas */}
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span>Feminino:</span> 
+                    <Badge variant={areasByGender.female.length > 0 ? "default" : "secondary"}>
+                      {areasByGender.female.length} área(s)
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>Masculino:</span> 
+                    <Badge variant={areasByGender.male.length > 0 ? "default" : "secondary"}>
+                      {areasByGender.male.length} área(s)
+                    </Badge>
+                  </div>
                 </div>
               </div>
             )}

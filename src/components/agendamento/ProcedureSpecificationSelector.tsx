@@ -192,9 +192,10 @@ const ProcedureSpecificationSelector = ({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    // Draw ALL areas for ALL specifications with area selection
+    // Draw ALL areas for ALL specifications with area selection that match current gender
     const allSpecsWithAreas = specifications.filter(
-      (s) => s.has_area_selection && s.area_shapes && s.area_shapes.length > 0
+      (s) => s.has_area_selection && s.area_shapes && s.area_shapes.length > 0 && 
+      (!s.gender || s.gender === selectedGender)
     );
     
     console.log('Drawing areas for specifications:', allSpecsWithAreas.map(s => ({ 
@@ -205,17 +206,10 @@ const ProcedureSpecificationSelector = ({
       selectedGender: selectedGender
     })));
     
-    // Draw areas for all specifications that match the current gender or have no gender specified
+    // Draw areas for all specifications that match the current gender
     allSpecsWithAreas.forEach((spec) => {
       const isSelected = selectedSpecs.has(spec.id);
       const isHovered = hoveredSpecId === spec.id;
-      
-      // Show areas for current gender or unisex specifications
-      const shouldShowArea = !spec.gender || spec.gender === selectedGender;
-      if (!shouldShowArea) {
-        console.log(`Skipping spec ${spec.name} - gender mismatch: ${spec.gender} !== ${selectedGender}`);
-        return;
-      }
       
       console.log(`Drawing areas for spec: ${spec.name} (${spec.area_shapes?.length || 0} areas)`);
       
@@ -387,7 +381,8 @@ const ProcedureSpecificationSelector = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {hasAnyArea && (
+          {/* Seleção de gênero só aparece se houver ambas as imagens */}
+          {(bodyImageUrl && bodyImageUrlMale) && (
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-gradient-to-r from-muted/50 to-muted/30 rounded-lg border">
               <Label className="text-sm font-medium text-foreground">Selecione o gênero:</Label>
               <div className="flex gap-2">
@@ -416,7 +411,9 @@ const ProcedureSpecificationSelector = ({
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-4">
               <div className="space-y-3">
-                {specifications.map((spec) => {
+                {specifications.filter((spec) => 
+                  !spec.gender || spec.gender === selectedGender
+                ).map((spec) => {
                   const selected = selectedSpecs.has(spec.id);
                   return (
                     <div 

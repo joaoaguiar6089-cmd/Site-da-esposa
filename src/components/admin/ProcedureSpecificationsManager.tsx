@@ -344,12 +344,13 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
       display_order: spec.display_order.toString()
     });
     
-    // Carregar áreas existentes se houver
+    // Carregar áreas existentes se houver para o gênero específico
     if (spec.has_area_selection && spec.area_shapes) {
       setCurrentShapes(spec.area_shapes as any[]);
       setSelectedGender(spec.gender as 'female' | 'male');
     } else {
       setCurrentShapes([]);
+      setSelectedGender('female'); // Default para feminino
     }
     
     setDialogOpen(true);
@@ -923,31 +924,41 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
                   Selecione as Áreas da Especificação
                 </Label>
                 
-                {/* Seletor de Gênero - só aparece se necessário */}
-                {(!procedureSettings.body_selection_type.includes('_male') && 
-                  !procedureSettings.body_selection_type.includes('_female')) && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">Gênero:</span>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant={selectedGender === 'female' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setSelectedGender('female')}
-                      >
-                        Feminino
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={selectedGender === 'male' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setSelectedGender('male')}
-                      >
-                        Masculino
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                 {/* Seletor de Gênero - só aparece para imagens customizadas com ambos os gêneros */}
+                 {(procedureSettings.body_selection_type === 'custom' && 
+                   procedureSettings.body_image_url && procedureSettings.body_image_url_male) && (
+                   <div className="flex items-center gap-2">
+                     <span className="text-sm">Gênero:</span>
+                     <div className="flex gap-2">
+                       <Button
+                         type="button"
+                         variant={selectedGender === 'female' ? 'default' : 'outline'}
+                         size="sm"
+                         onClick={() => {
+                           setSelectedGender('female');
+                           // Limpar áreas ao trocar de gênero - as áreas são independentes
+                           setCurrentShapes([]);
+                           setCurrentShape(null);
+                         }}
+                       >
+                         Feminino
+                       </Button>
+                       <Button
+                         type="button"
+                         variant={selectedGender === 'male' ? 'default' : 'outline'}
+                         size="sm"
+                         onClick={() => {
+                           setSelectedGender('male');
+                           // Limpar áreas ao trocar de gênero - as áreas são independentes
+                           setCurrentShapes([]);
+                           setCurrentShape(null);
+                         }}
+                       >
+                         Masculino
+                       </Button>
+                     </div>
+                   </div>
+                 )}
 
                 <div className="flex flex-col items-center space-y-2">
                   <img

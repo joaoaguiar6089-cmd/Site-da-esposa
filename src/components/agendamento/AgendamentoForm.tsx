@@ -13,8 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatDateToBrazil, getCurrentDateBrazil, getCurrentDateTimeBrazil } from '@/utils/dateUtils';
 import type { Client } from "@/types/client";
-import ProcedureSpecificationSelector from "./ProcedureSpecificationSelector";
-import { useSpecificationCalculation, ProcedureSpecification } from "@/hooks/useSpecificationCalculation";
+import ProcedureSpecificationSelector, { ProcedureSpecification } from "./ProcedureSpecificationSelector";
+import { useDiscountCalculation } from "@/hooks/useDiscountCalculation";
 
 interface Category {
   id: string;
@@ -86,6 +86,12 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
   const [totalBodyAreasPrice, setTotalBodyAreasPrice] = useState(0);
   const [selectedSpecifications, setSelectedSpecifications] = useState<ProcedureSpecification[]>([]);
   const [totalSpecificationsPrice, setTotalSpecificationsPrice] = useState(0);
+  const [discountInfo, setDiscountInfo] = useState({
+    originalTotal: 0,
+    discountAmount: 0,
+    finalTotal: 0,
+    discountPercentage: 0,
+  });
   const [loading, setLoading] = useState(false);
   const [loadingProcedures, setLoadingProcedures] = useState(true);
   const [cancelling, setCancelling] = useState(false);
@@ -780,45 +786,56 @@ Para reagendar, entre em contato conosco.`;
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader className="text-center">
-        <div className="flex items-center justify-center gap-2 mb-2">
-          <Calendar className="w-6 h-6 text-primary" />
-          <CardTitle className="text-xl">Novo Agendamento</CardTitle>
-        </div>
-        <p className="text-muted-foreground">
-          {client.nome} {client.sobrenome}
-        </p>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="procedure" className="text-sm font-medium">
-              Procedimento *
-            </label>
-            <Popover open={procedureSearchOpen} onOpenChange={setProcedureSearchOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={procedureSearchOpen}
-                  className="w-full justify-between mt-1"
-                >
-                  {formData.procedure_id ? (
-                    <div className="text-left">
-                      <div className="font-medium">
-                        {procedures.find(p => p.id === formData.procedure_id)?.name}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {procedures.find(p => p.id === formData.procedure_id)?.duration}min - R$ {procedures.find(p => p.id === formData.procedure_id)?.price?.toFixed(2)}
-                      </div>
-                    </div>
-                  ) : (
-                    "Selecione um procedimento..."
-                  )}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background p-4">
+      <div className="max-w-4xl mx-auto">
+        <Card className="shadow-2xl border-0 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm">
+          <CardHeader className="text-center space-y-4 pb-6">
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <div className="p-2 bg-gradient-to-br from-primary to-primary/80 rounded-full">
+                <Calendar className="w-6 h-6 text-primary-foreground" />
+              </div>
+              <CardTitle className="text-2xl bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                {editingId ? "Editar Agendamento" : "Novo Agendamento"}
+              </CardTitle>
+            </div>
+            <div className="space-y-1">
+              <p className="text-lg font-semibold text-foreground">
+                {client.nome} {client.sobrenome}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {client.celular}
+              </p>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">{/* rest of form content */}
+              <div className="space-y-2">
+                <label htmlFor="procedure" className="text-sm font-semibold text-foreground">
+                  Procedimento <span className="text-destructive">*</span>
+                </label>
+                <Popover open={procedureSearchOpen} onOpenChange={setProcedureSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={procedureSearchOpen}
+                      className="w-full justify-between h-auto min-h-[3rem] border-2 hover:border-primary/50 transition-all duration-200"
+                    >
+                      {formData.procedure_id ? (
+                        <div className="text-left space-y-1">
+                          <div className="font-semibold text-foreground">
+                            {procedures.find(p => p.id === formData.procedure_id)?.name}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {procedures.find(p => p.id === formData.procedure_id)?.duration}min - R$ {procedures.find(p => p.id === formData.procedure_id)?.price?.toFixed(2)}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">Selecione um procedimento...</span>
+                      )}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
               <PopoverContent className="w-full p-0" style={{ width: 'var(--radix-popover-trigger-width)' }}>
                 <Command>
                   <CommandInput 
@@ -1002,202 +1019,224 @@ Para reagendar, entre em contato conosco.`;
           </div>
 
 
-          <div>
-            <label htmlFor="date" className="text-sm font-medium">
-              Data *
-            </label>
-            <Input
-              id="date"
-              type="date"
-              min={getMinDate()}
-              value={formData.appointment_date}
-              onChange={async (e) => {
-                const newDate = e.target.value;
-                
-                // Verificar se a data está bloqueada
-                const isDisabled = await isDateDisabled(newDate);
-                if (isDisabled) {
-                  toast({
-                    title: "Data indisponível",
-                    description: "A clínica estará fechada nesta data. Escolha outra data.",
-                    variant: "destructive",
-                  });
-                  return;
-                }
-                
-                setFormData(prev => ({ ...prev, appointment_date: newDate, appointment_time: "" }));
-                loadAvailableTimes(newDate);
-              }}
-              className="mt-1"
-              required
-            />
-          </div>
-
-          {/* Especificações e Áreas do procedimento - sempre mostra para procedimentos */}
-          {selectedProcedure && (
-            <div className="space-y-4">
-              {/* Mostra informações do procedimento */}
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <h3 className="font-medium text-sm mb-1">Procedimento selecionado:</h3>
-                <p className="text-sm text-muted-foreground">{selectedProcedure.name}</p>
-                {selectedProcedure.price && (
-                  <p className="text-sm font-medium">Preço base: R$ {selectedProcedure.price.toFixed(2).replace('.', ',')}</p>
-                )}
+              <div className="space-y-2">
+                <label htmlFor="date" className="text-sm font-semibold text-foreground">
+                  Data <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  id="date"
+                  type="date"
+                  min={getMinDate()}
+                  value={formData.appointment_date}
+                  onChange={async (e) => {
+                    const newDate = e.target.value;
+                    
+                    // Verificar se a data está bloqueada
+                    const isDisabled = await isDateDisabled(newDate);
+                    if (isDisabled) {
+                      toast({
+                        title: "Data indisponível",
+                        description: "A clínica estará fechada nesta data. Escolha outra data.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    
+                    setFormData(prev => ({ ...prev, appointment_date: newDate, appointment_time: "" }));
+                    loadAvailableTimes(newDate);
+                  }}
+                  className="border-2 hover:border-primary/50 focus:border-primary transition-all duration-200"
+                  required
+                />
               </div>
 
-              {/* Sempre renderiza o componente de especificações */}
-              <ProcedureSpecificationSelector
-                procedureId={selectedProcedure.id}
-                onSelectionChange={(data) => {
-                  console.log('Seleção de especificações mudou:', data);
-                  setSelectedSpecifications(data.selectedSpecifications);
-                  setTotalSpecificationsPrice(data.totalPrice);
-                  if (data.selectedGender) {
-                    setSelectedGender(data.selectedGender as 'male' | 'female');
-                  }
-                }}
-                bodySelectionType={selectedProcedure.body_selection_type || ''}
-                bodyImageUrl={selectedProcedure.body_image_url}
-                bodyImageUrlMale={selectedProcedure.body_image_url_male}
-              />
-            </div>
-          )}
+              {/* Especificações e Áreas do procedimento - sempre mostra para procedimentos */}
+              {selectedProcedure && (
+                <div className="space-y-6">
+                  {/* Mostra informações do procedimento */}
+                  <div className="p-4 bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl border border-primary/20">
+                    <h3 className="font-semibold text-sm mb-2 text-primary">Procedimento selecionado:</h3>
+                    <p className="font-medium text-foreground">{selectedProcedure.name}</p>
+                    {selectedProcedure.description && (
+                      <p className="text-sm text-muted-foreground mt-1">{selectedProcedure.description}</p>
+                    )}
+                    {selectedProcedure.price && (
+                      <p className="text-sm font-medium mt-2 text-primary">
+                        Preço base: {new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(selectedProcedure.price)}
+                      </p>
+                    )}
+                  </div>
 
-          <div>
-            <label htmlFor="time" className="text-sm font-medium">
-              Horário *
-            </label>
-            <Select
-              value={formData.appointment_time}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, appointment_time: value }))}
-            >
-              <SelectTrigger className="mt-1" disabled={loadingTimes || availableTimes.length === 0}>
-                <SelectValue placeholder={
-                  loadingTimes 
-                    ? "Carregando horários..." 
-                    : (formData.appointment_date ? "Selecione um horário" : "Selecione uma data primeiro")
-                } />
-              </SelectTrigger>
-              <SelectContent>
-                {availableTimes.length > 0 ? (
-                  availableTimes.map((time) => (
-                    <SelectItem key={time} value={time}>
-                      {time}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem value="no-times" disabled>
-                    {formData.appointment_date ? "Nenhum horário disponível" : "Selecione uma data primeiro"}
-                  </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
+                  {/* Sempre renderiza o componente de especificações */}
+                  <ProcedureSpecificationSelector
+                    procedureId={selectedProcedure.id}
+                    onSelectionChange={(data) => {
+                      console.log('Seleção de especificações mudou:', data);
+                      setSelectedSpecifications(data.selectedSpecifications);
+                      setTotalSpecificationsPrice(data.totalPrice);
+                      setDiscountInfo(data.discountInfo);
+                      if (data.selectedGender) {
+                        setSelectedGender(data.selectedGender as 'male' | 'female');
+                      }
+                    }}
+                    bodySelectionType={selectedProcedure.body_selection_type || ''}
+                    bodyImageUrl={selectedProcedure.body_image_url}
+                    bodyImageUrlMale={selectedProcedure.body_image_url_male}
+                  />
+                </div>
+              )}
 
-          <div>
-            <label htmlFor="notes" className="text-sm font-medium">
-              Observações
-            </label>
-            <Textarea
-              id="notes"
-              placeholder="Alguma observação especial..."
-              value={formData.notes}
-              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-              className="mt-1"
-              rows={3}
-            />
-          </div>
+              <div className="space-y-2">
+                <label htmlFor="time" className="text-sm font-semibold text-foreground">
+                  Horário <span className="text-destructive">*</span>
+                </label>
+                <Select
+                  value={formData.appointment_time}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, appointment_time: value }))}
+                >
+                  <SelectTrigger className="border-2 hover:border-primary/50 focus:border-primary transition-all duration-200" disabled={loadingTimes || availableTimes.length === 0}>
+                    <SelectValue placeholder={
+                      loadingTimes 
+                        ? "Carregando horários..." 
+                        : (formData.appointment_date ? "Selecione um horário" : "Selecione uma data primeiro")
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableTimes.length > 0 ? (
+                      availableTimes.map((time) => (
+                        <SelectItem key={time} value={time}>
+                          {time}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-times" disabled>
+                        {formData.appointment_date ? "Nenhum horário disponível" : "Selecione uma data primeiro"}
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="notes" className="text-sm font-semibold text-foreground">
+                  Observações
+                </label>
+                <Textarea
+                  id="notes"
+                  placeholder="Alguma observação especial sobre o procedimento..."
+                  value={formData.notes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  className="border-2 hover:border-primary/50 focus:border-primary transition-all duration-200 resize-none"
+                  rows={3}
+                />
+              </div>
           
           
           {/* Resumo e promoções (mobile-friendly) */}
-          <div className="md:hidden mt-4 sticky bottom-2 z-10">
-            <div className="rounded-xl border bg-background/90 backdrop-blur p-4 shadow-lg">
-              <div className="flex items-center justify-between">
-                <div className="text-sm">
-                  <div className="text-muted-foreground">Subtotal</div>
-                  <div className="font-medium">
-                    {new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(
-                      (totalSpecificationsPrice || 0) + (totalBodyAreasPrice || 0) + (selectedProcedure?.price || 0)
+          {selectedProcedure && (
+            <div className="lg:hidden">
+              <div className="sticky bottom-4 z-10">
+                <div className="bg-gradient-to-r from-background to-muted/50 backdrop-blur-sm border-2 border-primary/20 rounded-2xl p-4 shadow-xl">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal:</span>
+                      <span className="font-medium">
+                        {new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(
+                          discountInfo.originalTotal + (selectedProcedure?.price || 0)
+                        )}
+                      </span>
+                    </div>
+                    
+                    {discountInfo.discountAmount > 0 && (
+                      <div className="flex items-center justify-between text-sm text-green-600">
+                        <span>Desconto ({discountInfo.discountPercentage}%):</span>
+                        <span className="font-medium">
+                          -{new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(discountInfo.discountAmount)}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent"></div>
+                    
+                    <div className="flex items-center justify-between font-bold text-lg">
+                      <span>Total:</span>
+                      <span className="text-primary">
+                        {new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(
+                          discountInfo.finalTotal + (selectedProcedure?.price || 0)
+                        )}
+                      </span>
+                    </div>
+                    
+                    {discountInfo.discountAmount > 0 && (
+                      <div className="text-center text-xs text-green-600 font-medium">
+                        🎉 Você economizou {new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(discountInfo.discountAmount)}!
+                      </div>
                     )}
                   </div>
-                </div>
-                <div className="text-right text-sm">
-                  <div className="text-muted-foreground">Promoções</div>
-                  <div className="font-medium">
-                    {/* TODO: mostrar desconto aplicado */}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold">Total</span>
-                  <span className="font-bold">
-                    {new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(
-                      (totalSpecificationsPrice || 0) + (totalBodyAreasPrice || 0) + (selectedProcedure?.price || 0)
-                    )}
-                  </span>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
-          <div className="flex gap-2 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onBack}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Voltar
-            </Button>
-            
-            {/* Botão de cancelar - para agendamentos confirmados e agendados */}
-            {editingId && (currentAppointment?.status === 'confirmado' || currentAppointment?.status === 'agendado') && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    disabled={cancelling}
-                    className="flex items-center gap-2"
-                  >
-                    <X className="w-4 h-4" />
-                    Cancelar Agendamento
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Cancelar Agendamento</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Tem certeza que deseja cancelar este agendamento? Esta ação não pode ser desfeita e a proprietária será notificada.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Manter Agendamento</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleCancelAppointment}
-                      disabled={cancelling}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      {cancelling ? "Cancelando..." : "Confirmar Cancelamento"}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
+              <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onBack}
+                  className="flex items-center justify-center gap-2 border-2 hover:border-primary/50 transition-all duration-200"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Voltar
+                </Button>
+                
+                {/* Botão de cancelar - para agendamentos confirmados e agendados */}
+                {editingId && (currentAppointment?.status === 'confirmado' || currentAppointment?.status === 'agendado') && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        disabled={cancelling}
+                        className="flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105"
+                      >
+                        <X className="w-4 h-4" />
+                        Cancelar Agendamento
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Cancelar Agendamento</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Tem certeza que deseja cancelar este agendamento? Esta ação não pode ser desfeita e a proprietária será notificada.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Manter Agendamento</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleCancelAppointment}
+                          disabled={cancelling}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          {cancelling ? "Cancelando..." : "Confirmar Cancelamento"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
 
-            <Button
-              type="submit"
-              disabled={loading}
-              className="flex-1"
-            >
-              {loading ? (editingId ? "Salvando..." : "Agendando...") : (editingId ? "Salvar Alterações" : "Confirmar Agendamento")}
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary transition-all duration-200 hover:scale-105 shadow-lg"
+                >
+                  {loading ? (editingId ? "Salvando..." : "Agendando...") : (editingId ? "Salvar Alterações" : "Confirmar Agendamento")}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 };
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useDiscountCalculation } from "@/hooks/useDiscountCalculation";
+import { cn } from "@/lib/utils";
 
 type Gender = "female" | "male";
 
@@ -35,6 +37,12 @@ interface ProcedureSpecificationSelectorProps {
     selectedSpecifications: ProcedureSpecification[];
     totalPrice: number;
     selectedGender: Gender;
+    discountInfo: {
+      originalTotal: number;
+      discountAmount: number;
+      finalTotal: number;
+      discountPercentage: number;
+    };
   }) => void;
   initialSelections?: string[];
   bodySelectionType?: string | null;
@@ -81,6 +89,22 @@ const ProcedureSpecificationSelector = ({
   const imageRef = useRef<HTMLImageElement>(null);
   const { toast } = useToast();
 
+  // Calculate totals
+  const selectedSpecifications = useMemo(() => 
+    specifications.filter((s) => selectedSpecs.has(s.id)), 
+    [specifications, selectedSpecs]
+  );
+  
+  const originalTotal = useMemo(() => 
+    selectedSpecifications.reduce((sum, s) => sum + (s.price || 0), 0), 
+    [selectedSpecifications]
+  );
+
+  const selectedGroupsCount = selectedSpecifications.length;
+
+  // Use discount calculation hook
+  const { discountResult } = useDiscountCalculation(procedureId, selectedGroupsCount, originalTotal);
+
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
@@ -123,11 +147,26 @@ const ProcedureSpecificationSelector = ({
     return () => void (cancelled = true);
   }, [procedureId, toast]);
 
+  // Callback for selection changes
+  const handleSelectionChange = useCallback(() => {
+    if (onSelectionChange) {
+      onSelectionChange({
+        selectedSpecifications,
+        totalPrice: discountResult.finalTotal,
+        selectedGender,
+        discountInfo: {
+          originalTotal: discountResult.originalTotal,
+          discountAmount: discountResult.discountAmount,
+          finalTotal: discountResult.finalTotal,
+          discountPercentage: discountResult.discountPercentage,
+        }
+      });
+    }
+  }, [selectedSpecifications, discountResult, selectedGender, onSelectionChange]);
+
   useEffect(() => {
-    const selected = specifications.filter((s) => selectedSpecs.has(s.id));
-    const total = selected.reduce((sum, s) => sum + (s.price || 0), 0);
-    onSelectionChange?.({ selectedSpecifications: selected, totalPrice: total, selectedGender });
-  }, [specifications, selectedSpecs, selectedGender, onSelectionChange]);
+    handleSelectionChange();
+  }, [handleSelectionChange]);
 
   const imageUrl = useMemo(() => {
     if (selectedGender === "male") return bodyImageUrlMale || "/images/body-male-default.png";
@@ -258,104 +297,181 @@ const ProcedureSpecificationSelector = ({
   }
 
   const hasAnyArea = specifications.some((s) => s.has_area_selection);
-  const total = specifications.filter((s) => selectedSpecs.has(s.id)).reduce((sum, s) => sum + (s.price || 0), 0);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Especificações do procedimento</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {hasAnyArea && (
-          <div className="flex items-center gap-2">
-            <Label className="text-sm">Gênero para a imagem:</Label>
-            <div className="flex gap-2">
-              <Button type="button" variant={selectedGender === "female" ? "default" : "outline"} onClick={() => { setSelectedGender("female"); setHoveredSpecId(null); }} size="sm">Feminino</Button>
-              <Button type="button" variant={selectedGender === "male" ? "default" : "outline"} onClick={() => { setSelectedGender("male"); setHoveredSpecId(null); }} size="sm">Masculino</Button>
-            </div>
-          </div>
-        )}
-
-        <div className="grid gap-6 md:grid-cols-2">
-          <div className="space-y-3">
-            {specifications.map((spec) => {
-              const selected = selectedSpecs.has(spec.id);
-              return (
-                <div key={spec.id} className="rounded-md border p-3 flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      id={`spec-${spec.id}`}
-                      checked={selected}
-                      onCheckedChange={(c: boolean) =>
-                        setSelectedSpecs((prev) => {
-                          const next = new Set(prev);
-                          if (c) next.add(spec.id);
-                          else next.delete(spec.id);
-                          return next;
-                        })
-                      }
-                    />
-                    <div>
-                      <Label htmlFor={`spec-${spec.id}`} className="cursor-pointer">{spec.name}</Label>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {spec.price > 0 ? currency(spec.price) : "Sem custo adicional"}
-                      </div>
-                      {spec.has_area_selection && (
-                        <div className="mt-1">
-                          <Badge variant="secondary" className="mr-2">seleção de área</Badge>
-                          <Badge variant="outline">{spec.gender === "male" ? "masculino" : "feminino"}</Badge>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            <Separator className="my-2" />
-            <div className="flex justify-between font-medium">
-              <span>Total:</span>
-              <span>{currency(total)}</span>
-            </div>
-          </div>
-
+    <div className="w-full space-y-6">
+      <Card className="shadow-lg border-0 bg-gradient-to-br from-background to-muted/50">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+            Especificações do procedimento
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
           {hasAnyArea && (
-            <div>
-              <Label className="text-sm mb-2 block">Clique nas áreas destacadas para (de)selecionar.</Label>
-              <div className="relative border rounded-md overflow-hidden bg-muted/30 max-w-xs mx-auto">
-                <canvas ref={canvasRef} className="w-full cursor-crosshair" onMouseMove={onCanvasMove} onClick={onCanvasClick} />
-                <img
-                  ref={imageRef}
-                  src={imageUrl || ""}
-                  alt="Mapa corporal"
-                  className="absolute inset-0 w-px h-px opacity-0 pointer-events-none"
-                  onLoad={onImageLoad}
-                  onError={() =>
-                    toast({
-                      title: "Imagem indisponível",
-                      description: "Não foi possível carregar a imagem de apoio. Você ainda pode selecionar pela lista.",
-                    })
-                  }
-                />
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-gradient-to-r from-muted/50 to-muted/30 rounded-lg border">
+              <Label className="text-sm font-medium text-foreground">Selecione o gênero:</Label>
+              <div className="flex gap-2">
+                <Button 
+                  type="button" 
+                  variant={selectedGender === "female" ? "default" : "outline"} 
+                  onClick={() => { setSelectedGender("female"); setHoveredSpecId(null); }} 
+                  size="sm"
+                  className="transition-all duration-200 hover:scale-105"
+                >
+                  Feminino
+                </Button>
+                <Button 
+                  type="button" 
+                  variant={selectedGender === "male" ? "default" : "outline"} 
+                  onClick={() => { setSelectedGender("male"); setHoveredSpecId(null); }} 
+                  size="sm"
+                  className="transition-all duration-200 hover:scale-105"
+                >
+                  Masculino
+                </Button>
               </div>
             </div>
           )}
-        </div>
 
-        {Array.from(selectedSpecs).length > 0 && (
-          <div className="mt-4 p-3 bg-muted rounded-md">
-            <h4 className="font-medium mb-1 text-sm">Selecionados:</h4>
-            <div className="space-y-0.5 text-sm">
-              {specifications.filter((s) => selectedSpecs.has(s.id)).map((s) => (
-                <div key={s.id} className="flex justify-between">
-                  <span>{s.name}</span>
-                  <span>{s.price > 0 ? currency(s.price) : "Sem custo"}</span>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="space-y-4">
+              <div className="space-y-3">
+                {specifications.map((spec) => {
+                  const selected = selectedSpecs.has(spec.id);
+                  return (
+                    <div 
+                      key={spec.id} 
+                      className={cn(
+                        "rounded-lg border p-4 transition-all duration-200 hover:shadow-md",
+                        selected ? "border-primary bg-primary/5 shadow-sm" : "border-border bg-card"
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          id={`spec-${spec.id}`}
+                          checked={selected}
+                          onCheckedChange={(c: boolean) =>
+                            setSelectedSpecs((prev) => {
+                              const next = new Set(prev);
+                              if (c) next.add(spec.id);
+                              else next.delete(spec.id);
+                              return next;
+                            })
+                          }
+                          className="mt-1"
+                        />
+                        <div className="flex-1 space-y-2">
+                          <Label htmlFor={`spec-${spec.id}`} className="cursor-pointer font-medium leading-snug">
+                            {spec.name}
+                          </Label>
+                          <div className="text-sm text-muted-foreground">
+                            {spec.description && <p className="mb-1">{spec.description}</p>}
+                            <div className="font-medium text-foreground">
+                              {spec.price > 0 ? currency(spec.price) : "Sem custo adicional"}
+                            </div>
+                          </div>
+                          {spec.has_area_selection && (
+                            <div className="flex flex-wrap gap-2">
+                              <Badge variant="secondary" className="text-xs">
+                                Seleção de área
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                {spec.gender === "male" ? "Masculino" : "Feminino"}
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              <Separator className="my-4" />
+              
+              <div className="space-y-3 p-4 bg-gradient-to-r from-muted/30 to-muted/20 rounded-lg border">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Subtotal:</span>
+                  <span className="font-medium">{currency(discountResult.originalTotal)}</span>
                 </div>
-              ))}
+                
+                {discountResult.discountAmount > 0 && (
+                  <>
+                    <div className="flex justify-between items-center text-sm text-green-600">
+                      <span>Desconto ({discountResult.discountPercentage}%):</span>
+                      <span className="font-medium">-{currency(discountResult.discountAmount)}</span>
+                    </div>
+                    <Separator />
+                  </>
+                )}
+                
+                <div className="flex justify-between items-center font-semibold text-lg">
+                  <span>Total:</span>
+                  <span className="text-primary">{currency(discountResult.finalTotal)}</span>
+                </div>
+                
+                {discountResult.discountAmount > 0 && (
+                  <div className="text-xs text-center text-green-600 font-medium">
+                    Você economizou {currency(discountResult.discountAmount)}!
+                  </div>
+                )}
+              </div>
             </div>
+
+            {hasAnyArea && (
+              <div className="space-y-4">
+                <div className="text-center space-y-2">
+                  <h4 className="font-medium text-sm">Seleção de áreas</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Clique nas áreas destacadas na imagem para selecionar
+                  </p>
+                </div>
+                <div className="flex justify-center">
+                  <div className="relative border-2 border-border rounded-xl overflow-hidden bg-gradient-to-br from-muted/30 to-muted/10 shadow-lg max-w-sm">
+                    <canvas 
+                      ref={canvasRef} 
+                      className="w-full cursor-crosshair transition-all duration-200 hover:scale-[1.02]" 
+                      onMouseMove={onCanvasMove} 
+                      onClick={onCanvasClick} 
+                    />
+                    <img
+                      ref={imageRef}
+                      src={imageUrl || ""}
+                      alt="Mapa corporal"
+                      className="absolute inset-0 w-px h-px opacity-0 pointer-events-none"
+                      onLoad={onImageLoad}
+                      onError={() =>
+                        toast({
+                          title: "Imagem indisponível",
+                          description: "Não foi possível carregar a imagem de apoio. Você ainda pode selecionar pela lista.",
+                          variant: "destructive",
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </CardContent>
-    </Card>
+
+          {selectedSpecifications.length > 0 && (
+            <div className="mt-6 p-4 bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20">
+              <h4 className="font-semibold mb-3 text-sm text-primary">Especificações selecionadas:</h4>
+              <div className="grid gap-2">
+                {selectedSpecifications.map((s) => (
+                  <div key={s.id} className="flex justify-between items-center text-sm bg-background/50 p-2 rounded">
+                    <span className="font-medium">{s.name}</span>
+                    <span className="text-primary font-semibold">
+                      {s.price > 0 ? currency(s.price) : "Sem custo"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

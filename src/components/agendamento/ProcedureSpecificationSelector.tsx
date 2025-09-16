@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -7,13 +7,24 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useSpecificationCalculation, ProcedureSpecification } from "@/hooks/useSpecificationCalculation";
 
 interface AreaShape {
   x: number;
   y: number;
   width: number;
   height: number;
+}
+
+interface ProcedureSpecification {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  display_order: number;
+  is_active: boolean;
+  has_area_selection?: boolean;
+  area_shapes?: any; // Changed back to any to handle JSON from database
+  gender?: string;
 }
 
 interface ProcedureSpecificationSelectorProps {
@@ -38,6 +49,7 @@ const ProcedureSpecificationSelector = ({
   bodyImageUrlMale
 }: ProcedureSpecificationSelectorProps) => {
   const [specifications, setSpecifications] = useState<ProcedureSpecification[]>([]);
+  const [selectedSpecs, setSelectedSpecs] = useState<Set<string>>(new Set(initialSelections));
   const [loading, setLoading] = useState(true);
   const [selectedGender, setSelectedGender] = useState<'female' | 'male'>('female');
   const [hoveredSpecId, setHoveredSpecId] = useState<string | null>(null);
@@ -45,32 +57,21 @@ const ProcedureSpecificationSelector = ({
   const imageRef = useRef<HTMLImageElement>(null);
   const { toast } = useToast();
 
-  const {
-    selectedSpecifications,
-    totalPrice,
-    selectSpecification,
-    getSelectedSpecifications
-  } = useSpecificationCalculation({
-    specifications,
-    initialSelections
-  });
-
   useEffect(() => {
     loadSpecifications();
   }, [procedureId]);
 
-  // Update total when selections change - use useCallback to prevent infinite loops
-  const notifySelectionChange = useCallback(() => {
+  // Calculate total price and notify parent when selections change
+  useEffect(() => {
+    const selectedSpecifications = specifications.filter(spec => selectedSpecs.has(spec.id));
+    const totalPrice = selectedSpecifications.reduce((sum, spec) => sum + spec.price, 0);
+    
     onSelectionChange?.({
-      selectedSpecifications: getSelectedSpecifications(),
+      selectedSpecifications,
       totalPrice,
       selectedGender
     });
-  }, [selectedSpecifications, totalPrice, selectedGender, getSelectedSpecifications]);
-
-  useEffect(() => {
-    notifySelectionChange();
-  }, [notifySelectionChange]);
+  }, [selectedSpecs, specifications, selectedGender, onSelectionChange]);
 
   const loadSpecifications = async () => {
     try {
@@ -112,14 +113,14 @@ const ProcedureSpecificationSelector = ({
     // Draw background image
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    // Draw areas for all specifications with area selection
-    selectedSpecifications
+    // Draw areas for specifications with area selection for current gender
+    specifications
       .filter(spec => spec.has_area_selection && spec.area_shapes && spec.gender === selectedGender)
       .forEach(spec => {
-        const isSelected = spec.selected;
+        const isSelected = selectedSpecs.has(spec.id);
         const isHovered = hoveredSpecId === spec.id;
         
-        (spec.area_shapes as any[])?.forEach((shape: any) => {
+        spec.area_shapes?.forEach((shape: any) => {
           // Different colors for selected vs unselected areas
           if (isSelected) {
             ctx.strokeStyle = '#10B981'; // Green for selected
@@ -141,12 +142,12 @@ const ProcedureSpecificationSelector = ({
       });
   };
 
-  const isPointInSpecification = (x: number, y: number, spec: any) => {
+  const isPointInSpecification = (x: number, y: number, spec: ProcedureSpecification) => {
     if (!spec.area_shapes || spec.gender !== selectedGender) return false;
     const canvas = canvasRef.current;
     if (!canvas) return false;
     
-    return (spec.area_shapes as any[]).some((shape: any) => {
+    return spec.area_shapes.some((shape: any) => {
       const shapeX = (shape.x / 100) * canvas.width;
       const shapeY = (shape.y / 100) * canvas.height;
       const shapeWidth = (shape.width / 100) * canvas.width;
@@ -165,15 +166,23 @@ const ProcedureSpecificationSelector = ({
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    // Check all specifications with areas, not just selected ones
-    const hoveredSpec = selectedSpecifications.find(spec => 
-      spec.has_area_selection && isPointInSpecification(x, y, spec)
+    // Check all specifications with areas for current gender
+    const hoveredSpec = specifications.find(spec => 
+      spec.has_area_selection && spec.gender === selectedGender && isPointInSpecification(x, y, spec)
     );
     setHoveredSpecId(hoveredSpec?.id || null);
   };
 
   const handleSpecificationChange = (specId: string, checked: boolean) => {
-    selectSpecification(specId, checked);
+    setSelectedSpecs(prev => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(specId);
+      } else {
+        newSet.delete(specId);
+      }
+      return newSet;
+    });
   };
 
   const handleImageLoad = () => {
@@ -192,7 +201,7 @@ const ProcedureSpecificationSelector = ({
 
   useEffect(() => {
     drawCanvas();
-  }, [selectedSpecifications, selectedGender, hoveredSpecId]);
+  }, [specifications, selectedSpecs, selectedGender, hoveredSpecId]);
 
   const getImageUrl = () => {
     if (!bodySelectionType) return '';
@@ -214,14 +223,23 @@ const ProcedureSpecificationSelector = ({
   );
   
   // Check if any selected specification has area selection for the current gender
-  const hasSelectedAreaForGender = selectedSpecifications.some(spec => 
-    spec.selected && spec.has_area_selection && spec.gender === selectedGender
+  const hasSelectedAreaForGender = specifications.some(spec => 
+    selectedSpecs.has(spec.id) && spec.has_area_selection && spec.gender === selectedGender
   );
 
   // Check if we should show the image (if there are specifications with area selection for the current gender)
   const shouldShowImage = specifications.some(spec => 
     spec.has_area_selection && spec.gender === selectedGender
   );
+
+  // Get current total price
+  const totalPrice = specifications
+    .filter(spec => selectedSpecs.has(spec.id))
+    .reduce((sum, spec) => sum + spec.price, 0);
+
+  // Get selected specifications for display
+  const getSelectedSpecifications = () => 
+    specifications.filter(spec => selectedSpecs.has(spec.id));
 
   if (loading) {
     return (
@@ -270,19 +288,19 @@ const ProcedureSpecificationSelector = ({
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Specifications Selection */}
-        {selectedSpecifications.map((spec, index) => (
+        {specifications.map((spec, index) => (
           <div key={spec.id}>
             <div 
               className={`flex items-start space-x-3 p-4 rounded-lg border transition-colors cursor-pointer ${
-                spec.selected ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'
+                selectedSpecs.has(spec.id) ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'
               }`}
               onMouseEnter={() => spec.has_area_selection && setHoveredSpecId(spec.id)}
               onMouseLeave={() => setHoveredSpecId(null)}
-              onClick={() => handleSpecificationChange(spec.id, !spec.selected)}
+              onClick={() => handleSpecificationChange(spec.id, !selectedSpecs.has(spec.id))}
             >
               <Checkbox
                 id={`spec-${spec.id}`}
-                checked={spec.selected}
+                checked={selectedSpecs.has(spec.id)}
                 onCheckedChange={(checked) => 
                   handleSpecificationChange(spec.id, checked as boolean)
                 }
@@ -309,7 +327,7 @@ const ProcedureSpecificationSelector = ({
                 )}
               </div>
             </div>
-            {index < selectedSpecifications.length - 1 && <Separator className="my-2" />}
+            {index < specifications.length - 1 && <Separator className="my-2" />}
           </div>
         ))}
 
@@ -361,12 +379,12 @@ const ProcedureSpecificationSelector = ({
                     const y = e.clientY - rect.top;
 
                     // Procura especificações que têm área clicável nesta posição
-                    const clickedSpec = selectedSpecifications.find(spec => 
-                      spec.has_area_selection && isPointInSpecification(x, y, spec)
+                    const clickedSpec = specifications.find(spec => 
+                      spec.has_area_selection && spec.gender === selectedGender && isPointInSpecification(x, y, spec)
                     );
                     
                     if (clickedSpec) {
-                      handleSpecificationChange(clickedSpec.id, !clickedSpec.selected);
+                      handleSpecificationChange(clickedSpec.id, !selectedSpecs.has(clickedSpec.id));
                     }
                   }}
                 />
@@ -378,7 +396,7 @@ const ProcedureSpecificationSelector = ({
                   onLoad={handleImageLoad}
                 />
               </div>
-              {!hasSelectedAreaForGender && hasAreaSelection && (
+              {!hasSelectedAreaForGender && specifications.some(spec => spec.has_area_selection) && (
                 <p className="text-xs text-muted-foreground text-center">
                   Selecione um procedimento acima para ver as áreas disponíveis na imagem
                 </p>

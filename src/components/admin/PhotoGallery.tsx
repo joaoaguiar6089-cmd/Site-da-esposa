@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Camera, Upload, Eye, Download, Trash2, Calendar, X } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -21,6 +22,14 @@ interface ProcedureResult {
   procedure_name?: string;
 }
 
+interface Appointment {
+  id: string;
+  appointment_date: string;
+  procedure: {
+    name: string;
+  };
+}
+
 interface PhotoGalleryProps {
   results: ProcedureResult[];
   clientId: string;
@@ -33,9 +42,34 @@ const PhotoGallery = ({ results, clientId, onResultUploaded }: PhotoGalleryProps
   const [selectedPhoto, setSelectedPhoto] = useState<ProcedureResult | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [description, setDescription] = useState("");
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState("");
+  const [clientAppointments, setClientAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
 
   const { toast } = useToast();
+
+  useEffect(() => {
+    loadClientAppointments();
+  }, [clientId]);
+
+  const loadClientAppointments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("appointments")
+        .select(`
+          id,
+          appointment_date,
+          procedure:procedures(name)
+        `)
+        .eq("client_id", clientId)
+        .order("appointment_date", { ascending: false });
+
+      if (error) throw error;
+      setClientAppointments(data || []);
+    } catch (error) {
+      console.error("Erro ao carregar agendamentos:", error);
+    }
+  };
 
   const handleUploadPhoto = async () => {
     if (!selectedFile) return;
@@ -56,26 +90,31 @@ const PhotoGallery = ({ results, clientId, onResultUploaded }: PhotoGalleryProps
         .from('procedure-results')
         .getPublicUrl(uploadData.path);
 
-      // Criar um "appointment" temporário para fotos sem procedimento específico
-      const { data: tempAppointment, error: appointmentError } = await supabase
-        .from('appointments')
-        .insert([{
-          client_id: clientId,
-          procedure_id: null, // Sem procedimento específico
-          appointment_date: new Date().toISOString().split('T')[0],
-          appointment_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
-          status: 'foto_avulsa',
-          notes: 'Foto sem procedimento específico'
-        }])
-        .select()
-        .single();
+      let appointmentId = selectedAppointmentId;
 
-      if (appointmentError) throw appointmentError;
+      // Se não selecionou um agendamento específico, criar um registro avulso
+      if (!appointmentId) {
+        const { data: tempAppointment, error: appointmentError } = await supabase
+          .from('appointments')
+          .insert([{
+            client_id: clientId,
+            procedure_id: (await supabase.from('procedures').select('id').limit(1).single()).data?.id || null,
+            appointment_date: new Date().toISOString().split('T')[0],
+            appointment_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
+            status: 'foto_avulsa',
+            notes: 'Foto sem procedimento específico'
+          }])
+          .select()
+          .single();
+
+        if (appointmentError) throw appointmentError;
+        appointmentId = tempAppointment.id;
+      }
 
       const { error: insertError } = await supabase
         .from('procedure_results')
         .insert([{
-          appointment_id: tempAppointment.id,
+          appointment_id: appointmentId,
           image_url: urlData.publicUrl,
           description: description || "Foto sem especificação"
         }]);
@@ -90,6 +129,7 @@ const PhotoGallery = ({ results, clientId, onResultUploaded }: PhotoGalleryProps
       setShowUploadDialog(false);
       setSelectedFile(null);
       setDescription("");
+      setSelectedAppointmentId("");
       onResultUploaded();
     } catch (error: any) {
       console.error("Erro ao fazer upload:", error);
@@ -279,13 +319,32 @@ const PhotoGallery = ({ results, clientId, onResultUploaded }: PhotoGalleryProps
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="photo-file">Selecionar Foto</Label>
+              <Label htmlFor="photo-file">Selecionar Foto *</Label>
               <Input
                 id="photo-file"
                 type="file"
                 accept="image/*"
                 onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
               />
+            </div>
+            <div>
+              <Label htmlFor="procedure-select">Procedimento (opcional)</Label>
+              <Select 
+                value={selectedAppointmentId} 
+                onValueChange={setSelectedAppointmentId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um procedimento ou deixe em branco" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sem procedimento específico</SelectItem>
+                  {clientAppointments.map((appointment) => (
+                    <SelectItem key={appointment.id} value={appointment.id}>
+                      {appointment.procedure.name} - {format(new Date(appointment.appointment_date), "dd/MM/yyyy")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="photo-description">Descrição (opcional)</Label>

@@ -622,6 +622,10 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
 
         // Notificar proprietária da clínica via WhatsApp
         try {
+          const specificationsText = selectedSpecifications.length > 0 
+            ? selectedSpecifications.map(spec => spec.name).join('; ')
+            : '';
+
           const ownerNotifyData = {
             type: editingId ? 'alteracao' : 'agendamento',
             clientName: `${client.nome} ${client.sobrenome}`,
@@ -630,7 +634,8 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
             appointmentTime: formData.appointment_time,
             procedureName: selectedProc?.name || '',
             professionalName: null,
-            notes: formData.notes
+            notes: formData.notes,
+            specifications: specificationsText
           };
           
           console.log('Dados completos sendo enviados para notify-owner:', ownerNotifyData);

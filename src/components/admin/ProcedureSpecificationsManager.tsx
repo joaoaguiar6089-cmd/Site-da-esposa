@@ -71,7 +71,8 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
     requires_body_image_selection: false,
     body_selection_type: "",
     body_image_url: "",
-    body_image_url_male: ""
+    body_image_url_male: "",
+    requires_specifications: false
   });
 
   // Image uploads
@@ -112,7 +113,7 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
     try {
       const { data, error } = await supabase
         .from('procedures')
-        .select('requires_body_image_selection, body_selection_type, body_image_url, body_image_url_male')
+        .select('requires_body_image_selection, body_selection_type, body_image_url, body_image_url_male, requires_specifications')
         .eq('id', procedureId)
         .single();
 
@@ -121,7 +122,8 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
         requires_body_image_selection: data?.requires_body_image_selection || false,
         body_selection_type: data?.body_selection_type || "",
         body_image_url: data?.body_image_url || "",
-        body_image_url_male: data?.body_image_url_male || ""
+        body_image_url_male: data?.body_image_url_male || "",
+        requires_specifications: data?.requires_specifications || false
       });
     } catch (error: any) {
       toast({
@@ -871,6 +873,7 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
       <ProcedureDiscountManager 
         procedureId={procedureId}
         requiresBodySelection={procedureSettings.requires_body_image_selection}
+        requiresSpecifications={procedureSettings.requires_specifications}
       />
 
       {/* Dialog para criar/editar especificação */}

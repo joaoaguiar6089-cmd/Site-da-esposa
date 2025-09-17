@@ -7,15 +7,17 @@ import DiscountConfigManager from './DiscountConfigManager';
 interface ProcedureDiscountManagerProps {
   procedureId: string;
   requiresBodySelection: boolean;
+  requiresSpecifications?: boolean;
 }
 
 const ProcedureDiscountManager: React.FC<ProcedureDiscountManagerProps> = ({
   procedureId,
   requiresBodySelection,
+  requiresSpecifications = false,
 }) => {
   const [discountManagerOpen, setDiscountManagerOpen] = useState(false);
 
-  if (!requiresBodySelection) {
+  if (!requiresBodySelection && !requiresSpecifications) {
     return null;
   }
 
@@ -25,10 +27,10 @@ const ProcedureDiscountManager: React.FC<ProcedureDiscountManagerProps> = ({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Percent className="w-5 h-5 text-primary" />
-            Promoções por Grupos
+            Promoções por {requiresBodySelection ? 'Grupos' : 'Especificações'}
           </CardTitle>
           <CardDescription>
-            Configure descontos automáticos baseados na quantidade de grupos de áreas selecionados pelo cliente
+            Configure descontos automáticos baseados na quantidade de {requiresBodySelection ? 'grupos de áreas' : 'especificações'} selecionados pelo cliente
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -36,10 +38,10 @@ const ProcedureDiscountManager: React.FC<ProcedureDiscountManagerProps> = ({
             <div className="text-sm text-muted-foreground space-y-2">
               <p>📋 <strong>Como funciona:</strong></p>
               <ul className="list-disc list-inside space-y-1 ml-4">
-                <li>Configure diferentes faixas de desconto (ex: 2-3 grupos = 10%, 4+ grupos = 20%)</li>
+                <li>Configure diferentes faixas de desconto (ex: 2-3 {requiresBodySelection ? 'grupos' : 'especificações'} = 10%, 4+ {requiresBodySelection ? 'grupos' : 'especificações'} = 20%)</li>
                 <li>Os descontos são aplicados automaticamente no agendamento</li>
                 <li>O sistema escolhe o maior desconto aplicável</li>
-                <li>Incentiva clientes a selecionar mais procedimentos</li>
+                <li>Incentiva clientes a selecionar mais {requiresBodySelection ? 'procedimentos' : 'especificações'}</li>
               </ul>
             </div>
             

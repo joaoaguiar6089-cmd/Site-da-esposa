@@ -1015,7 +1015,8 @@ const ProceduresManagement = () => {
       {editingProcedure && (
         <ProcedureDiscountManager
           procedureId={editingProcedure.id}
-        requiresBodySelection={formData.requires_body_selection || false}
+          requiresBodySelection={formData.requires_body_selection || false}
+          requiresSpecifications={formData.requires_specifications || false}
         />
       )}
     </div>

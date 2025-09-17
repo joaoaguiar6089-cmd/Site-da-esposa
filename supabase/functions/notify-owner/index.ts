@@ -14,6 +14,7 @@ interface NotificationRequest {
   procedureName: string;
   professionalName?: string;
   notes?: string;
+  specifications?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -27,7 +28,7 @@ const handler = async (req: Request): Promise<Response> => {
     const requestBody = await req.json();
     console.log('Request body received:', requestBody);
     
-    const { type, clientName, clientPhone, appointmentDate, appointmentTime, procedureName, professionalName, notes }: NotificationRequest = requestBody;
+    const { type, clientName, clientPhone, appointmentDate, appointmentTime, procedureName, professionalName, notes, specifications }: NotificationRequest = requestBody;
 
     console.log('=== Owner Notification Function Called ===');
     console.log('Notification type:', type);
@@ -120,6 +121,7 @@ const handler = async (req: Request): Promise<Response> => {
     });
     
     const notesText = notes ? `\n📝 Observações: ${notes}` : '';
+    const specificationsText = specifications || '';
 
     // Get template and format message
     const getTemplateResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/get-whatsapp-template`, {
@@ -136,6 +138,7 @@ const handler = async (req: Request): Promise<Response> => {
           appointmentDate: formattedDate,
           appointmentTime,
           procedureName,
+          specifications: specificationsText,
           notes: notesText
         }
       }),

@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Edit2, Trash2, X, Upload, Image, MapPin } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Upload, MapPin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -24,7 +24,7 @@ interface ProcedureSpecification {
   is_active: boolean;
   has_area_selection: boolean;
   area_shapes: any;
-  gender: string;
+  gender: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -166,7 +166,7 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
       const fileExt = file.name.split('.').pop();
       const fileName = `body-${Date.now()}.${fileExt}`;
       
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('procedure-images')
         .upload(fileName, file, {
           cacheControl: '3600',
@@ -201,7 +201,7 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
       const fileExt = file.name.split('.').pop();
       const fileName = `body-male-${Date.now()}.${fileExt}`;
       
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('procedure-images')
         .upload(fileName, file, {
           cacheControl: '3600',
@@ -228,15 +228,18 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
     }
   };
 
-  // Salvar áreas do gênero atual
- const saveCurrentGenderAreas = () => {
-  setAreasByGender(prev => ({
-    ...prev,
-    [selectedGender]: currentShapes
-  }));
-  toast({ ... });
-};
-
+  // Salvar áreas do gênero atual em memória
+  const saveCurrentGenderAreas = () => {
+    setAreasByGender(prev => ({
+      ...prev,
+      [selectedGender]: currentShapes
+    }));
+    
+    toast({
+      title: "Áreas salvas",
+      description: `Áreas do gênero ${selectedGender === 'female' ? 'feminino' : 'masculino'} foram salvas.`,
+    });
+  };
 
   // Trocar de gênero carregando as áreas salvas
   const switchGender = (newGender: 'female' | 'male') => {
@@ -257,148 +260,136 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
     setCurrentShape(null);
   };
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-
-  if (!formData.name.trim()) {
-    toast({
-      title: "Campo obrigatório",
-      description: "Nome da especificação é obrigatório.",
-      variant: "destructive",
-    });
-    return;
-  }
-
-  // Se exige imagem de área, pode salvar só um gênero por vez sem problema:
-  // mas sempre persistiremos o objeto completo (female/male), mesmo que uma das listas esteja vazia.
-
-  try {
-    const specData = {
-      procedure_id: procedureId,
-      name: formData.name.trim(),
-      description: formData.description.trim() || null,
-      price: parseFloat(formData.price) || 0,
-      display_order: parseInt(formData.display_order) || 1,
-      is_active: true,
-      updated_at: new Date().toISOString(),
-    };
-
-    // 🔄 Sincroniza o canvas atual com o mapa por gênero antes de montar o payload
-    const mergedAreasByGender = {
-      ...areasByGender,
-      [selectedGender]: currentShapes,
-    };
-
-    // Monta o objeto combinado para salvar no campo area_shapes
-    const combinedAreaShapes = procedureSettings.requires_body_image_selection
-      ? {
-          female: Array.isArray(mergedAreasByGender.female) ? mergedAreasByGender.female : [],
-          male: Array.isArray(mergedAreasByGender.male) ? mergedAreasByGender.male : [],
-        }
-      : null;
-
-    const hasAnyArea =
-      !!combinedAreaShapes &&
-      ((combinedAreaShapes.female?.length || 0) + (combinedAreaShapes.male?.length || 0) > 0);
-
-    if (editingSpec) {
-      // Atualiza campos gerais
-      const { error: baseErr } = await supabase
-        .from('procedure_specifications')
-        .update({
-          name: specData.name,
-          description: specData.description,
-          price: specData.price,
-          display_order: specData.display_order,
-          updated_at: specData.updated_at,
-          // 👇 Persistência unificada das áreas
-          has_area_selection: hasAnyArea,
-          area_shapes: combinedAreaShapes, // { female: [...], male: [...] } ou null
-          gender: hasAnyArea ? 'both' : null, // se sua coluna for NOT NULL, mantenha 'both'
-        })
-        .eq('id', editingSpec.id);
-
-      if (baseErr) throw baseErr;
-
+  // ✅ SUBSTITUTO: handleSubmit que persiste female+male juntos
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.name.trim()) {
       toast({
-        title: "Especificação atualizada",
-        description: "A especificação foi atualizada com sucesso.",
+        title: "Campo obrigatório",
+        description: "Nome da especificação é obrigatório.",
+        variant: "destructive",
       });
-    } else {
-      // Cria a especificação
-      const { data: newSpec, error: specError } = await supabase
-        .from('procedure_specifications')
-        .insert([{
-          ...specData,
-          has_area_selection: hasAnyArea,
-          area_shapes: combinedAreaShapes, // pode iniciar já com um gênero só
-          gender: hasAnyArea ? 'both' : null, // manter compatibilidade
-          created_at: new Date().toISOString(),
-        }])
-        .select()
-        .single();
-
-      if (specError) throw specError;
-
-      toast({
-        title: "Especificação criada",
-        description: "A especificação foi criada com sucesso.",
-      });
+      return;
     }
 
-    resetForm();
-    setDialogOpen(false);
-    loadSpecifications();
-  } catch (error: any) {
-    toast({
-      title: "Erro ao salvar",
-      description: error.message,
-      variant: "destructive",
-    });
-  }
-};
+    try {
+      const specData = {
+        procedure_id: procedureId,
+        name: formData.name.trim(),
+        description: formData.description.trim() || null,
+        price: parseFloat(formData.price) || 0,
+        display_order: parseInt(formData.display_order) || 1,
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      };
 
+      // 🔄 Sincroniza o canvas atual com o mapa por gênero
+      const mergedAreasByGender = {
+        ...areasByGender,
+        [selectedGender]: currentShapes,
+      };
+
+      const combinedAreaShapes = procedureSettings.requires_body_image_selection
+        ? {
+            female: Array.isArray(mergedAreasByGender.female) ? mergedAreasByGender.female : [],
+            male: Array.isArray(mergedAreasByGender.male) ? mergedAreasByGender.male : [],
+          }
+        : null;
+
+      const hasAnyArea = !!combinedAreaShapes &&
+        ((combinedAreaShapes.female?.length || 0) + (combinedAreaShapes.male?.length || 0) > 0);
+
+      if (editingSpec) {
+        const { error: baseErr } = await supabase
+          .from('procedure_specifications')
+          .update({
+            name: specData.name,
+            description: specData.description,
+            price: specData.price,
+            display_order: specData.display_order,
+            updated_at: specData.updated_at,
+            has_area_selection: hasAnyArea,
+            area_shapes: combinedAreaShapes, // { female: [...], male: [...] } ou null
+            gender: hasAnyArea ? 'both' : null, // se a coluna for NOT NULL, deixe 'both'
+          })
+          .eq('id', editingSpec.id);
+
+        if (baseErr) throw baseErr;
+
+        toast({
+          title: "Especificação atualizada",
+          description: "A especificação foi atualizada com sucesso.",
+        });
+      } else {
+        const { error: specError } = await supabase
+          .from('procedure_specifications')
+          .insert([{ 
+            ...specData,
+            has_area_selection: hasAnyArea,
+            area_shapes: combinedAreaShapes,
+            gender: hasAnyArea ? 'both' : null,
+            created_at: new Date().toISOString(),
+          }]);
+
+        if (specError) throw specError;
+
+        toast({
+          title: "Especificação criada",
+          description: "A especificação foi criada com sucesso.",
+        });
+      }
+
+      resetForm();
+      setDialogOpen(false);
+      loadSpecifications();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao salvar",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // ✅ SUBSTITUTO: handleEdit que normaliza formato legado e novo
   const handleEdit = (spec: ProcedureSpecification) => {
-  setEditingSpec(spec);
-  setFormData({
-    name: spec.name,
-    description: spec.description || "",
-    price: spec.price?.toString?.() || "",
-    display_order: spec.display_order?.toString?.() || "1",
-  });
+    setEditingSpec(spec);
+    setFormData({
+      name: spec.name,
+      description: spec.description || "",
+      price: spec.price?.toString?.() || "",
+      display_order: spec.display_order?.toString?.() || "1",
+    });
+    
+    // Normaliza area_shapes: aceita array legado + gender OU { female, male }
+    let nextAreasByGender = { female: [] as any[], male: [] as any[] };
 
-  // ▶️ Normalização do formato de area_shapes
-  // Aceita tanto o formato novo { female:[], male:[] } quanto o legado (array + gender)
-  let nextAreasByGender = { female: [] as any[], male: [] as any[] };
+    if (spec.has_area_selection && spec.area_shapes) {
+      const shapes = spec.area_shapes as any;
 
-  if (spec.has_area_selection && spec.area_shapes) {
-    const shapes = spec.area_shapes as any;
-
-    if (Array.isArray(shapes)) {
-      // Formato legado: um array e um spec.gender
-      const g = (spec.gender === 'male' ? 'male' : 'female') as 'female' | 'male';
-      nextAreasByGender[g] = shapes;
-    } else if (typeof shapes === 'object') {
-      // Formato novo
-      nextAreasByGender.female = Array.isArray(shapes.female) ? shapes.female : [];
-      nextAreasByGender.male = Array.isArray(shapes.male) ? shapes.male : [];
+      if (Array.isArray(shapes)) {
+        // legado: array em conjunto com spec.gender
+        const g = (spec.gender === 'male' ? 'male' : 'female') as 'female' | 'male';
+        nextAreasByGender[g] = shapes;
+      } else if (typeof shapes === 'object') {
+        nextAreasByGender.female = Array.isArray(shapes.female) ? shapes.female : [];
+        nextAreasByGender.male = Array.isArray(shapes.male) ? shapes.male : [];
+      }
     }
-  }
 
-  setAreasByGender(nextAreasByGender);
+    setAreasByGender(nextAreasByGender);
 
-  // Mantém o seletor no último gênero usado ou, se preferir, default no feminino
-  const firstGender: 'female' | 'male' =
-    (nextAreasByGender.female?.length ?? 0) > 0 ? 'female'
-    : (nextAreasByGender.male?.length ?? 0) > 0 ? 'male'
-    : 'female';
+    const firstGender: 'female' | 'male' =
+      (nextAreasByGender.female?.length ?? 0) > 0 ? 'female'
+      : (nextAreasByGender.male?.length ?? 0) > 0 ? 'male'
+      : 'female';
 
-  setSelectedGender(firstGender);
-  setCurrentShapes(nextAreasByGender[firstGender]);
+    setSelectedGender(firstGender);
+    setCurrentShapes(nextAreasByGender[firstGender]);
 
-  setDialogOpen(true);
-};
-
+    setDialogOpen(true);
+  };
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Tem certeza que deseja excluir a especificação "${name}"?`)) return;
@@ -463,7 +454,7 @@ const handleSubmit = async (e: React.FormEvent) => {
       return defaultImages[imageKey] || procedureSettings.body_image_url || '';
     }
 
-    return defaultImages[`body_${selectedGender}`] || procedureSettings.body_image_url || '';
+    return defaultImages[`body_${selectedGender}` as 'body_male' | 'body_female'] || procedureSettings.body_image_url || '';
   }, [procedureSettings, selectedGender]);
 
   const getCanvasCoordinates = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -488,7 +479,7 @@ const handleSubmit = async (e: React.FormEvent) => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(imageRef.current, 0, 0, canvas.width, canvas.height);
 
-    // Desenhar formas temporárias
+    // Desenhar formas já salvas
     currentShapes.forEach((shape) => {
       const x = (shape.x / 100) * canvas.width;
       const y = (shape.y / 100) * canvas.height;
@@ -724,9 +715,11 @@ const handleSubmit = async (e: React.FormEvent) => {
                     {procedureSettings.body_image_url && (
                       <div className="flex items-center gap-2">
                         <img 
+                          ref={imageRef}
                           src={procedureSettings.body_image_url} 
                           alt="Preview feminino" 
                           className="w-20 h-20 object-contain rounded border" 
+                          onLoad={handleImageLoad}
                         />
                         <Badge variant="secondary">Imagem carregada</Badge>
                       </div>

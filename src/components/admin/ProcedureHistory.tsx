@@ -12,7 +12,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import SimpleAppointmentForm from "./SimpleAppointmentForm";
+import NewAppointmentForm from "./NewAppointmentForm";
 
 interface Appointment {
   id: string;
@@ -44,11 +44,7 @@ interface ProcedureResult {
 interface ProcedureHistoryProps {
   appointments: Appointment[];
   results: ProcedureResult[];
-  client: {
-    id: string;
-    nome: string;
-    sobrenome: string;
-  };
+  clientId: string;
   onAppointmentUpdated: () => void;
   onResultUploaded: () => void;
 }
@@ -56,7 +52,7 @@ interface ProcedureHistoryProps {
 const ProcedureHistory = ({ 
   appointments, 
   results, 
-  client,
+  clientId,
   onAppointmentUpdated,
   onResultUploaded
 }: ProcedureHistoryProps) => {
@@ -306,8 +302,7 @@ const ProcedureHistory = ({
 
   if (showNewAppointmentForm) {
     return (
-      <SimpleAppointmentForm
-        client={client}
+      <NewAppointmentForm
         onBack={() => setShowNewAppointmentForm(false)}
         onSuccess={() => {
           setShowNewAppointmentForm(false);

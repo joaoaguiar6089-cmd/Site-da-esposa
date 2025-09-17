@@ -114,7 +114,7 @@ const ClientDetail = ({
             <ProcedureHistory
               appointments={appointments}
               results={results}
-              client={client}
+              clientId={client.id}
               onAppointmentUpdated={onAppointmentUpdated}
               onResultUploaded={onResultUploaded}
             />

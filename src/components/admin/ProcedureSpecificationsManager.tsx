@@ -260,159 +260,148 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
     setCurrentShape(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.name.trim()) {
-      toast({
-        title: "Campo obrigatório",
-        description: "Nome da especificação é obrigatório.",
-        variant: "destructive",
-      });
-      return;
-    }
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    // Validação para novas especificações que requerem área
-    if (!editingSpec && procedureSettings.requires_body_image_selection && currentShapes.length === 0) {
-      toast({
-        title: "Área obrigatória",
-        description: "Selecione pelo menos uma área para esta especificação.",
-        variant: "destructive",
-      });
-      return;
-    }
+  if (!formData.name.trim()) {
+    toast({
+      title: "Campo obrigatório",
+      description: "Nome da especificação é obrigatório.",
+      variant: "destructive",
+    });
+    return;
+  }
 
-    try {
-      const specData = {
-        procedure_id: procedureId,
-        name: formData.name.trim(),
-        description: formData.description.trim() || null,
-        price: parseFloat(formData.price) || 0,
-        display_order: parseInt(formData.display_order) || 1,
-        is_active: true
-      };
+  // Se exige imagem de área, pode salvar só um gênero por vez sem problema:
+  // mas sempre persistiremos o objeto completo (female/male), mesmo que uma das listas esteja vazia.
 
-      if (editingSpec) {
-        const { error } = await supabase
-          .from('procedure_specifications')
-          .update({
-            name: specData.name,
-            description: specData.description,
-            price: specData.price,
-            display_order: specData.display_order,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', editingSpec.id);
+  try {
+    const specData = {
+      procedure_id: procedureId,
+      name: formData.name.trim(),
+      description: formData.description.trim() || null,
+      price: parseFloat(formData.price) || 0,
+      display_order: parseInt(formData.display_order) || 1,
+      is_active: true,
+      updated_at: new Date().toISOString(),
+    };
 
-        if (error) throw error;
-        
-        // Atualizando especificação existente - atualizar áreas se necessário
-        if (procedureSettings.requires_body_image_selection) {
-          const finalAreas = currentShapes.length > 0 ? currentShapes : areasByGender[selectedGender];
-          
-          const areaUpdateData = finalAreas && finalAreas.length > 0 ? {
-            has_area_selection: true,
-            area_shapes: finalAreas,
-            gender: selectedGender
-          } : {
-            has_area_selection: false,
-            area_shapes: null,
-            gender: selectedGender
-          };
+    // 🔄 Sincroniza o canvas atual com o mapa por gênero antes de montar o payload
+    const mergedAreasByGender = {
+      ...areasByGender,
+      [selectedGender]: currentShapes,
+    };
 
-          const { error: areasError } = await supabase
-            .from('procedure_specifications')
-            .update(areaUpdateData)
-            .eq('id', editingSpec.id);
-
-          if (areasError) {
-            console.warn('Erro ao salvar áreas:', areasError);
-          }
+    // Monta o objeto combinado para salvar no campo area_shapes
+    const combinedAreaShapes = procedureSettings.requires_body_image_selection
+      ? {
+          female: Array.isArray(mergedAreasByGender.female) ? mergedAreasByGender.female : [],
+          male: Array.isArray(mergedAreasByGender.male) ? mergedAreasByGender.male : [],
         }
-        
-        toast({
-          title: "Especificação atualizada",
-          description: "A especificação foi atualizada com sucesso.",
-        });
-      } else {
-        // Criar nova especificação
-        const { data: newSpec, error: specError } = await supabase
-          .from('procedure_specifications')
-          .insert([specData])
-          .select()
-          .single();
+      : null;
 
-        if (specError) throw specError;
+    const hasAnyArea =
+      !!combinedAreaShapes &&
+      ((combinedAreaShapes.female?.length || 0) + (combinedAreaShapes.male?.length || 0) > 0);
 
-        // Se há áreas selecionadas, atualizar a especificação com as áreas
-        if (procedureSettings.requires_body_image_selection) {
-          const finalAreas = currentShapes.length > 0 ? currentShapes : areasByGender[selectedGender];
-          
-          if (finalAreas && finalAreas.length > 0) {
-            const { error: areasError } = await supabase
-              .from('procedure_specifications')
-              .update({
-                has_area_selection: true,
-                area_shapes: finalAreas,
-                gender: selectedGender
-              })
-              .eq('id', newSpec.id);
+    if (editingSpec) {
+      // Atualiza campos gerais
+      const { error: baseErr } = await supabase
+        .from('procedure_specifications')
+        .update({
+          name: specData.name,
+          description: specData.description,
+          price: specData.price,
+          display_order: specData.display_order,
+          updated_at: specData.updated_at,
+          // 👇 Persistência unificada das áreas
+          has_area_selection: hasAnyArea,
+          area_shapes: combinedAreaShapes, // { female: [...], male: [...] } ou null
+          gender: hasAnyArea ? 'both' : null, // se sua coluna for NOT NULL, mantenha 'both'
+        })
+        .eq('id', editingSpec.id);
 
-            if (areasError) {
-              console.warn('Erro ao salvar áreas:', areasError);
-            }
-          }
-        }
-        
-        toast({
-          title: "Especificação criada",
-          description: "A especificação foi criada com sucesso.",
-        });
-      }
+      if (baseErr) throw baseErr;
 
-      resetForm();
-      setDialogOpen(false);
-      loadSpecifications();
-    } catch (error: any) {
       toast({
-        title: "Erro ao salvar",
-        description: error.message,
-        variant: "destructive",
+        title: "Especificação atualizada",
+        description: "A especificação foi atualizada com sucesso.",
+      });
+    } else {
+      // Cria a especificação
+      const { data: newSpec, error: specError } = await supabase
+        .from('procedure_specifications')
+        .insert([{
+          ...specData,
+          has_area_selection: hasAnyArea,
+          area_shapes: combinedAreaShapes, // pode iniciar já com um gênero só
+          gender: hasAnyArea ? 'both' : null, // manter compatibilidade
+          created_at: new Date().toISOString(),
+        }])
+        .select()
+        .single();
+
+      if (specError) throw specError;
+
+      toast({
+        title: "Especificação criada",
+        description: "A especificação foi criada com sucesso.",
       });
     }
-  };
+
+    resetForm();
+    setDialogOpen(false);
+    loadSpecifications();
+  } catch (error: any) {
+    toast({
+      title: "Erro ao salvar",
+      description: error.message,
+      variant: "destructive",
+    });
+  }
+};
 
   const handleEdit = (spec: ProcedureSpecification) => {
-    setEditingSpec(spec);
-    setFormData({
-      name: spec.name,
-      description: spec.description || "",
-      price: spec.price.toString(),
-      display_order: spec.display_order.toString()
-    });
-    
-    // Carregar áreas existentes se houver para o gênero específico
-    if (spec.has_area_selection && spec.area_shapes) {
-      const specGender = spec.gender as 'female' | 'male';
-      setSelectedGender(specGender);
-      setCurrentShapes(spec.area_shapes as any[]);
-      
-      // Atualizar o estado das áreas por gênero
-      setAreasByGender(prev => ({
-        ...prev,
-        [specGender]: spec.area_shapes as any[]
-      }));
-    } else {
-      setCurrentShapes([]);
-      setSelectedGender('female'); // Default para feminino
-      setAreasByGender({
-        female: [],
-        male: []
-      });
+  setEditingSpec(spec);
+  setFormData({
+    name: spec.name,
+    description: spec.description || "",
+    price: spec.price?.toString?.() || "",
+    display_order: spec.display_order?.toString?.() || "1",
+  });
+
+  // ▶️ Normalização do formato de area_shapes
+  // Aceita tanto o formato novo { female:[], male:[] } quanto o legado (array + gender)
+  let nextAreasByGender = { female: [] as any[], male: [] as any[] };
+
+  if (spec.has_area_selection && spec.area_shapes) {
+    const shapes = spec.area_shapes as any;
+
+    if (Array.isArray(shapes)) {
+      // Formato legado: um array e um spec.gender
+      const g = (spec.gender === 'male' ? 'male' : 'female') as 'female' | 'male';
+      nextAreasByGender[g] = shapes;
+    } else if (typeof shapes === 'object') {
+      // Formato novo
+      nextAreasByGender.female = Array.isArray(shapes.female) ? shapes.female : [];
+      nextAreasByGender.male = Array.isArray(shapes.male) ? shapes.male : [];
     }
-    
-    setDialogOpen(true);
-  };
+  }
+
+  setAreasByGender(nextAreasByGender);
+
+  // Mantém o seletor no último gênero usado ou, se preferir, default no feminino
+  const firstGender: 'female' | 'male' =
+    (nextAreasByGender.female?.length ?? 0) > 0 ? 'female'
+    : (nextAreasByGender.male?.length ?? 0) > 0 ? 'male'
+    : 'female';
+
+  setSelectedGender(firstGender);
+  setCurrentShapes(nextAreasByGender[firstGender]);
+
+  setDialogOpen(true);
+};
+
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Tem certeza que deseja excluir a especificação "${name}"?`)) return;

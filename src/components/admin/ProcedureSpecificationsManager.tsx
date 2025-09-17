@@ -229,17 +229,14 @@ const ProcedureSpecificationsManager = ({ procedureId, procedureName, onClose }:
   };
 
   // Salvar áreas do gênero atual
-  const saveCurrentGenderAreas = () => {
-    setAreasByGender(prev => ({
-      ...prev,
-      [selectedGender]: currentShapes
-    }));
-    
-    toast({
-      title: "Áreas salvas",
-      description: `Áreas do gênero ${selectedGender === 'female' ? 'feminino' : 'masculino'} foram salvas.`,
-    });
-  };
+ const saveCurrentGenderAreas = () => {
+  setAreasByGender(prev => ({
+    ...prev,
+    [selectedGender]: currentShapes
+  }));
+  toast({ ... });
+};
+
 
   // Trocar de gênero carregando as áreas salvas
   const switchGender = (newGender: 'female' | 'male') => {

@@ -19,6 +19,12 @@ interface AreaShape {
   height: number;
 }
 
+// Novo formato suportado: objeto com female/male
+interface AreaShapesByGender {
+  female?: AreaShape[];
+  male?: AreaShape[];
+}
+
 export interface ProcedureSpecification {
   id: string;
   name: string;
@@ -27,8 +33,8 @@ export interface ProcedureSpecification {
   display_order: number;
   is_active: boolean;
   has_area_selection: boolean;
-  gender: Gender;
-  area_shapes?: AreaShape[] | null;
+  gender: "female" | "male" | "both" | null; // compat
+  area_shapes?: AreaShape[] | AreaShapesByGender | null; // compat
 }
 
 interface ProcedureSpecificationSelectorProps {
@@ -45,7 +51,7 @@ interface ProcedureSpecificationSelectorProps {
     };
   }) => void;
   initialSelections?: string[];
-  bodySelectionType?: string | null;
+  bodySelectionType?: string | null; // mantido para compat
   bodyImageUrl?: string | null;
   bodyImageUrlMale?: string | null;
 }
@@ -53,22 +59,74 @@ interface ProcedureSpecificationSelectorProps {
 const currency = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0);
 
-const normalizeGender = (g: any): Gender =>
-  String(g || "female").toLowerCase().startsWith("m") ? "male" : "female";
+const normalizeGenderLegacy = (g: any): "female" | "male" | "both" | null => {
+  if (g === null || g === undefined) return null;
+  const s = String(g).toLowerCase();
+  if (s === "both") return "both";
+  if (s.startsWith("m")) return "male";
+  if (s.startsWith("f")) return "female";
+  return null;
+};
 
-const normalizeShapes = (raw: any): AreaShape[] | undefined => {
+// Aceita: null | array de shapes | objeto { female, male } | string JSON destes
+const parseAreaShapes = (raw: any): AreaShape[] | AreaShapesByGender | undefined => {
   if (!raw) return undefined;
   try {
-    const arr = Array.isArray(raw) ? raw : typeof raw === "string" ? JSON.parse(raw) : [raw];
-    return arr.filter(Boolean).map((s: any) => ({
-      x: Number(s?.x ?? 0),
-      y: Number(s?.y ?? 0),
-      width: Number(s?.width ?? 0),
-      height: Number(s?.height ?? 0),
-    }));
+    const val = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (Array.isArray(val)) {
+      // legado: só uma lista
+      return val.map((s) => ({
+        x: Number(s?.x ?? 0),
+        y: Number(s?.y ?? 0),
+        width: Number(s?.width ?? 0),
+        height: Number(s?.height ?? 0),
+      }));
+    }
+    if (typeof val === "object") {
+      const obj: AreaShapesByGender = {};
+      if (Array.isArray(val.female)) {
+        obj.female = val.female.map((s: any) => ({
+          x: Number(s?.x ?? 0),
+          y: Number(s?.y ?? 0),
+          width: Number(s?.width ?? 0),
+          height: Number(s?.height ?? 0),
+        }));
+      }
+      if (Array.isArray(val.male)) {
+        obj.male = val.male.map((s: any) => ({
+          x: Number(s?.x ?? 0),
+          y: Number(s?.y ?? 0),
+          width: Number(s?.width ?? 0),
+          height: Number(s?.height ?? 0),
+        }));
+      }
+      return obj;
+    }
+    return undefined;
   } catch {
     return undefined;
   }
+};
+
+// Dado um spec (no formato antigo ou novo), retorna as áreas do gênero atual
+const getShapesForGender = (
+  spec: ProcedureSpecification,
+  gender: Gender
+): AreaShape[] => {
+  const shapes = spec.area_shapes;
+  if (!shapes) return [];
+
+  // novo formato
+  if (typeof shapes === "object" && !Array.isArray(shapes)) {
+    const map = shapes as AreaShapesByGender;
+    return (gender === "female" ? map.female : map.male) ?? [];
+  }
+
+  // legado: uma lista e o spec.gender indica a quem pertence
+  const list = Array.isArray(shapes) ? shapes : [];
+  const g = spec.gender === "male" || spec.gender === "female" ? spec.gender : null;
+  if (!g) return list; // se não tiver gênero salvo, assume aplicável a ambos (caso raro)
+  return g === gender ? list : [];
 };
 
 const ProcedureSpecificationSelector = ({
@@ -89,22 +147,26 @@ const ProcedureSpecificationSelector = ({
   const imageRef = useRef<HTMLImageElement>(null);
   const { toast } = useToast();
 
-  // Calculate totals
-  const selectedSpecifications = useMemo(() => 
-    specifications.filter((s) => selectedSpecs.has(s.id)), 
+  // Totais
+  const selectedSpecifications = useMemo(
+    () => specifications.filter((s) => selectedSpecs.has(s.id)),
     [specifications, selectedSpecs]
   );
-  
-  const originalTotal = useMemo(() => 
-    selectedSpecifications.reduce((sum, s) => sum + (s.price || 0), 0), 
+
+  const originalTotal = useMemo(
+    () => selectedSpecifications.reduce((sum, s) => sum + (s.price || 0), 0),
     [selectedSpecifications]
   );
 
   const selectedGroupsCount = selectedSpecifications.length;
 
-  // Use discount calculation hook
-  const { discountResult } = useDiscountCalculation(procedureId, selectedGroupsCount, originalTotal);
+  const { discountResult } = useDiscountCalculation(
+    procedureId,
+    selectedGroupsCount,
+    originalTotal
+  );
 
+  // Carregar specs
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
@@ -125,18 +187,12 @@ const ProcedureSpecificationSelector = ({
           display_order: Number(row.display_order ?? 0),
           is_active: Boolean(row.is_active),
           has_area_selection: Boolean(row.has_area_selection),
-          gender: normalizeGender(row.gender),
-          area_shapes: normalizeShapes(row.area_shapes),
+          gender: normalizeGenderLegacy(row.gender),
+          area_shapes: parseAreaShapes(row.area_shapes),
         }));
         if (!cancelled) {
           setSpecifications(processed);
-          console.log("Especificações carregadas:", processed.map(s => ({ 
-            id: s.id, 
-            name: s.name, 
-            gender: s.gender, 
-            has_area_selection: s.has_area_selection,
-            areas: s.area_shapes?.length || 0 
-          })));
+          // console.debug("Especificações:", processed);
         }
       } catch (e) {
         if (!cancelled) {
@@ -153,10 +209,12 @@ const ProcedureSpecificationSelector = ({
       }
     };
     run();
-    return () => void (cancelled = true);
+    return () => {
+      cancelled = true;
+    };
   }, [procedureId, toast]);
 
-  // Callback for selection changes
+  // Propagar seleção
   const handleSelectionChange = useCallback(() => {
     if (onSelectionChange) {
       onSelectionChange({
@@ -168,7 +226,7 @@ const ProcedureSpecificationSelector = ({
           discountAmount: discountResult.discountAmount,
           finalTotal: discountResult.finalTotal,
           discountPercentage: discountResult.discountPercentage,
-        }
+        },
       });
     }
   }, [selectedSpecifications, discountResult, selectedGender, onSelectionChange]);
@@ -177,12 +235,14 @@ const ProcedureSpecificationSelector = ({
     handleSelectionChange();
   }, [handleSelectionChange]);
 
+  // Imagem por gênero
   const imageUrl = useMemo(() => {
     if (selectedGender === "male") return bodyImageUrlMale || "/images/body-male-default.png";
     return bodyImageUrl || "/images/body-female-default.png";
   }, [selectedGender, bodyImageUrl, bodyImageUrlMale]);
 
-  const drawCanvas = () => {
+  // Canvas: desenhar todas as áreas válidas para o gênero atual
+  const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     const img = imageRef.current;
     if (!canvas || !img || !img.complete) return;
@@ -192,82 +252,60 @@ const ProcedureSpecificationSelector = ({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    // Draw ALL areas for ALL specifications with area selection that match current gender
-    const allSpecsWithAreas = specifications.filter(
-      (s) => s.has_area_selection && s.area_shapes && s.area_shapes.length > 0 && 
-      (!s.gender || s.gender === selectedGender)
-    );
-    
-    console.log('Drawing areas for specifications:', allSpecsWithAreas.map(s => ({ 
-      id: s.id, 
-      name: s.name, 
-      gender: s.gender, 
-      areas: s.area_shapes?.length || 0,
-      selectedGender: selectedGender
-    })));
-    
-    // Draw areas for all specifications that match the current gender
-    allSpecsWithAreas.forEach((spec) => {
+    // Specs que têm ao menos 1 shape para o gênero atual
+    const specsWithShapes = specifications.filter((s) => {
+      if (!s.has_area_selection || !s.area_shapes) return false;
+      return getShapesForGender(s, selectedGender).length > 0;
+    });
+
+    const palette = [
+      { fill: "rgba(16,185,129,", stroke: "#10B981" }, // verde
+      { fill: "rgba(59,130,246,", stroke: "#3B82F6" }, // azul
+      { fill: "rgba(239,68,68,", stroke: "#EF4444" }, // vermelho
+      { fill: "rgba(245,158,11,", stroke: "#F59E0B" }, // âmbar
+      { fill: "rgba(139,92,246,", stroke: "#8B5CF6" }, // roxo
+    ];
+
+    specsWithShapes.forEach((spec, idx) => {
       const isSelected = selectedSpecs.has(spec.id);
       const isHovered = hoveredSpecId === spec.id;
-      
-      console.log(`Drawing areas for spec: ${spec.name} (${spec.area_shapes?.length || 0} areas)`);
-      
-      (spec.area_shapes ?? []).forEach((shape, shapeIndex) => {
+      const color = palette[idx % palette.length];
+
+      const shapes = getShapesForGender(spec, selectedGender);
+      shapes.forEach((shape) => {
         const x = (shape.x / 100) * canvas.width;
         const y = (shape.y / 100) * canvas.height;
         const w = (shape.width / 100) * canvas.width;
         const h = (shape.height / 100) * canvas.height;
-        
-        // Different colors for different specifications to help identify them
-        const colors = [
-          { fill: "rgba(16,185,129,", stroke: "#10B981" }, // Green
-          { fill: "rgba(59,130,246,", stroke: "#3B82F6" }, // Blue  
-          { fill: "rgba(239,68,68,", stroke: "#EF4444" }, // Red
-          { fill: "rgba(245,158,11,", stroke: "#F59E0B" }, // Amber
-          { fill: "rgba(139,92,246,", stroke: "#8B5CF6" }, // Purple
-        ];
-        
-        const colorIndex = allSpecsWithAreas.findIndex(s => s.id === spec.id) % colors.length;
-        const color = colors[colorIndex];
-        
-        // Fill area
-        ctx.fillStyle = isSelected
-          ? isHovered
-            ? color.fill + "0.6)"
-            : color.fill + "0.4)"
-          : isHovered
-          ? color.fill + "0.3)"
-          : color.fill + "0.15)";
+
+        ctx.fillStyle = isSelected ? (isHovered ? color.fill + "0.6)" : color.fill + "0.4)") : (isHovered ? color.fill + "0.3)" : color.fill + "0.15)");
         ctx.fillRect(x, y, w, h);
-        
-        // Draw border
+
         ctx.lineWidth = isSelected ? 3 : 2;
         ctx.strokeStyle = isSelected ? color.stroke : color.stroke + "80";
         ctx.strokeRect(x, y, w, h);
-        
-        // Add specification name label
+
         if (isHovered || isSelected) {
-          ctx.fillStyle = "#FFFFFF";
+          ctx.fillStyle = "#fff";
           ctx.font = "bold 11px Arial";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          
-          // Add background for text
-          const textWidth = ctx.measureText(spec.name).width;
+
+          const text = spec.name;
+          const textWidth = ctx.measureText(text).width;
           const textHeight = 14;
-          const textX = x + w/2 - textWidth/2 - 4;
-          const textY = y + h/2 - textHeight/2;
-          
+          const textX = x + w / 2 - textWidth / 2 - 4;
+          const textY = y + h / 2 - textHeight / 2;
+
           ctx.fillStyle = "rgba(0,0,0,0.8)";
           ctx.fillRect(textX, textY, textWidth + 8, textHeight);
-          
-          ctx.fillStyle = "#FFFFFF";
-          ctx.fillText(spec.name, x + w/2, y + h/2);
+
+          ctx.fillStyle = "#fff";
+          ctx.fillText(text, x + w / 2, y + h / 2);
         }
       });
     });
-  };
+  }, [specifications, selectedSpecs, hoveredSpecId, selectedGender]);
 
   const getCanvasXY = (evt: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -279,14 +317,10 @@ const ProcedureSpecificationSelector = ({
   };
 
   const pointInSpec = (x: number, y: number, spec: ProcedureSpecification) => {
-    if (!spec.area_shapes) return false;
-    // Only check specifications that match current gender or have no gender specified
-    if (spec.gender && spec.gender !== selectedGender) return false;
-    
     const canvas = canvasRef.current;
     if (!canvas) return false;
-    
-    return (spec.area_shapes ?? []).some((shape) => {
+    const shapes = getShapesForGender(spec, selectedGender);
+    return shapes.some((shape) => {
       const sx = (shape.x / 100) * canvas.width;
       const sy = (shape.y / 100) * canvas.height;
       const sw = (shape.width / 100) * canvas.width;
@@ -298,9 +332,7 @@ const ProcedureSpecificationSelector = ({
   const onCanvasMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = getCanvasXY(e);
     const hovered = specifications.find(
-      (s) => s.has_area_selection && s.area_shapes && 
-             (!s.gender || s.gender === selectedGender) && 
-             pointInSpec(x, y, s)
+      (s) => s.has_area_selection && s.area_shapes && pointInSpec(x, y, s)
     );
     setHoveredSpecId(hovered?.id || null);
   };
@@ -308,24 +340,15 @@ const ProcedureSpecificationSelector = ({
   const onCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = getCanvasXY(e);
     const clicked = specifications.find(
-      (s) => s.has_area_selection && s.area_shapes && 
-             (!s.gender || s.gender === selectedGender) && 
-             pointInSpec(x, y, s)
+      (s) => s.has_area_selection && s.area_shapes && pointInSpec(x, y, s)
     );
     if (clicked) {
-      console.log('Clicked on specification:', clicked.name, 'Gender:', clicked.gender);
       setSelectedSpecs((prev) => {
         const next = new Set(prev);
-        if (next.has(clicked.id)) {
-          next.delete(clicked.id);
-        } else {
-          next.add(clicked.id);
-        }
-        console.log('Updated selections:', Array.from(next));
+        if (next.has(clicked.id)) next.delete(clicked.id);
+        else next.add(clicked.id);
         return next;
       });
-    } else {
-      console.log('No specification found at click position:', { x, y });
     }
   };
 
@@ -342,8 +365,7 @@ const ProcedureSpecificationSelector = ({
 
   useEffect(() => {
     drawCanvas();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageUrl, selectedGender, specifications, selectedSpecs, hoveredSpecId]);
+  }, [imageUrl, selectedGender, specifications, selectedSpecs, hoveredSpecId, drawCanvas]);
 
   if (loading) {
     return (
@@ -370,7 +392,13 @@ const ProcedureSpecificationSelector = ({
     );
   }
 
-  const hasAnyArea = specifications.some((s) => s.has_area_selection);
+  const hasAnyArea = specifications.some((s) => {
+    if (!s.has_area_selection || !s.area_shapes) return false;
+    return (
+      getShapesForGender(s, "female").length > 0 ||
+      getShapesForGender(s, "male").length > 0
+    );
+  });
 
   return (
     <div className="w-full space-y-6">
@@ -411,10 +439,16 @@ const ProcedureSpecificationSelector = ({
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-4">
               <div className="space-y-3">
-                {specifications.filter((spec) => 
-                  !spec.gender || spec.gender === selectedGender
-                ).map((spec) => {
+                {specifications.map((spec) => {
                   const selected = selectedSpecs.has(spec.id);
+                  const shapesCurrent = getShapesForGender(spec, selectedGender);
+                  const showBadge = spec.has_area_selection && (shapesCurrent.length > 0);
+
+                  // Filtragem por gênero para a lista textual:
+                  // Se o spec tiver shapes apenas para o outro gênero, não mostre.
+                  const hasAnyForCurrentGender = shapesCurrent.length > 0 || !spec.has_area_selection;
+                  if (!hasAnyForCurrentGender) return null;
+
                   return (
                     <div 
                       key={spec.id} 
@@ -447,13 +481,13 @@ const ProcedureSpecificationSelector = ({
                               {spec.price > 0 ? currency(spec.price) : "Sem custo adicional"}
                             </div>
                           </div>
-                          {spec.has_area_selection && (
+                          {showBadge && (
                             <div className="flex flex-wrap gap-2">
                               <Badge variant="secondary" className="text-xs">
                                 Seleção de área
                               </Badge>
                               <Badge variant="outline" className="text-xs">
-                                {spec.gender === "male" ? "Masculino" : "Feminino"}
+                                {spec.gender === "male" ? "Masculino" : spec.gender === "female" ? "Feminino" : "Ambos"}
                               </Badge>
                             </div>
                           )}

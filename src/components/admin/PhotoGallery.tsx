@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Camera, Upload, Eye, Download, Trash2, Calendar, X } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -33,9 +34,30 @@ const PhotoGallery = ({ results, clientId, onResultUploaded }: PhotoGalleryProps
   const [selectedPhoto, setSelectedPhoto] = useState<ProcedureResult | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [description, setDescription] = useState("");
+  const [selectedProcedure, setSelectedProcedure] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [procedures, setProcedures] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   const { toast } = useToast();
+
+  useEffect(() => {
+    loadProcedures();
+  }, []);
+
+  const loadProcedures = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("procedures")
+        .select("id, name")
+        .order("name");
+
+      if (error) throw error;
+      setProcedures(data || []);
+    } catch (error) {
+      console.error("Erro ao carregar procedimentos:", error);
+    }
+  };
 
   const handleUploadPhoto = async () => {
     if (!selectedFile) return;
@@ -56,17 +78,19 @@ const PhotoGallery = ({ results, clientId, onResultUploaded }: PhotoGalleryProps
         .from('procedure-results')
         .getPublicUrl(uploadData.path);
 
-      // Criar um "appointment" temporário para fotos sem procedimento específico
+      // Criar um "appointment" temporário para fotos - com ou sem procedimento específico
+      const appointmentData = {
+        client_id: clientId,
+        procedure_id: selectedProcedure || null,
+        appointment_date: selectedDate || new Date().toISOString().split('T')[0],
+        appointment_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
+        status: selectedProcedure ? 'realizado' : 'foto_avulsa',
+        notes: selectedProcedure ? 'Foto do procedimento' : 'Foto sem procedimento específico'
+      };
+
       const { data: tempAppointment, error: appointmentError } = await supabase
         .from('appointments')
-        .insert([{
-          client_id: clientId,
-          procedure_id: null, // Sem procedimento específico
-          appointment_date: new Date().toISOString().split('T')[0],
-          appointment_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
-          status: 'foto_avulsa',
-          notes: 'Foto sem procedimento específico'
-        }])
+        .insert([appointmentData])
         .select()
         .single();
 
@@ -90,6 +114,8 @@ const PhotoGallery = ({ results, clientId, onResultUploaded }: PhotoGalleryProps
       setShowUploadDialog(false);
       setSelectedFile(null);
       setDescription("");
+      setSelectedProcedure("");
+      setSelectedDate("");
       onResultUploaded();
     } catch (error: any) {
       console.error("Erro ao fazer upload:", error);
@@ -287,6 +313,35 @@ const PhotoGallery = ({ results, clientId, onResultUploaded }: PhotoGalleryProps
                 onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
               />
             </div>
+            
+            <div>
+              <Label htmlFor="photo-procedure">Procedimento (opcional)</Label>
+              <Select value={selectedProcedure} onValueChange={setSelectedProcedure}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um procedimento..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sem procedimento específico</SelectItem>
+                  {procedures.map((procedure) => (
+                    <SelectItem key={procedure.id} value={procedure.id}>
+                      {procedure.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="photo-date">Data (opcional)</Label>
+              <Input
+                id="photo-date"
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                placeholder="Data do procedimento"
+              />
+            </div>
+            
             <div>
               <Label htmlFor="photo-description">Descrição (opcional)</Label>
               <Textarea

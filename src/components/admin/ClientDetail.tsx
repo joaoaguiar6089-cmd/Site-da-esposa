@@ -115,6 +115,7 @@ const ClientDetail = ({
               appointments={appointments}
               results={results}
               clientId={client.id}
+              client={client}
               onAppointmentUpdated={onAppointmentUpdated}
               onResultUploaded={onResultUploaded}
             />

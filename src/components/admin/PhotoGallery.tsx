@@ -81,11 +81,11 @@ const PhotoGallery = ({ results, clientId, onResultUploaded }: PhotoGalleryProps
       // Criar um "appointment" temporário para fotos - com ou sem procedimento específico
       const appointmentData = {
         client_id: clientId,
-        procedure_id: selectedProcedure || null,
+        procedure_id: (selectedProcedure && selectedProcedure !== 'none') ? selectedProcedure : null,
         appointment_date: selectedDate || new Date().toISOString().split('T')[0],
         appointment_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
-        status: selectedProcedure ? 'realizado' : 'foto_avulsa',
-        notes: selectedProcedure ? 'Foto do procedimento' : 'Foto sem procedimento específico'
+        status: (selectedProcedure && selectedProcedure !== 'none') ? 'realizado' : 'foto_avulsa',
+        notes: (selectedProcedure && selectedProcedure !== 'none') ? 'Foto do procedimento' : 'Foto sem procedimento específico'
       };
 
       const { data: tempAppointment, error: appointmentError } = await supabase
@@ -321,7 +321,7 @@ const PhotoGallery = ({ results, clientId, onResultUploaded }: PhotoGalleryProps
                   <SelectValue placeholder="Selecione um procedimento..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sem procedimento específico</SelectItem>
+                  <SelectItem value="none">Sem procedimento específico</SelectItem>
                   {procedures.map((procedure) => (
                     <SelectItem key={procedure.id} value={procedure.id}>
                       {procedure.name}

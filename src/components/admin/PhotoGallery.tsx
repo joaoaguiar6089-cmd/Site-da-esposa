@@ -78,28 +78,65 @@ const PhotoGallery = ({ results, clientId, onResultUploaded }: PhotoGalleryProps
         .from('procedure-results')
         .getPublicUrl(uploadData.path);
 
-      // Criar um "appointment" temporário para fotos - com ou sem procedimento específico
-      const appointmentData = {
-        client_id: clientId,
-        procedure_id: (selectedProcedure && selectedProcedure !== 'none') ? selectedProcedure : null,
-        appointment_date: selectedDate || new Date().toISOString().split('T')[0],
-        appointment_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
-        status: (selectedProcedure && selectedProcedure !== 'none') ? 'realizado' : 'foto_avulsa',
-        notes: (selectedProcedure && selectedProcedure !== 'none') ? 'Foto do procedimento' : 'Foto sem procedimento específico'
-      };
+      let appointmentId = null;
 
-      const { data: tempAppointment, error: appointmentError } = await supabase
-        .from('appointments')
-        .insert([appointmentData])
-        .select()
-        .single();
+      // Se há procedimento selecionado, criar appointment com procedimento
+      if (selectedProcedure && selectedProcedure !== 'none') {
+        const appointmentData = {
+          client_id: clientId,
+          procedure_id: selectedProcedure,
+          appointment_date: selectedDate || new Date().toISOString().split('T')[0],
+          appointment_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
+          status: 'realizado',
+          notes: 'Foto do procedimento'
+        };
 
-      if (appointmentError) throw appointmentError;
+        const { data: tempAppointment, error: appointmentError } = await supabase
+          .from('appointments')
+          .insert([appointmentData])
+          .select()
+          .single();
+
+        if (appointmentError) throw appointmentError;
+        appointmentId = tempAppointment.id;
+      } else {
+        // Para fotos sem procedimento específico, usar uma query para encontrar o primeiro procedimento disponível
+        // ou criar um appointment genérico
+        const { data: firstProcedure } = await supabase
+          .from('procedures')
+          .select('id')
+          .limit(1)
+          .single();
+
+        if (firstProcedure) {
+          const appointmentData = {
+            client_id: clientId,
+            procedure_id: firstProcedure.id,
+            appointment_date: selectedDate || new Date().toISOString().split('T')[0],
+            appointment_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
+            status: 'foto_avulsa',
+            notes: 'Foto sem procedimento específico - registro temporário'
+          };
+
+          const { data: tempAppointment, error: appointmentError } = await supabase
+            .from('appointments')
+            .insert([appointmentData])
+            .select()
+            .single();
+
+          if (appointmentError) throw appointmentError;
+          appointmentId = tempAppointment.id;
+        }
+      }
+
+      if (!appointmentId) {
+        throw new Error("Não foi possível criar o registro de agendamento para a foto");
+      }
 
       const { error: insertError } = await supabase
         .from('procedure_results')
         .insert([{
-          appointment_id: tempAppointment.id,
+          appointment_id: appointmentId,
           image_url: urlData.publicUrl,
           description: description || "Foto sem especificação"
         }]);

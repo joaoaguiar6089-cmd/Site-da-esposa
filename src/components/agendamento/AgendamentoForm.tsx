@@ -80,6 +80,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
     appointment_date: "",
     appointment_time: "",
     notes: "",
+    city_id: "",
   });
   const [selectedBodyAreas, setSelectedBodyAreas] = useState<AreaGroup[]>([]);
   const [selectedGender, setSelectedGender] = useState<'male' | 'female'>('female');
@@ -92,6 +93,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
     finalTotal: 0,
     discountPercentage: 0,
   });
+  const [cities, setCities] = useState<{id: string, city_name: string}[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingProcedures, setLoadingProcedures] = useState(true);
   const [cancelling, setCancelling] = useState(false);
@@ -124,9 +126,19 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
 
       if (subcategoriesError) throw subcategoriesError;
 
+      // Carregar cidades
+      const { data: citiesData, error: citiesError } = await supabase
+        .from('city_settings')
+        .select('id, city_name')
+        .eq('is_active', true)
+        .order('display_order');
+
+      if (citiesError) throw citiesError;
+
       setProcedures(proceduresData || []);
       setCategories(categoriesData || []);
       setSubcategories(subcategoriesData || []);
+      setCities(citiesData || []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast({
@@ -166,7 +178,8 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         .select(`
           *,
           procedures!appointments_procedure_id_fkey(name, duration, price, requires_body_selection, body_selection_type),
-          appointment_specifications(specification_id, specification_name, specification_price)
+          appointment_specifications(specification_id, specification_name, specification_price),
+          city_settings(city_name)
         `)
         .eq('id', appointmentId)
         .single();
@@ -179,6 +192,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         appointment_date: data.appointment_date,
         appointment_time: data.appointment_time,
         notes: data.notes || "",
+        city_id: data.city_id || "",
       });
 
       // Carregar especificações selecionadas se existirem
@@ -220,6 +234,28 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
 
   const generateTimeOptions = async () => {
     try {
+      // Primeiro verificar se uma cidade está selecionada
+      if (!formData.city_id || !formData.appointment_date) {
+        return [];
+      }
+
+      // Verificar se o dia está disponível na cidade selecionada
+      const { data: cityAvailability, error: availabilityError } = await supabase
+        .from('city_availability')
+        .select('*')
+        .eq('city_id', formData.city_id)
+        .or(`and(date_start.lte.${formData.appointment_date},date_end.gte.${formData.appointment_date}),and(date_start.eq.${formData.appointment_date},date_end.is.null)`);
+
+      if (availabilityError) {
+        console.error('Erro ao verificar disponibilidade da cidade:', availabilityError);
+        return [];
+      }
+
+      // Se não há disponibilidade na cidade para esta data, retorna vazio
+      if (!cityAvailability || cityAvailability.length === 0) {
+        return [];
+      }
+
       // Verificar se a data tem exceções configuradas
       if (formData.appointment_date) {
         const { data: exceptions, error: exceptionsError } = await supabase
@@ -425,10 +461,10 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.procedure_id || !formData.appointment_date || !formData.appointment_time) {
+    if (!formData.procedure_id || !formData.appointment_date || !formData.appointment_time || !formData.city_id) {
       toast({
         title: "Campos obrigatórios",
-        description: "Por favor, preencha todos os campos obrigatórios.",
+        description: "Por favor, preencha todos os campos obrigatórios (procedimento, cidade, data e horário).",
         variant: "destructive",
       });
       return;
@@ -482,6 +518,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
             notes: formData.notes.trim() || null,
             selected_gender: selectedProcedure?.requires_body_selection ? selectedGender : null,
             total_body_areas_price: totalBodyAreasPrice,
+            city_id: formData.city_id || null,
           })
           .eq('id', editingId)
           .select()
@@ -499,6 +536,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
             status: 'agendado',
             selected_gender: selectedProcedure?.requires_body_selection ? selectedGender : null,
             total_body_areas_price: totalBodyAreasPrice,
+            city_id: formData.city_id || null,
           })
           .select()
           .single();
@@ -1023,37 +1061,94 @@ Para reagendar, entre em contato conosco.`;
             {/* Removida a descrição que aparecia abaixo do dropdown */}
           </div>
 
+          {/* Seleção de Cidade */}
+          <div className="space-y-2">
+            <label htmlFor="city" className="text-sm font-semibold text-foreground">
+              Cidade de Atendimento <span className="text-destructive">*</span>
+            </label>
+            <Select
+              value={formData.city_id}
+              onValueChange={(value) => {
+                setFormData({...formData, city_id: value, appointment_date: "", appointment_time: ""});
+                setAvailableTimes([]);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a cidade" />
+              </SelectTrigger>
+              <SelectContent>
+                {cities.map(city => (
+                  <SelectItem key={city.id} value={city.id}>
+                    {city.city_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-              <div className="space-y-2">
-                <label htmlFor="date" className="text-sm font-semibold text-foreground">
-                  Data <span className="text-destructive">*</span>
-                </label>
-                <Input
-                  id="date"
-                  type="date"
-                  min={getMinDate()}
-                  value={formData.appointment_date}
-                  onChange={async (e) => {
+          <div className="space-y-2">
+            <label htmlFor="date" className="text-sm font-semibold text-foreground">
+              Data <span className="text-destructive">*</span>
+            </label>
+            <Input
+              id="date"
+              type="date"
+              min={getMinDate()}
+              value={formData.appointment_date}
+              disabled={!formData.city_id}
+              onChange={async (e) => {
                     const newDate = e.target.value;
                     
                     // Verificar se a data está bloqueada
                     const isDisabled = await isDateDisabled(newDate);
-                    if (isDisabled) {
+                    if (!isDisabled) {
+                      // Verificar se a data está disponível na cidade selecionada
+                      if (formData.city_id) {
+                        const { data: cityAvailability, error: availabilityError } = await supabase
+                          .from('city_availability')
+                          .select('*')
+                          .eq('city_id', formData.city_id)
+                          .or(`and(date_start.lte.${newDate},date_end.gte.${newDate}),and(date_start.eq.${newDate},date_end.is.null)`);
+
+                        if (availabilityError) {
+                          console.error('Erro ao verificar disponibilidade:', availabilityError);
+                          toast({
+                            title: "Erro",
+                            description: "Erro ao verificar disponibilidade da cidade.",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+
+                        if (!cityAvailability || cityAvailability.length === 0) {
+                          toast({
+                            title: "Data indisponível",
+                            description: "Esta data não está disponível na cidade selecionada.",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                      }
+                      
+                      setFormData({...formData, appointment_date: newDate, appointment_time: ""});
+                      loadAvailableTimes(newDate);
+                    } else {
                       toast({
                         title: "Data indisponível",
-                        description: "A clínica estará fechada nesta data. Escolha outra data.",
+                        description: "A clínica está fechada nesta data.",
                         variant: "destructive",
                       });
-                      return;
                     }
-                    
-                    setFormData(prev => ({ ...prev, appointment_date: newDate, appointment_time: "" }));
-                    loadAvailableTimes(newDate);
                   }}
                   className="border-2 hover:border-primary/50 focus:border-primary transition-all duration-200"
                   required
-                />
-              </div>
+                  />
+                  {!formData.city_id && (
+                    <p className="text-sm text-muted-foreground">
+                      Primeiro selecione uma cidade para habilitar a seleção de data
+                    </p>
+                  )}
+                </div>
 
               <div className="space-y-2">
                 <label htmlFor="time" className="text-sm font-semibold text-foreground">

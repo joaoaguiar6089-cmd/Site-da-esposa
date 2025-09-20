@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import ScheduleExceptions from "./ScheduleExceptions";
+import CitySettings from "./CitySettings";
 
 interface ScheduleSettings {
   id: string;
@@ -156,8 +157,9 @@ const ScheduleSettings = () => {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="general">Configurações Gerais</TabsTrigger>
+          <TabsTrigger value="cities">Cidades</TabsTrigger>
           <TabsTrigger value="exceptions">Exceções de Horários</TabsTrigger>
         </TabsList>
         
@@ -238,6 +240,10 @@ const ScheduleSettings = () => {
               </Button>
             </CardContent>
           </Card>
+        </TabsContent>
+        
+        <TabsContent value="cities">
+          <CitySettings />
         </TabsContent>
         
         <TabsContent value="exceptions">

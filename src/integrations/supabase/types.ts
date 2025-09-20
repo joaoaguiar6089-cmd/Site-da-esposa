@@ -132,6 +132,7 @@ export type Database = {
         Row: {
           appointment_date: string
           appointment_time: string
+          city_id: string | null
           client_id: string
           created_at: string
           id: string
@@ -146,6 +147,7 @@ export type Database = {
         Insert: {
           appointment_date: string
           appointment_time: string
+          city_id?: string | null
           client_id: string
           created_at?: string
           id?: string
@@ -160,6 +162,7 @@ export type Database = {
         Update: {
           appointment_date?: string
           appointment_time?: string
+          city_id?: string | null
           client_id?: string
           created_at?: string
           id?: string
@@ -172,6 +175,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "appointments_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "city_settings"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "appointments_client_id_fkey"
             columns: ["client_id"]
@@ -263,6 +273,68 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      city_availability: {
+        Row: {
+          city_id: string
+          created_at: string
+          date_end: string | null
+          date_start: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          city_id: string
+          created_at?: string
+          date_end?: string | null
+          date_start: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          city_id?: string
+          created_at?: string
+          date_end?: string | null
+          date_start?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "city_availability_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "city_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      city_settings: {
+        Row: {
+          city_name: string
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          updated_at: string
+        }
+        Insert: {
+          city_name: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Update: {
+          city_name?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
           updated_at?: string
         }
         Relationships: []

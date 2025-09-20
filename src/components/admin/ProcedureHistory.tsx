@@ -7,12 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Clock, Edit, Camera, Eye, Download, Trash2, Plus } from "lucide-react";
+import { Calendar, Clock, Edit, Camera, Eye, Download, Trash2, Plus, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import SimpleAppointmentForm from "./SimpleAppointmentForm";
+import CompletedProcedureForm from "./CompletedProcedureForm";
 
 interface Appointment {
   id: string;
@@ -67,6 +68,7 @@ const ProcedureHistory = ({
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showResultDialog, setShowResultDialog] = useState(false);
   const [showNewAppointmentForm, setShowNewAppointmentForm] = useState(false);
+  const [showCompletedProcedureForm, setShowCompletedProcedureForm] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [resultDescription, setResultDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -321,10 +323,31 @@ const ProcedureHistory = ({
     );
   }
 
+  if (showCompletedProcedureForm) {
+    return (
+      <CompletedProcedureForm
+        client={client}
+        onBack={() => setShowCompletedProcedureForm(false)}
+        onSuccess={() => {
+          setShowCompletedProcedureForm(false);
+          onAppointmentUpdated();
+        }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4">
-      {/* Botão para novo agendamento */}
-      <div className="flex justify-end">
+      {/* Botões para novo agendamento e procedimento realizado */}
+      <div className="flex justify-end gap-3">
+        <Button 
+          onClick={() => setShowCompletedProcedureForm(true)} 
+          variant="outline"
+          className="flex items-center gap-2"
+        >
+          <CheckCircle className="h-4 w-4" />
+          Inserir Procedimento Realizado
+        </Button>
         <Button onClick={() => setShowNewAppointmentForm(true)} className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
           Novo Agendamento
@@ -341,9 +364,17 @@ const ProcedureHistory = ({
           <p className="text-muted-foreground mb-4">
             Este cliente ainda não possui procedimentos agendados.
           </p>
-          <Button onClick={() => setShowNewAppointmentForm(true)}>
-            Agendar Primeiro Procedimento
-          </Button>
+          <div className="flex gap-3 justify-center">
+            <Button 
+              onClick={() => setShowCompletedProcedureForm(true)}
+              variant="outline"
+            >
+              Inserir Procedimento Realizado
+            </Button>
+            <Button onClick={() => setShowNewAppointmentForm(true)}>
+              Agendar Primeiro Procedimento
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">

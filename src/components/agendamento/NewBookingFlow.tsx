@@ -597,7 +597,7 @@ const BookingFormStep = ({ onComplete, onBack, preSelectedProcedureId }: Booking
           </div>
           
           <Button type="submit" className="w-full" disabled={loading}>
-            Continuar para CPF
+            Continuar
           </Button>
         </form>
       </CardContent>

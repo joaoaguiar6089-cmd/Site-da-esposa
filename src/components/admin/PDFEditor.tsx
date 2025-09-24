@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Canvas as FabricCanvas, FabricText, FabricImage } from "fabric";
+import { Canvas as FabricCanvas, FabricText, FabricImage, fabric } from "fabric";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,10 +10,21 @@ import { Type, Edit, Save, Download, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { PDFDocument } from "pdf-lib";
-import * as pdfjsLib from "pdfjs-dist";
 
-// Configurar PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+// Fallback se PDF.js não estiver disponível
+const loadPDFJS = async () => {
+  try {
+    const pdfjsLib = await import("pdfjs-dist");
+    // Configurar worker se disponível
+    if (typeof window !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+    return pdfjsLib;
+  } catch (error) {
+    console.warn("PDF.js não disponível, usando fallback");
+    return null;
+  }
+};
 
 interface Document {
   id: string;
@@ -35,7 +46,7 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
   const [pdfDoc, setPdfDoc] = useState<PDFDocument | null>(null);
   const [pdfPages, setPdfPages] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [activeTool, setActiveTool] = useState<"select" | "text" | "draw">("select");
   const [textColor, setTextColor] = useState("#000000");
   const [textSize, setTextSize] = useState(16);
@@ -44,50 +55,87 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
   const [fileName, setFileName] = useState(document.file_name);
   const [loading, setLoading] = useState(false);
   const [pdfLoaded, setPdfLoaded] = useState(false);
+  const [canvasInitialized, setCanvasInitialized] = useState(false);
   const { toast } = useToast();
+
+  // Inicializar canvas
+  const initializeCanvas = () => {
+    if (!canvasRef.current || canvasInitialized) return;
+
+    try {
+      const canvas = new FabricCanvas(canvasRef.current, {
+        width: 800,
+        height: 600,
+        backgroundColor: "#ffffff",
+        selection: true,
+        preserveObjectStacking: true,
+      });
+
+      // Configurar brush para desenho
+      canvas.isDrawingMode = false;
+      if (canvas.freeDrawingBrush) {
+        canvas.freeDrawingBrush.color = drawColor;
+        canvas.freeDrawingBrush.width = drawWidth;
+        
+        // Configurar shadow se disponível
+        try {
+          canvas.freeDrawingBrush.shadow = new fabric.Shadow({
+            blur: 0,
+            offsetX: 0,
+            offsetY: 0,
+          });
+        } catch (e) {
+          // Shadow não suportado nesta versão
+        }
+      }
+
+      setFabricCanvas(canvas);
+      setCanvasInitialized(true);
+    } catch (error) {
+      console.error("Erro ao inicializar canvas:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao inicializar editor",
+        variant: "destructive",
+      });
+    }
+  };
 
   useEffect(() => {
     loadPDF();
   }, []);
 
   useEffect(() => {
-    if (!canvasRef.current || fabricCanvas) return;
-
-    const canvas = new FabricCanvas(canvasRef.current, {
-      width: 800,
-      height: 600,
-      backgroundColor: "#ffffff",
-      selection: true,
-      preserveObjectStacking: true,
-    });
-
-    // Configurar brush para desenho
-    canvas.isDrawingMode = false;
-    canvas.freeDrawingBrush.color = drawColor;
-    canvas.freeDrawingBrush.width = drawWidth;
-    canvas.freeDrawingBrush.shadow = new fabric.Shadow({
-      blur: 0,
-      offsetX: 0,
-      offsetY: 0,
-    });
-
-    setFabricCanvas(canvas);
+    if (!canvasRef.current) return;
+    
+    const timer = setTimeout(() => {
+      initializeCanvas();
+    }, 100);
 
     return () => {
-      if (canvas && !canvas.disposed) {
-        canvas.dispose();
+      clearTimeout(timer);
+      if (fabricCanvas && !fabricCanvas.disposed) {
+        try {
+          fabricCanvas.dispose();
+        } catch (e) {
+          console.warn("Erro ao fazer dispose do canvas:", e);
+        }
       }
     };
   }, [canvasRef.current]);
 
   useEffect(() => {
-    if (!fabricCanvas) return;
+    if (!fabricCanvas || fabricCanvas.disposed) return;
 
-    fabricCanvas.isDrawingMode = activeTool === "draw";
-    
-    if (activeTool === "draw" && fabricCanvas.freeDrawingBrush) {
-      fabricCanvas.freeDrawingBrush.color = drawColor;
-      fabricCanvas.freeDrawingBrush.width = drawWidth;
+    try {
+      fabricCanvas.isDrawingMode = activeTool === "draw";
+      
+      if (activeTool === "draw" && fabricCanvas.freeDrawingBrush) {
+        fabricCanvas.freeDrawingBrush.color = drawColor;
+        fabricCanvas.freeDrawingBrush.width = drawWidth;
+      }
+    } catch (error) {
+      console.warn("Erro ao configurar ferramenta:", error);
     }
   }, [activeTool, drawColor, drawWidth, fabricCanvas]);
 
@@ -106,23 +154,34 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
       // Carregar com pdf-lib para edição
       const pdfDocument = await PDFDocument.load(arrayBuffer);
       setPdfDoc(pdfDocument);
+      setTotalPages(pdfDocument.getPageCount());
       
-      // Carregar com PDF.js para renderização
-      const loadingTask = pdfjsLib.getDocument(arrayBuffer);
-      const pdfDoc2 = await loadingTask.promise;
-      
-      const pages = [];
-      for (let i = 1; i <= pdfDoc2.numPages; i++) {
-        const page = await pdfDoc2.getPage(i);
-        pages.push(page);
+      // Tentar carregar com PDF.js para renderização
+      const pdfjsLib = await loadPDFJS();
+      if (pdfjsLib) {
+        try {
+          const loadingTask = pdfjsLib.getDocument(arrayBuffer);
+          const pdfDoc2 = await loadingTask.promise;
+          
+          const pages = [];
+          for (let i = 1; i <= pdfDoc2.numPages; i++) {
+            const page = await pdfDoc2.getPage(i);
+            pages.push(page);
+          }
+          
+          setPdfPages(pages);
+          setTotalPages(pdfDoc2.numPages);
+        } catch (pdfError) {
+          console.warn("Erro ao renderizar PDF com PDF.js:", pdfError);
+        }
       }
       
-      setPdfPages(pages);
-      setTotalPages(pdfDoc2.numPages);
       setPdfLoaded(true);
       
       // Carregar primeira página
-      await loadPage(0, pages);
+      setTimeout(() => {
+        loadPage(0);
+      }, 200);
       
     } catch (error) {
       console.error("Error loading PDF:", error);
@@ -136,54 +195,68 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
     }
   };
 
-  const loadPage = async (pageIndex: number, pages?: any[]) => {
-    const pdfPagesArray = pages || pdfPages;
-    if (!pdfPagesArray.length || !fabricCanvas || pageIndex >= pdfPagesArray.length) return;
+  const loadPage = async (pageIndex: number) => {
+    if (!fabricCanvas || fabricCanvas.disposed) return;
 
     try {
-      const page = pdfPagesArray[pageIndex];
-      
-      // Configurar viewport e escala
-      const viewport = page.getViewport({ scale: 1.5 });
-      
-      // Criar canvas temporário para renderizar o PDF
-      const tempCanvas = document.createElement('canvas');
-      const tempContext = tempCanvas.getContext('2d');
-      
-      if (!tempContext) return;
-      
-      tempCanvas.width = viewport.width;
-      tempCanvas.height = viewport.height;
-
-      // Renderizar página do PDF
-      await page.render({
-        canvasContext: tempContext,
-        viewport: viewport
-      }).promise;
-
-      // Redimensionar fabric canvas para coincidir
-      fabricCanvas.setWidth(viewport.width);
-      fabricCanvas.setHeight(viewport.height);
-
-      // Limpar canvas atual (manter apenas objetos não-PDF)
+      // Limpar objetos não-PDF
       const objects = fabricCanvas.getObjects();
       const nonPdfObjects = objects.filter(obj => !obj.get('isPdfBackground'));
       fabricCanvas.clear();
 
-      // Criar imagem do PDF como fundo
-      const pdfImage = new FabricImage(tempCanvas, {
-        left: 0,
-        top: 0,
-        selectable: false,
-        evented: false,
-        isPdfBackground: true, // marca customizada
-      });
+      if (pdfPages.length > 0 && pageIndex < pdfPages.length) {
+        // Renderizar com PDF.js se disponível
+        const page = pdfPages[pageIndex];
+        const viewport = page.getViewport({ scale: 1.2 });
+        
+        // Criar canvas temporário
+        const tempCanvas = window.document.createElement('canvas');
+        const tempContext = tempCanvas.getContext('2d');
+        
+        if (tempContext) {
+          tempCanvas.width = viewport.width;
+          tempCanvas.height = viewport.height;
 
-      fabricCanvas.add(pdfImage);
+          await page.render({
+            canvasContext: tempContext,
+            viewport: viewport
+          }).promise;
+
+          // Redimensionar fabric canvas
+          fabricCanvas.setWidth(viewport.width);
+          fabricCanvas.setHeight(viewport.height);
+
+          // Adicionar como imagem de fundo
+          const pdfImage = new FabricImage(tempCanvas, {
+            left: 0,
+            top: 0,
+            selectable: false,
+            evented: false,
+            isPdfBackground: true,
+          });
+
+          fabricCanvas.add(pdfImage);
+        }
+      } else {
+        // Fallback - mostrar placeholder
+        fabricCanvas.setWidth(800);
+        fabricCanvas.setHeight(600);
+        
+        const placeholderText = new FabricText(`PDF Página ${pageIndex + 1}`, {
+          left: 50,
+          top: 50,
+          fontSize: 24,
+          fill: "#666666",
+          selectable: false,
+          evented: false,
+          isPdfBackground: true,
+        });
+        
+        fabricCanvas.add(placeholderText);
+      }
       
-      // Re-adicionar objetos não-PDF (textos, desenhos do usuário)
+      // Re-adicionar objetos do usuário
       nonPdfObjects.forEach(obj => fabricCanvas.add(obj));
-      
       fabricCanvas.renderAll();
       setCurrentPage(pageIndex);
       
@@ -198,62 +271,72 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
   };
 
   const addText = () => {
-    if (!fabricCanvas) return;
+    if (!fabricCanvas || fabricCanvas.disposed) return;
 
-    const text = new FabricText("Clique para editar", {
-      left: 100,
-      top: 100,
-      fontSize: textSize,
-      fill: textColor,
-      fontFamily: 'Arial',
-      editable: true,
-    });
+    try {
+      const text = new FabricText("Clique para editar", {
+        left: 100,
+        top: 100,
+        fontSize: textSize,
+        fill: textColor,
+        fontFamily: 'Arial',
+        editable: true,
+      });
 
-    fabricCanvas.add(text);
-    fabricCanvas.setActiveObject(text);
-    
-    // Entrar em modo de edição automaticamente
-    text.enterEditing();
-    text.selectAll();
-    
-    fabricCanvas.renderAll();
+      fabricCanvas.add(text);
+      fabricCanvas.setActiveObject(text);
+      
+      // Tentar entrar em modo de edição (compatibilidade com diferentes versões)
+      setTimeout(() => {
+        try {
+          const activeObj = fabricCanvas.getActiveObject() as any;
+          if (activeObj && typeof activeObj.enterEditing === 'function') {
+            activeObj.enterEditing();
+            if (typeof activeObj.selectAll === 'function') {
+              activeObj.selectAll();
+            }
+          }
+        } catch (e) {
+          console.log("Modo de edição automática não suportado");
+        }
+      }, 100);
+      
+      fabricCanvas.renderAll();
+    } catch (error) {
+      console.error("Erro ao adicionar texto:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao adicionar texto",
+        variant: "destructive",
+      });
+    }
   };
 
   const clearAnnotations = () => {
-    if (!fabricCanvas) return;
+    if (!fabricCanvas || fabricCanvas.disposed) return;
     
-    // Remover apenas objetos que não são o fundo do PDF
-    const objects = fabricCanvas.getObjects();
-    const pdfBackground = objects.find(obj => obj.get('isPdfBackground'));
-    
-    fabricCanvas.clear();
-    
-    // Re-adicionar apenas o fundo do PDF
-    if (pdfBackground) {
-      fabricCanvas.add(pdfBackground);
+    try {
+      const objects = fabricCanvas.getObjects();
+      const pdfBackground = objects.find(obj => obj.get('isPdfBackground'));
+      
+      fabricCanvas.clear();
+      
+      if (pdfBackground) {
+        fabricCanvas.add(pdfBackground);
+      }
+      
+      fabricCanvas.renderAll();
+    } catch (error) {
+      console.error("Erro ao limpar anotações:", error);
     }
-    
-    fabricCanvas.renderAll();
   };
 
   const savePDF = async () => {
-    if (!fabricCanvas || !pdfDoc) return;
+    if (!fabricCanvas || !pdfDoc || fabricCanvas.disposed) return;
 
     setLoading(true);
     try {
-      // Obter dados do canvas (anotações)
-      const canvasDataURL = fabricCanvas.toDataURL({
-        format: 'png',
-        quality: 1,
-        multiplier: 2, // Alta resolução
-        left: 0,
-        top: 0,
-        width: fabricCanvas.width,
-        height: fabricCanvas.height,
-      });
-
-      // Em uma implementação real, você converteria as anotações para o PDF
-      // Por enquanto, apenas atualizaremos o nome do arquivo
+      // Salvar metadados
       const { error } = await supabase
         .from("client_documents")
         .update({ 
@@ -283,16 +366,22 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
   };
 
   const downloadPDF = async () => {
-    if (!pdfDoc || !fabricCanvas) return;
+    if (!fabricCanvas || fabricCanvas.disposed) return;
 
     try {
-      // Para um download simples, vamos baixar o canvas como imagem
-      const link = document.createElement('a');
+      const link = window.document.createElement('a');
       link.download = `${fileName}_anotado.png`;
-      link.href = fabricCanvas.toDataURL('image/png');
-      document.body.appendChild(link);
+      
+      const dataURL = fabricCanvas.toDataURL({
+        format: 'png',
+        quality: 1,
+        multiplier: 2
+      });
+      
+      link.href = dataURL;
+      window.document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      window.document.body.removeChild(link);
 
       toast({
         title: "Sucesso",
@@ -339,6 +428,7 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
               size="sm"
               variant={activeTool === "select" ? "default" : "outline"}
               onClick={() => setActiveTool("select")}
+              disabled={!canvasInitialized}
             >
               Selecionar
             </Button>
@@ -346,6 +436,7 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
               size="sm"
               variant={activeTool === "text" ? "default" : "outline"}
               onClick={() => setActiveTool("text")}
+              disabled={!canvasInitialized}
             >
               <Type className="h-4 w-4 mr-1" />
               Texto
@@ -354,6 +445,7 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
               size="sm"
               variant={activeTool === "draw" ? "default" : "outline"}
               onClick={() => setActiveTool("draw")}
+              disabled={!canvasInitialized}
             >
               <Edit className="h-4 w-4 mr-1" />
               Desenhar
@@ -362,13 +454,27 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
         </div>
 
         <div className="flex items-center space-x-2">
-          <Button size="sm" variant="outline" onClick={clearAnnotations}>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={clearAnnotations}
+            disabled={!canvasInitialized}
+          >
             <Trash2 className="h-4 w-4" />
           </Button>
-          <Button size="sm" variant="outline" onClick={downloadPDF}>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={downloadPDF}
+            disabled={!canvasInitialized}
+          >
             <Download className="h-4 w-4" />
           </Button>
-          <Button size="sm" onClick={savePDF} disabled={loading}>
+          <Button 
+            size="sm" 
+            onClick={savePDF} 
+            disabled={loading || !canvasInitialized}
+          >
             <Save className="h-4 w-4 mr-1" />
             {loading ? "Salvando..." : "Salvar"}
           </Button>
@@ -409,7 +515,11 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
                     onChange={(e) => setTextColor(e.target.value)}
                   />
                 </div>
-                <Button onClick={addText} className="w-full">
+                <Button 
+                  onClick={addText} 
+                  className="w-full"
+                  disabled={!canvasInitialized}
+                >
                   Adicionar Texto
                 </Button>
               </>
@@ -441,6 +551,9 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
                     onChange={(e) => setDrawColor(e.target.value)}
                   />
                 </div>
+                <div className="text-sm text-gray-600">
+                  <p>Clique e arraste no PDF para desenhar</p>
+                </div>
               </>
             )}
 
@@ -448,6 +561,7 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
               <div className="text-sm text-gray-600">
                 <p>Modo seleção ativo.</p>
                 <p>Clique nos elementos para selecioná-los e editá-los.</p>
+                <p>Use duplo-clique para editar texto.</p>
               </div>
             )}
           </CardContent>
@@ -461,7 +575,7 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
               <Button
                 size="sm"
                 variant="outline"
-                disabled={currentPage === 0 || loading}
+                disabled={currentPage === 0 || loading || !canvasInitialized}
                 onClick={() => loadPage(currentPage - 1)}
               >
                 Anterior
@@ -472,7 +586,7 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
               <Button
                 size="sm"
                 variant="outline"
-                disabled={currentPage === totalPages - 1 || loading}
+                disabled={currentPage === totalPages - 1 || loading || !canvasInitialized}
                 onClick={() => loadPage(currentPage + 1)}
               >
                 Próxima
@@ -480,6 +594,13 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
             </div>
 
             <Separator className="mb-4" />
+
+            {/* Status */}
+            {!canvasInitialized && (
+              <div className="text-center text-sm text-gray-500 mb-4">
+                Inicializando editor...
+              </div>
+            )}
 
             {/* Canvas */}
             <div className="border border-gray-200 rounded-lg overflow-auto bg-gray-50 p-4">

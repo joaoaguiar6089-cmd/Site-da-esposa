@@ -1,4 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { Canvas as FabricCanvas, FabricText } from "fabric";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Type, Edit, Save, Download, Trash2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { PDFDocument } from "pdf-lib";
 
 interface Document {
   id: string;
@@ -17,9 +28,10 @@ interface PDFEditorProps {
 const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [context, setContext] = useState<CanvasRenderingContext2D | null>(null);
+  const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
+  const [pdfDoc, setPdfDoc] = useState<PDFDocument | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
   const [activeTool, setActiveTool] = useState<"select" | "text" | "draw">("select");
   const [textColor, setTextColor] = useState("#000000");
   const [textSize, setTextSize] = useState(16);
@@ -27,24 +39,8 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
   const [drawWidth, setDrawWidth] = useState(2);
   const [fileName, setFileName] = useState(document.file_name);
   const [loading, setLoading] = useState(false);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [textObjects, setTextObjects] = useState<Array<{
-    id: string;
-    text: string;
-    x: number;
-    y: number;
-    fontSize: number;
-    color: string;
-  }>>([]);
-  const [editingTextId, setEditingTextId] = useState<string | null>(null);
-  const [textInput, setTextInput] = useState("");
-  const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
-
-  // Função para mostrar toast
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    setToast({message, type});
-    setTimeout(() => setToast(null), 3000);
-  };
+  const [canvasInitialized, setCanvasInitialized] = useState(false);
+  const { toast } = useToast();
 
   // Função para calcular dimensões responsivas do canvas
   const getCanvasDimensions = useCallback(() => {
@@ -60,430 +56,436 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
     };
   }, []);
 
-  // Inicialização do canvas
+  // Inicialização do canvas com cleanup adequado
   const initializeCanvas = useCallback(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || canvasInitialized) return;
 
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    try {
+      // Garantir que qualquer canvas anterior seja limpo
+      if (fabricCanvas) {
+        fabricCanvas.dispose();
+        setFabricCanvas(null);
+      }
 
-    const dimensions = getCanvasDimensions();
-    canvas.width = dimensions.width;
-    canvas.height = dimensions.height;
+      const dimensions = getCanvasDimensions();
+      const canvas = new FabricCanvas(canvasRef.current, {
+        width: dimensions.width,
+        height: dimensions.height,
+        backgroundColor: "#ffffff",
+        selection: true,
+        preserveObjectStacking: true
+      });
 
-    // Configurar canvas
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    setContext(ctx);
-  }, [getCanvasDimensions]);
+      // Configurar brush para desenho
+      canvas.isDrawingMode = false;
+      if (canvas.freeDrawingBrush) {
+        canvas.freeDrawingBrush.color = drawColor;
+        canvas.freeDrawingBrush.width = drawWidth;
+      }
 
-  // Efeito para inicializar canvas
+      setFabricCanvas(canvas);
+      setCanvasInitialized(true);
+    } catch (error) {
+      console.error("Erro ao inicializar canvas:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao inicializar editor. Tente recarregar a página.",
+        variant: "destructive",
+      });
+    }
+  }, [canvasInitialized, fabricCanvas, drawColor, drawWidth, getCanvasDimensions, toast]);
+
+  // Cleanup do canvas
+  const cleanupCanvas = useCallback(() => {
+    if (fabricCanvas && !fabricCanvas.disposed) {
+      try {
+        fabricCanvas.dispose();
+      } catch (error) {
+        console.error("Erro ao fazer cleanup do canvas:", error);
+      }
+    }
+    setFabricCanvas(null);
+    setCanvasInitialized(false);
+  }, [fabricCanvas]);
+
+  // Efeito para carregar PDF
+  useEffect(() => {
+    loadPDF();
+  }, []);
+
+  // Efeito para inicializar canvas após o DOM estar pronto
   useEffect(() => {
     const timer = setTimeout(() => {
       initializeCanvas();
     }, 100);
 
-    return () => clearTimeout(timer);
-  }, [initializeCanvas]);
+    return () => {
+      clearTimeout(timer);
+      cleanupCanvas();
+    };
+  }, []);
 
-  // Redraw canvas
-  const redrawCanvas = useCallback(() => {
-    if (!context || !canvasRef.current) return;
-
-    const canvas = canvasRef.current;
-    
-    // Limpar canvas
-    context.fillStyle = '#ffffff';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Desenhar texto de página
-    context.fillStyle = '#666666';
-    context.font = '20px Arial';
-    context.fillText(`PDF Página ${currentPage + 1}`, 50, 50);
-
-    // Desenhar textos adicionados
-    textObjects.forEach(textObj => {
-      context.fillStyle = textObj.color;
-      context.font = `${textObj.fontSize}px Arial`;
-      context.fillText(textObj.text, textObj.x, textObj.y);
-    });
-  }, [context, currentPage, textObjects]);
-
-  // Efeito para redraw quando textObjects mudam
+  // Efeito para atualizar configurações do canvas
   useEffect(() => {
-    redrawCanvas();
-  }, [redrawCanvas]);
+    if (!fabricCanvas || fabricCanvas.disposed) return;
 
-  // Handlers para desenho
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (activeTool !== "draw" || !context || !canvasRef.current) return;
+    try {
+      fabricCanvas.isDrawingMode = activeTool === "draw";
+      
+      if (activeTool === "draw" && fabricCanvas.freeDrawingBrush) {
+        fabricCanvas.freeDrawingBrush.color = drawColor;
+        fabricCanvas.freeDrawingBrush.width = drawWidth;
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar configurações do canvas:", error);
+    }
+  }, [activeTool, drawColor, drawWidth, fabricCanvas]);
 
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+  // Efeito para redimensionar canvas em dispositivos móveis
+  useEffect(() => {
+    const handleResize = () => {
+      if (!fabricCanvas || fabricCanvas.disposed) return;
+      
+      try {
+        const dimensions = getCanvasDimensions();
+        fabricCanvas.setWidth(dimensions.width);
+        fabricCanvas.setHeight(dimensions.height);
+        fabricCanvas.renderAll();
+      } catch (error) {
+        console.error("Erro ao redimensionar canvas:", error);
+      }
+    };
 
-    setIsDrawing(true);
-    context.beginPath();
-    context.moveTo(x, y);
-    context.strokeStyle = drawColor;
-    context.lineWidth = drawWidth;
-    context.lineCap = 'round';
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [fabricCanvas, getCanvasDimensions]);
+
+  const loadPDF = async () => {
+    try {
+      const { data, error } = await supabase.storage
+        .from("client-documents")
+        .download(document.file_path);
+
+      if (error) throw error;
+
+      const arrayBuffer = await data.arrayBuffer();
+      const pdfDocument = await PDFDocument.load(arrayBuffer);
+      
+      setPdfDoc(pdfDocument);
+      setTotalPages(pdfDocument.getPageCount());
+      
+      // Aguardar canvas estar pronto antes de carregar página
+      setTimeout(() => {
+        loadPage(0, pdfDocument);
+      }, 200);
+    } catch (error) {
+      console.error("Error loading PDF:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar PDF",
+        variant: "destructive",
+      });
+    }
   };
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || activeTool !== "draw" || !context || !canvasRef.current) return;
+  const loadPage = async (pageIndex: number, doc?: PDFDocument) => {
+    const pdfDocument = doc || pdfDoc;
+    if (!pdfDocument || !fabricCanvas || fabricCanvas.disposed) return;
 
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    try {
+      // Limpar canvas de forma segura
+      fabricCanvas.clear();
+      fabricCanvas.backgroundColor = "#ffffff";
 
-    context.lineTo(x, y);
-    context.stroke();
+      // Placeholder para a página do PDF
+      const pageText = new FabricText(`PDF Página ${pageIndex + 1}`, {
+        left: 50,
+        top: 50,
+        fontSize: Math.min(20, textSize),
+        fill: "#666666",
+        selectable: false,
+      });
+      
+      fabricCanvas.add(pageText);
+      fabricCanvas.renderAll();
+      setCurrentPage(pageIndex);
+    } catch (error) {
+      console.error("Error loading page:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar página",
+        variant: "destructive",
+      });
+    }
   };
 
-  const stopDrawing = () => {
-    setIsDrawing(false);
-  };
-
-  // Handler para adicionar texto
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (activeTool !== "text" || !canvasRef.current) return;
-
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const newTextId = Date.now().toString();
-    setTextObjects(prev => [...prev, {
-      id: newTextId,
-      text: "Clique para editar",
-      x,
-      y,
-      fontSize: textSize,
-      color: textColor
-    }]);
-    
-    setEditingTextId(newTextId);
-    setTextInput("Clique para editar");
-  };
-
-  // Adicionar texto programaticamente
   const addText = () => {
-    const newTextId = Date.now().toString();
-    setTextObjects(prev => [...prev, {
-      id: newTextId,
-      text: "Novo texto",
-      x: 100,
-      y: 100,
-      fontSize: textSize,
-      color: textColor
-    }]);
-    
-    setEditingTextId(newTextId);
-    setTextInput("Novo texto");
-  };
+    if (!fabricCanvas || fabricCanvas.disposed) return;
 
-  // Salvar texto editado
-  const saveEditingText = () => {
-    if (!editingTextId) return;
+    try {
+      const text = new FabricText("Clique para editar", {
+        left: 100,
+        top: 100,
+        fontSize: textSize,
+        fill: textColor,
+        editable: true
+      });
 
-    setTextObjects(prev => prev.map(textObj => 
-      textObj.id === editingTextId 
-        ? { ...textObj, text: textInput }
-        : textObj
-    ));
-
-    setEditingTextId(null);
-    setTextInput("");
-  };
-
-  // Cancelar edição de texto
-  const cancelEditingText = () => {
-    setEditingTextId(null);
-    setTextInput("");
+      fabricCanvas.add(text);
+      fabricCanvas.setActiveObject(text);
+      fabricCanvas.renderAll();
+    } catch (error) {
+      console.error("Erro ao adicionar texto:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao adicionar texto",
+        variant: "destructive",
+      });
+    }
   };
 
   const clearCanvas = () => {
-    setTextObjects([]);
-    redrawCanvas();
-  };
-
-  const loadPage = (pageIndex: number) => {
-    setCurrentPage(pageIndex);
-    // Limpar objetos da página anterior
-    setTextObjects([]);
+    if (!fabricCanvas || fabricCanvas.disposed) return;
+    
+    try {
+      fabricCanvas.clear();
+      fabricCanvas.backgroundColor = "#ffffff";
+      fabricCanvas.renderAll();
+    } catch (error) {
+      console.error("Erro ao limpar canvas:", error);
+    }
   };
 
   const savePDF = async () => {
+    if (!fabricCanvas || !pdfDoc || fabricCanvas.disposed) return;
+
     setLoading(true);
     try {
-      // Simular salvamento
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      showToast("Documento salvo com sucesso", "success");
+      // Convert canvas to image data
+      const dataURL = fabricCanvas.toDataURL({
+        format: 'png',
+        quality: 1,
+        multiplier: 1
+      });
+
+      // Atualizar nome do documento
+      const { error } = await supabase
+        .from("client_documents")
+        .update({ file_name: fileName })
+        .eq("id", document.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Documento salvo com sucesso",
+      });
+
       onSave();
     } catch (error) {
-      console.error("Erro ao salvar:", error);
-      showToast("Erro ao salvar documento", "error");
+      console.error("Error saving PDF:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar documento",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const downloadPDF = async () => {
+    if (!pdfDoc) return;
+
     try {
-      // Simular download
-      if (!canvasRef.current) return;
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
       
-      const link = document.createElement('a');
-      link.download = `${fileName}.png`;
-      link.href = canvasRef.current.toDataURL();
-      link.click();
-      
-      showToast("Download iniciado", "success");
+      const a = window.document.createElement('a');
+      a.href = url;
+      a.download = `${fileName}.pdf`;
+      window.document.body.appendChild(a);
+      a.click();
+      window.document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Erro ao fazer download:", error);
-      showToast("Erro ao fazer download", "error");
+      console.error("Error downloading PDF:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao baixar PDF",
+        variant: "destructive",
+      });
     }
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4 p-4 max-w-7xl mx-auto">
-      {/* Toast */}
-      {toast && (
-        <div className={`fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
-          toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-        }`}>
-          {toast.message}
-        </div>
-      )}
-
-      {/* Editor de texto modal */}
-      {editingTextId && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
-          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Editar Texto</h3>
-            <input
-              type="text"
-              value={textInput}
-              onChange={(e) => setTextInput(e.target.value)}
-              className="w-full p-2 border rounded mb-4"
-              placeholder="Digite o texto"
-              autoFocus
-            />
-            <div className="flex justify-end space-x-2">
-              <button
-                onClick={cancelEditingText}
-                className="px-4 py-2 text-gray-600 border rounded hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={saveEditingText}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-              >
-                Salvar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+    <div className="flex flex-col h-full space-y-4">
       {/* Toolbar - Responsivo */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between p-4 border-b bg-white rounded-lg shadow-sm space-y-4 md:space-y-0">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between p-4 border-b space-y-4 md:space-y-0">
         <div className="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-4">
           <div className="flex-1 md:flex-none">
-            <label htmlFor="fileName" className="block text-sm font-medium mb-1">Nome do Arquivo</label>
-            <input
+            <Label htmlFor="fileName" className="text-sm">Nome do Arquivo</Label>
+            <Input
               id="fileName"
-              type="text"
               value={fileName}
               onChange={(e) => setFileName(e.target.value)}
-              className="w-full md:w-48 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full md:w-48"
             />
           </div>
           
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              className={`px-3 py-2 rounded text-sm ${
-                activeTool === "select" 
-                  ? "bg-blue-500 text-white" 
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
+            <Button
+              size="sm"
+              variant={activeTool === "select" ? "default" : "outline"}
               onClick={() => setActiveTool("select")}
             >
               Selecionar
-            </button>
-            <button
-              className={`px-3 py-2 rounded text-sm flex items-center ${
-                activeTool === "text" 
-                  ? "bg-blue-500 text-white" 
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
+            </Button>
+            <Button
+              size="sm"
+              variant={activeTool === "text" ? "default" : "outline"}
               onClick={() => setActiveTool("text")}
             >
-              <span className="mr-1">T</span>
+              <Type className="h-4 w-4 mr-1" />
               Texto
-            </button>
-            <button
-              className={`px-3 py-2 rounded text-sm flex items-center ${
-                activeTool === "draw" 
-                  ? "bg-blue-500 text-white" 
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
+            </Button>
+            <Button
+              size="sm"
+              variant={activeTool === "draw" ? "default" : "outline"}
               onClick={() => setActiveTool("draw")}
             >
-              <span className="mr-1">✏️</span>
+              <Edit className="h-4 w-4 mr-1" />
               Desenhar
-            </button>
+            </Button>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button 
-            className="px-3 py-2 border rounded text-sm hover:bg-gray-50"
-            onClick={clearCanvas}
-          >
-            🗑️
-          </button>
-          <button 
-            className="px-3 py-2 border rounded text-sm hover:bg-gray-50"
-            onClick={downloadPDF}
-          >
-            ⬇️
-          </button>
-          <button 
-            className="px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:opacity-50"
-            onClick={savePDF} 
-            disabled={loading}
-          >
-            {loading ? "Salvando..." : "💾 Salvar"}
-          </button>
-          <button 
-            className="px-3 py-2 border rounded text-sm hover:bg-gray-50"
-            onClick={onCancel}
-          >
+          <Button size="sm" variant="outline" onClick={clearCanvas}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          <Button size="sm" variant="outline" onClick={downloadPDF}>
+            <Download className="h-4 w-4" />
+          </Button>
+          <Button size="sm" onClick={savePDF} disabled={loading}>
+            <Save className="h-4 w-4 mr-1" />
+            Salvar
+          </Button>
+          <Button size="sm" variant="outline" onClick={onCancel}>
             Cancelar
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className="flex flex-col lg:flex-row flex-1 space-y-4 lg:space-y-0 lg:space-x-4">
         {/* Tools Panel - Responsivo */}
-        <div className="w-full lg:w-64 order-2 lg:order-1">
-          <div className="bg-white rounded-lg shadow-sm p-4 space-y-4">
+        <Card className="w-full lg:w-64 order-2 lg:order-1">
+          <CardContent className="p-4 space-y-4">
             {activeTool === "text" && (
               <>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Tamanho da Fonte</label>
-                  <select 
-                    value={textSize} 
-                    onChange={(e) => setTextSize(parseInt(e.target.value))}
-                    className="w-full p-2 border rounded"
-                  >
-                    <option value={12}>12px</option>
-                    <option value={14}>14px</option>
-                    <option value={16}>16px</option>
-                    <option value={18}>18px</option>
-                    <option value={20}>20px</option>
-                    <option value={24}>24px</option>
-                    <option value={32}>32px</option>
-                  </select>
+                  <Label>Tamanho da Fonte</Label>
+                  <Select value={textSize.toString()} onValueChange={(value) => setTextSize(parseInt(value))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="12">12px</SelectItem>
+                      <SelectItem value="14">14px</SelectItem>
+                      <SelectItem value="16">16px</SelectItem>
+                      <SelectItem value="18">18px</SelectItem>
+                      <SelectItem value="20">20px</SelectItem>
+                      <SelectItem value="24">24px</SelectItem>
+                      <SelectItem value="32">32px</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Cor do Texto</label>
-                  <input
+                  <Label>Cor do Texto</Label>
+                  <Input
                     type="color"
                     value={textColor}
                     onChange={(e) => setTextColor(e.target.value)}
-                    className="w-full h-10 border rounded"
                   />
                 </div>
-                <button 
-                  onClick={addText} 
-                  className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
-                >
+                <Button onClick={addText} className="w-full">
                   Adicionar Texto
-                </button>
+                </Button>
               </>
             )}
 
             {activeTool === "draw" && (
               <>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Largura do Traço</label>
-                  <select 
-                    value={drawWidth} 
-                    onChange={(e) => setDrawWidth(parseInt(e.target.value))}
-                    className="w-full p-2 border rounded"
-                  >
-                    <option value={1}>1px</option>
-                    <option value={2}>2px</option>
-                    <option value={3}>3px</option>
-                    <option value={5}>5px</option>
-                    <option value={8}>8px</option>
-                    <option value={12}>12px</option>
-                  </select>
+                  <Label>Largura do Traço</Label>
+                  <Select value={drawWidth.toString()} onValueChange={(value) => setDrawWidth(parseInt(value))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1px</SelectItem>
+                      <SelectItem value="2">2px</SelectItem>
+                      <SelectItem value="3">3px</SelectItem>
+                      <SelectItem value="5">5px</SelectItem>
+                      <SelectItem value="8">8px</SelectItem>
+                      <SelectItem value="12">12px</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Cor do Traço</label>
-                  <input
+                  <Label>Cor do Traço</Label>
+                  <Input
                     type="color"
                     value={drawColor}
                     onChange={(e) => setDrawColor(e.target.value)}
-                    className="w-full h-10 border rounded"
                   />
                 </div>
               </>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Canvas Area - Responsivo */}
-        <div className="flex-1 order-1 lg:order-2">
-          <div className="bg-white rounded-lg shadow-sm p-4" ref={containerRef}>
+        <Card className="flex-1 order-1 lg:order-2">
+          <CardContent className="p-4" ref={containerRef}>
             {/* Page Navigation */}
             <div className="flex items-center justify-between mb-4">
-              <button
-                className="px-3 py-1 border rounded text-sm disabled:opacity-50 hover:bg-gray-50"
+              <Button
+                size="sm"
+                variant="outline"
                 disabled={currentPage === 0}
                 onClick={() => loadPage(currentPage - 1)}
               >
                 Anterior
-              </button>
-              <span className="text-sm text-gray-600">
+              </Button>
+              <span className="text-sm text-muted-foreground">
                 Página {currentPage + 1} de {totalPages}
               </span>
-              <button
-                className="px-3 py-1 border rounded text-sm disabled:opacity-50 hover:bg-gray-50"
+              <Button
+                size="sm"
+                variant="outline"
                 disabled={currentPage === totalPages - 1}
                 onClick={() => loadPage(currentPage + 1)}
               >
                 Próxima
-              </button>
+              </Button>
             </div>
 
-            <hr className="mb-4" />
+            <Separator className="mb-4" />
 
             {/* Canvas Container */}
             <div className="border border-gray-200 rounded-lg overflow-hidden">
               <div className="flex justify-center">
                 <canvas 
                   ref={canvasRef} 
-                  className="max-w-full cursor-crosshair"
+                  className="max-w-full touch-none"
                   style={{ touchAction: 'none' }}
-                  onClick={handleCanvasClick}
-                  onMouseDown={startDrawing}
-                  onMouseMove={draw}
-                  onMouseUp={stopDrawing}
-                  onMouseLeave={stopDrawing}
                 />
               </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

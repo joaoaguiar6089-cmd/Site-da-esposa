@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Canvas as FabricCanvas, FabricText } from "fabric";
+import { Canvas as FabricCanvas, FabricText, FabricImage } from "fabric";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,30 +42,11 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  // Inicializar canvas
   useEffect(() => {
-    console.log("PDF load useEffect triggered", { hasFabricCanvas: !!fabricCanvas, document: document?.file_path });
-    
-    // Load PDF after component mounts
-    if (fabricCanvas) {
-      loadPDF();
-    }
-  }, [fabricCanvas]);
-
-  useEffect(() => {
-    console.log("Canvas useEffect triggered", { hasCanvasRef: !!canvasRef.current, hasFabricCanvas: !!fabricCanvas });
-    
-    if (!canvasRef.current) {
-      console.log("No canvas ref available");
-      return;
-    }
-    
-    if (fabricCanvas) {
-      console.log("Canvas already exists");
-      return;
-    }
+    if (!canvasRef.current) return;
 
     try {
-      console.log("Creating new Fabric canvas");
       const canvas = new FabricCanvas(canvasRef.current, {
         width: window.innerWidth < 768 ? Math.min(350, window.innerWidth - 40) : 800,
         height: window.innerWidth < 768 ? 500 : 600,
@@ -74,17 +55,14 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
 
       canvas.isDrawingMode = false;
       
-      // Initialize freeDrawingBrush safely
       if (canvas.freeDrawingBrush) {
         canvas.freeDrawingBrush.color = drawColor;
         canvas.freeDrawingBrush.width = drawWidth;
       }
 
-      console.log("Canvas created successfully", canvas);
       setFabricCanvas(canvas);
 
       return () => {
-        console.log("Disposing canvas");
         if (canvas) {
           canvas.dispose();
         }
@@ -100,6 +78,14 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
     }
   }, []);
 
+  // Carregar PDF quando canvas estiver pronto
+  useEffect(() => {
+    if (fabricCanvas) {
+      loadPDF();
+    }
+  }, [fabricCanvas]);
+
+  // Configurar modo de desenho
   useEffect(() => {
     if (!fabricCanvas) return;
 
@@ -111,21 +97,12 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
     }
   }, [activeTool, drawColor, drawWidth, fabricCanvas]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (fabricCanvas) {
-        fabricCanvas.dispose();
-        setFabricCanvas(null);
-      }
-    };
-  }, [fabricCanvas]);
-
   const loadPDF = async () => {
     console.log("Starting loadPDF", { documentPath: document.file_path });
     
     try {
-      console.log("Downloading PDF from storage...");
+      setLoading(true);
+      
       const { data, error } = await supabase.storage
         .from("client-documents")
         .download(document.file_path);
@@ -135,25 +112,14 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
         throw error;
       }
 
-      console.log("PDF downloaded successfully, size:", data.size, "bytes");
-      
-      // Convert to array buffer
       const arrayBuffer = await data.arrayBuffer();
-      console.log("ArrayBuffer created, size:", arrayBuffer.byteLength);
-      
-      // Load PDF document
-      console.log("Loading PDF with pdf-lib...");
       const pdfDocument = await PDFDocument.load(arrayBuffer);
-      console.log("PDF loaded successfully, pages:", pdfDocument.getPageCount());
       
       setPdfDoc(pdfDocument);
       setTotalPages(pdfDocument.getPageCount());
       
-      // Load first page
-      console.log("Loading first page...");
       await loadPage(0, pdfDocument);
       
-      console.log("PDF setup complete, setting loading to false");
       setLoading(false);
     } catch (error) {
       console.error("Error in loadPDF:", error);
@@ -167,27 +133,15 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
   };
 
   const loadPage = async (pageIndex: number, doc?: PDFDocument) => {
-    console.log("Starting loadPage", { pageIndex, hasPdfDoc: !!(doc || pdfDoc), hasFabricCanvas: !!fabricCanvas });
-    
     const pdfDocument = doc || pdfDoc;
-    if (!pdfDocument) {
-      console.log("No PDF document available");
-      return;
-    }
-    
-    if (!fabricCanvas) {
-      console.log("No fabric canvas available");
-      return;
-    }
+    if (!pdfDocument || !fabricCanvas) return;
 
     try {
-      console.log("Clearing canvas and setting up page...");
-      
-      // Clear canvas
+      setLoading(true);
       fabricCanvas.clear();
       fabricCanvas.backgroundColor = "#ffffff";
 
-      // Show loading indicator
+      // Adicionar texto de carregamento
       const loadingText = new FabricText("Carregando página...", {
         left: fabricCanvas.width / 2 - 100,
         top: fabricCanvas.height / 2 - 10,
@@ -199,56 +153,63 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
       fabricCanvas.add(loadingText);
       fabricCanvas.renderAll();
 
-      console.log("Setting up page content...");
+      // Extrair a página como imagem (solução simplificada)
+      // Em produção, você pode usar pdf.js para renderização mais avançada
+      const page = pdfDocument.getPage(pageIndex);
+      const { width, height } = page.getSize();
       
-      // Render PDF page info for now - in production you'd render the actual PDF
-      setTimeout(() => {
-        if (!fabricCanvas) {
-          console.log("Canvas no longer available in timeout");
-          return;
-        }
-        
-        console.log("Rendering page content...");
-        
-        fabricCanvas.clear();
-        fabricCanvas.backgroundColor = "#ffffff";
+      // Criar uma representação visual da página
+      const pageBackground = new FabricText(`Página ${pageIndex + 1} de ${totalPages}`, {
+        left: 50,
+        top: 50,
+        fontSize: 14,
+        fill: "#333333",
+        selectable: false,
+      });
 
-        const pageText = new FabricText(`Documento: ${document.file_name}`, {
-          left: 50,
-          top: 50,
-          fontSize: 18,
-          fill: "#333333",
-          selectable: false,
-        });
+      const documentName = new FabricText(document.file_name, {
+        left: 50,
+        top: 30,
+        fontSize: 12,
+        fill: "#666666",
+        selectable: false,
+      });
 
-        const pageInfo = new FabricText(`Página ${pageIndex + 1} de ${totalPages}`, {
-          left: 50,
-          top: 80,
-          fontSize: 14,
-          fill: "#666666",  
-          selectable: false,
-        });
+      // Adicionar retângulo representando a página
+      const pageRect = {
+        type: 'rect',
+        left: 50,
+        top: 80,
+        width: width / 4, // Escalar para caber no canvas
+        height: height / 4,
+        fill: '#f8f9fa',
+        stroke: '#dee2e6',
+        strokeWidth: 1,
+        selectable: false
+      };
 
-        const instructions = new FabricText("Use as ferramentas acima para adicionar texto ou desenhar", {
-          left: 50,
-          top: 120,
-          fontSize: 12,
-          fill: "#999999",
-          selectable: false,
-        });
-        
-        fabricCanvas.add(pageText);
-        fabricCanvas.add(pageInfo);
-        fabricCanvas.add(instructions);
-        fabricCanvas.renderAll();
-        
-        console.log("Page rendered successfully");
-      }, 100);
+      fabricCanvas.add(pageBackground);
+      fabricCanvas.add(documentName);
+      fabricCanvas.add(pageRect as any);
+      
+      // Adicionar instruções
+      const instructions = new FabricText("Use as ferramentas para adicionar anotações", {
+        left: 50,
+        top: 80 + height / 4 + 20,
+        fontSize: 12,
+        fill: "#999999",
+        selectable: false,
+      });
+      
+      fabricCanvas.add(instructions);
+      fabricCanvas.renderAll();
       
       setCurrentPage(pageIndex);
-      console.log("Page setup complete");
+      setLoading(false);
+      
     } catch (error) {
       console.error("Error in loadPage:", error);
+      setLoading(false);
       toast({
         title: "Erro",
         description: "Erro ao carregar página",
@@ -262,20 +223,32 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
 
     const text = new FabricText("Clique para editar", {
       left: 100,
-      top: 100,
+      top: 150,
       fontSize: textSize,
       fill: textColor,
     });
 
     fabricCanvas.add(text);
     fabricCanvas.setActiveObject(text);
+    
+    // Habilitar edição imediata
+    text.enterEditing();
     fabricCanvas.renderAll();
   };
 
   const clearCanvas = () => {
     if (!fabricCanvas) return;
+    
+    // Manter apenas os objetos de fundo (página e instruções)
+    const objectsToKeep = fabricCanvas.getObjects().filter(obj => 
+      (obj as FabricText).text?.includes("Página") || 
+      (obj as FabricText).text?.includes(document.file_name) ||
+      (obj as FabricText).text?.includes("Use as ferramentas") ||
+      obj.type === 'rect'
+    );
+    
     fabricCanvas.clear();
-    fabricCanvas.backgroundColor = "#ffffff";
+    objectsToKeep.forEach(obj => fabricCanvas.add(obj));
     fabricCanvas.renderAll();
   };
 
@@ -284,22 +257,16 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
 
     setLoading(true);
     try {
-      // Convert canvas to image data
-      const dataURL = fabricCanvas.toDataURL({
-        format: 'png',
-        quality: 1,
-        multiplier: 1
-      });
-
-      // In a real implementation, you would:
-      // 1. Convert the canvas overlay to PDF annotations
-      // 2. Merge with the original PDF
-      // 3. Save the new PDF
-
-      // For now, we'll update the document name and show success
+      // Para uma implementação real, você precisaria:
+      // 1. Salvar as anotações como overlays no PDF
+      // 2. Fazer upload do PDF modificado para o Supabase
+      
       const { error } = await supabase
         .from("client_documents")
-        .update({ file_name: fileName })
+        .update({ 
+          file_name: fileName,
+          updated_at: new Date().toISOString()
+        })
         .eq("id", document.id);
 
       if (error) throw error;
@@ -330,13 +297,18 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       
-      const a = window.document.createElement('a');
+      const a = document.createElement('a');
       a.href = url;
-      a.download = `${fileName}.pdf`;
-      window.document.body.appendChild(a);
+      a.download = `${fileName.replace('.pdf', '')}_editado.pdf`;
+      document.body.appendChild(a);
       a.click();
-      window.document.body.removeChild(a);
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Sucesso",
+        description: "PDF baixado com sucesso",
+      });
     } catch (error) {
       console.error("Error downloading PDF:", error);
       toast({
@@ -398,7 +370,7 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
           </Button>
           <Button size="sm" onClick={savePDF} disabled={loading}>
             <Save className="h-4 w-4 mr-1" />
-            Salvar
+            {loading ? "Salvando..." : "Salvar"}
           </Button>
           <Button size="sm" variant="outline" onClick={onCancel}>
             Cancelar
@@ -482,7 +454,7 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
               <Button
                 size="sm"
                 variant="outline"
-                disabled={currentPage === 0}
+                disabled={currentPage === 0 || loading}
                 onClick={() => loadPage(currentPage - 1)}
               >
                 Anterior
@@ -493,7 +465,7 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
               <Button
                 size="sm"
                 variant="outline"
-                disabled={currentPage === totalPages - 1}
+                disabled={currentPage === totalPages - 1 || loading}
                 onClick={() => loadPage(currentPage + 1)}
               >
                 Próxima

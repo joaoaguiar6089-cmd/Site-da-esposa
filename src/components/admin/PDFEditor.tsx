@@ -45,24 +45,30 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
   }, []);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || fabricCanvas) return;
 
     const canvas = new FabricCanvas(canvasRef.current, {
-      width: 800,
-      height: 600,
+      width: window.innerWidth < 768 ? Math.min(350, window.innerWidth - 40) : 800,
+      height: window.innerWidth < 768 ? 500 : 600,
       backgroundColor: "#ffffff",
     });
 
     canvas.isDrawingMode = false;
-    canvas.freeDrawingBrush.color = drawColor;
-    canvas.freeDrawingBrush.width = drawWidth;
+    
+    // Initialize freeDrawingBrush safely
+    if (canvas.freeDrawingBrush) {
+      canvas.freeDrawingBrush.color = drawColor;
+      canvas.freeDrawingBrush.width = drawWidth;
+    }
 
     setFabricCanvas(canvas);
 
     return () => {
-      canvas.dispose();
+      if (canvas) {
+        canvas.dispose();
+      }
     };
-  }, []);
+  }, [canvasRef.current]);
 
   useEffect(() => {
     if (!fabricCanvas) return;
@@ -74,6 +80,16 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
       fabricCanvas.freeDrawingBrush.width = drawWidth;
     }
   }, [activeTool, drawColor, drawWidth, fabricCanvas]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (fabricCanvas) {
+        fabricCanvas.dispose();
+        setFabricCanvas(null);
+      }
+    };
+  }, [fabricCanvas]);
 
   const loadPDF = async () => {
     try {
@@ -226,19 +242,19 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Toolbar */}
-      <div className="flex items-center justify-between p-4 border-b">
-        <div className="flex items-center space-x-4">
-          <div>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border-b space-y-4 sm:space-y-0">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
+          <div className="w-full sm:w-48">
             <Label htmlFor="fileName">Nome do Arquivo</Label>
             <Input
               id="fileName"
               value={fileName}
               onChange={(e) => setFileName(e.target.value)}
-              className="w-48"
+              className="w-full"
             />
           </div>
           
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 flex-wrap">
             <Button
               size="sm"
               variant={activeTool === "select" ? "default" : "outline"}
@@ -265,7 +281,7 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 flex-wrap">
           <Button size="sm" variant="outline" onClick={clearCanvas}>
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -282,9 +298,9 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
         </div>
       </div>
 
-      <div className="flex flex-1 space-x-4">
+      <div className="flex flex-col lg:flex-row flex-1 space-y-4 lg:space-y-0 lg:space-x-4">
         {/* Tools Panel */}
-        <Card className="w-64 h-fit">
+        <Card className="w-full lg:w-64 h-fit">
           <CardContent className="p-4 space-y-4">
             {activeTool === "text" && (
               <>
@@ -379,8 +395,12 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
             <Separator className="mb-4" />
 
             {/* Canvas */}
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <canvas ref={canvasRef} className="max-w-full" />
+            <div className="border border-gray-200 rounded-lg overflow-hidden touch-manipulation">
+              <canvas 
+                ref={canvasRef} 
+                className="max-w-full touch-none select-none"
+                style={{ touchAction: 'none' }}
+              />
             </div>
           </CardContent>
         </Card>

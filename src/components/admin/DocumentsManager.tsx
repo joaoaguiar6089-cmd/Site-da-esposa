@@ -380,24 +380,26 @@ const DocumentsManager = ({ clientId, clientName, onDocumentUpdated }: Documents
       {/* Edit PDF Dialog */}
       {editingDocument && (
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-          <DialogContent className="max-w-6xl max-h-[90vh]">
-            <DialogHeader>
+          <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full lg:max-w-6xl lg:max-h-[90vh] p-0">
+            <DialogHeader className="p-6 pb-4">
               <DialogTitle>Editar: {editingDocument.file_name}</DialogTitle>
             </DialogHeader>
-            <PDFEditor
-              document={editingDocument}
-              clientId={clientId}
-              onSave={() => {
-                setEditDialogOpen(false);
-                setEditingDocument(null);
-                loadDocuments();
-                onDocumentUpdated();
-              }}
-              onCancel={() => {
-                setEditDialogOpen(false);
-                setEditingDocument(null);
-              }}
-            />
+            <div className="flex-1 overflow-hidden">
+              <PDFEditor
+                document={editingDocument}
+                clientId={clientId}
+                onSave={() => {
+                  setEditDialogOpen(false);
+                  setEditingDocument(null);
+                  loadDocuments();
+                  onDocumentUpdated();
+                }}
+                onCancel={() => {
+                  setEditDialogOpen(false);
+                  setEditingDocument(null);
+                }}
+              />
+            </div>
           </DialogContent>
         </Dialog>
       )}

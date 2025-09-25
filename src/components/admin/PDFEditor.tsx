@@ -54,9 +54,18 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
   useEffect(() => {
     console.log("Canvas useEffect triggered", { hasCanvasRef: !!canvasRef.current, hasFabricCanvas: !!fabricCanvas });
     
-    if (!canvasRef.current || fabricCanvas) return;
+    if (!canvasRef.current) {
+      console.log("No canvas ref available");
+      return;
+    }
+    
+    if (fabricCanvas) {
+      console.log("Canvas already exists");
+      return;
+    }
 
     try {
+      console.log("Creating new Fabric canvas");
       const canvas = new FabricCanvas(canvasRef.current, {
         width: window.innerWidth < 768 ? Math.min(350, window.innerWidth - 40) : 800,
         height: window.innerWidth < 768 ? 500 : 600,
@@ -71,7 +80,7 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
         canvas.freeDrawingBrush.width = drawWidth;
       }
 
-      console.log("Canvas created successfully");
+      console.log("Canvas created successfully", canvas);
       setFabricCanvas(canvas);
 
       return () => {
@@ -82,13 +91,14 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
       };
     } catch (error) {
       console.error("Error creating canvas:", error);
+      setLoading(false);
       toast({
         title: "Erro",
         description: "Erro ao inicializar editor",
         variant: "destructive",
       });
     }
-  }, [canvasRef.current]);
+  }, []);
 
   useEffect(() => {
     if (!fabricCanvas) return;
@@ -113,9 +123,9 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
 
   const loadPDF = async () => {
     console.log("Starting loadPDF", { documentPath: document.file_path });
-    setLoading(true);
     
     try {
+      console.log("Downloading PDF from storage...");
       const { data, error } = await supabase.storage
         .from("client-documents")
         .download(document.file_path);
@@ -125,23 +135,28 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
         throw error;
       }
 
-      console.log("PDF downloaded successfully, size:", data.size);
-      const arrayBuffer = await data.arrayBuffer();
-      const pdfDocument = await PDFDocument.load(arrayBuffer);
+      console.log("PDF downloaded successfully, size:", data.size, "bytes");
       
-      console.log("PDF loaded, pages:", pdfDocument.getPageCount());
+      // Convert to array buffer
+      const arrayBuffer = await data.arrayBuffer();
+      console.log("ArrayBuffer created, size:", arrayBuffer.byteLength);
+      
+      // Load PDF document
+      console.log("Loading PDF with pdf-lib...");
+      const pdfDocument = await PDFDocument.load(arrayBuffer);
+      console.log("PDF loaded successfully, pages:", pdfDocument.getPageCount());
       
       setPdfDoc(pdfDocument);
       setTotalPages(pdfDocument.getPageCount());
       
-      // Load first page after canvas is ready
-      if (fabricCanvas) {
-        await loadPage(0, pdfDocument);
-      }
+      // Load first page
+      console.log("Loading first page...");
+      await loadPage(0, pdfDocument);
       
+      console.log("PDF setup complete, setting loading to false");
       setLoading(false);
     } catch (error) {
-      console.error("Error loading PDF:", error);
+      console.error("Error in loadPDF:", error);
       setLoading(false);
       toast({
         title: "Erro",
@@ -152,13 +167,22 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
   };
 
   const loadPage = async (pageIndex: number, doc?: PDFDocument) => {
+    console.log("Starting loadPage", { pageIndex, hasPdfDoc: !!(doc || pdfDoc), hasFabricCanvas: !!fabricCanvas });
+    
     const pdfDocument = doc || pdfDoc;
-    if (!pdfDocument || !fabricCanvas) {
-      console.log("Missing requirements:", { pdfDocument: !!pdfDocument, fabricCanvas: !!fabricCanvas });
+    if (!pdfDocument) {
+      console.log("No PDF document available");
+      return;
+    }
+    
+    if (!fabricCanvas) {
+      console.log("No fabric canvas available");
       return;
     }
 
     try {
+      console.log("Clearing canvas and setting up page...");
+      
       // Clear canvas
       fabricCanvas.clear();
       fabricCanvas.backgroundColor = "#ffffff";
@@ -175,9 +199,16 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
       fabricCanvas.add(loadingText);
       fabricCanvas.renderAll();
 
+      console.log("Setting up page content...");
+      
       // Render PDF page info for now - in production you'd render the actual PDF
       setTimeout(() => {
-        if (!fabricCanvas) return;
+        if (!fabricCanvas) {
+          console.log("Canvas no longer available in timeout");
+          return;
+        }
+        
+        console.log("Rendering page content...");
         
         fabricCanvas.clear();
         fabricCanvas.backgroundColor = "#ffffff";
@@ -210,11 +241,14 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
         fabricCanvas.add(pageInfo);
         fabricCanvas.add(instructions);
         fabricCanvas.renderAll();
+        
+        console.log("Page rendered successfully");
       }, 100);
       
       setCurrentPage(pageIndex);
+      console.log("Page setup complete");
     } catch (error) {
-      console.error("Error loading page:", error);
+      console.error("Error in loadPage:", error);
       toast({
         title: "Erro",
         description: "Erro ao carregar página",

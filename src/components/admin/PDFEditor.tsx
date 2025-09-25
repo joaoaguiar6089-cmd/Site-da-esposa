@@ -41,8 +41,11 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
   const { toast } = useToast();
 
   useEffect(() => {
-    loadPDF();
-  }, []);
+    // Load PDF after component mounts
+    if (fabricCanvas) {
+      loadPDF();
+    }
+  }, [fabricCanvas]);
 
   useEffect(() => {
     if (!canvasRef.current || fabricCanvas) return;
@@ -97,7 +100,10 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
         .from("client-documents")
         .download(document.file_path);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase storage error:", error);
+        throw error;
+      }
 
       const arrayBuffer = await data.arrayBuffer();
       const pdfDocument = await PDFDocument.load(arrayBuffer);
@@ -105,13 +111,15 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
       setPdfDoc(pdfDocument);
       setTotalPages(pdfDocument.getPageCount());
       
-      // Load first page
-      await loadPage(0, pdfDocument);
+      // Load first page after canvas is ready
+      if (fabricCanvas) {
+        await loadPage(0, pdfDocument);
+      }
     } catch (error) {
       console.error("Error loading PDF:", error);
       toast({
         title: "Erro",
-        description: "Erro ao carregar PDF",
+        description: `Erro ao carregar PDF: ${error.message}`,
         variant: "destructive",
       });
     }
@@ -119,25 +127,65 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
 
   const loadPage = async (pageIndex: number, doc?: PDFDocument) => {
     const pdfDocument = doc || pdfDoc;
-    if (!pdfDocument || !fabricCanvas) return;
+    if (!pdfDocument || !fabricCanvas) {
+      console.log("Missing requirements:", { pdfDocument: !!pdfDocument, fabricCanvas: !!fabricCanvas });
+      return;
+    }
 
     try {
       // Clear canvas
       fabricCanvas.clear();
       fabricCanvas.backgroundColor = "#ffffff";
 
-      // For now, we'll just show a placeholder for the PDF page
-      // In a real implementation, you'd render the PDF page as a background image
-      const pageText = new FabricText(`PDF Página ${pageIndex + 1}`, {
-        left: 50,
-        top: 50,
-        fontSize: 20,
+      // Show loading indicator
+      const loadingText = new FabricText("Carregando página...", {
+        left: fabricCanvas.width / 2 - 100,
+        top: fabricCanvas.height / 2 - 10,
+        fontSize: 16,
         fill: "#666666",
         selectable: false,
       });
       
-      fabricCanvas.add(pageText);
+      fabricCanvas.add(loadingText);
       fabricCanvas.renderAll();
+
+      // Render PDF page info for now - in production you'd render the actual PDF
+      setTimeout(() => {
+        if (!fabricCanvas) return;
+        
+        fabricCanvas.clear();
+        fabricCanvas.backgroundColor = "#ffffff";
+
+        const pageText = new FabricText(`Documento: ${document.file_name}`, {
+          left: 50,
+          top: 50,
+          fontSize: 18,
+          fill: "#333333",
+          selectable: false,
+        });
+
+        const pageInfo = new FabricText(`Página ${pageIndex + 1} de ${totalPages}`, {
+          left: 50,
+          top: 80,
+          fontSize: 14,
+          fill: "#666666",  
+          selectable: false,
+        });
+
+        const instructions = new FabricText("Use as ferramentas acima para adicionar texto ou desenhar", {
+          left: 50,
+          top: 120,
+          fontSize: 12,
+          fill: "#999999",
+          selectable: false,
+        });
+        
+        fabricCanvas.add(pageText);
+        fabricCanvas.add(pageInfo);
+        fabricCanvas.add(instructions);
+        fabricCanvas.renderAll();
+      }, 100);
+      
       setCurrentPage(pageIndex);
     } catch (error) {
       console.error("Error loading page:", error);

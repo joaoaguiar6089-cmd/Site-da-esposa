@@ -26,6 +26,8 @@ interface PDFEditorProps {
 }
 
 const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => {
+  console.log("PDFEditor rendered with document:", document);
+  
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   const [pdfDoc, setPdfDoc] = useState<PDFDocument | null>(null);
@@ -37,10 +39,12 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
   const [drawColor, setDrawColor] = useState("#000000");
   const [drawWidth, setDrawWidth] = useState(2);
   const [fileName, setFileName] = useState(document.file_name);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
+    console.log("PDF load useEffect triggered", { hasFabricCanvas: !!fabricCanvas, document: document?.file_path });
+    
     // Load PDF after component mounts
     if (fabricCanvas) {
       loadPDF();
@@ -48,29 +52,42 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
   }, [fabricCanvas]);
 
   useEffect(() => {
+    console.log("Canvas useEffect triggered", { hasCanvasRef: !!canvasRef.current, hasFabricCanvas: !!fabricCanvas });
+    
     if (!canvasRef.current || fabricCanvas) return;
 
-    const canvas = new FabricCanvas(canvasRef.current, {
-      width: window.innerWidth < 768 ? Math.min(350, window.innerWidth - 40) : 800,
-      height: window.innerWidth < 768 ? 500 : 600,
-      backgroundColor: "#ffffff",
-    });
+    try {
+      const canvas = new FabricCanvas(canvasRef.current, {
+        width: window.innerWidth < 768 ? Math.min(350, window.innerWidth - 40) : 800,
+        height: window.innerWidth < 768 ? 500 : 600,
+        backgroundColor: "#ffffff",
+      });
 
-    canvas.isDrawingMode = false;
-    
-    // Initialize freeDrawingBrush safely
-    if (canvas.freeDrawingBrush) {
-      canvas.freeDrawingBrush.color = drawColor;
-      canvas.freeDrawingBrush.width = drawWidth;
-    }
-
-    setFabricCanvas(canvas);
-
-    return () => {
-      if (canvas) {
-        canvas.dispose();
+      canvas.isDrawingMode = false;
+      
+      // Initialize freeDrawingBrush safely
+      if (canvas.freeDrawingBrush) {
+        canvas.freeDrawingBrush.color = drawColor;
+        canvas.freeDrawingBrush.width = drawWidth;
       }
-    };
+
+      console.log("Canvas created successfully");
+      setFabricCanvas(canvas);
+
+      return () => {
+        console.log("Disposing canvas");
+        if (canvas) {
+          canvas.dispose();
+        }
+      };
+    } catch (error) {
+      console.error("Error creating canvas:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao inicializar editor",
+        variant: "destructive",
+      });
+    }
   }, [canvasRef.current]);
 
   useEffect(() => {
@@ -95,6 +112,9 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
   }, [fabricCanvas]);
 
   const loadPDF = async () => {
+    console.log("Starting loadPDF", { documentPath: document.file_path });
+    setLoading(true);
+    
     try {
       const { data, error } = await supabase.storage
         .from("client-documents")
@@ -105,8 +125,11 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
         throw error;
       }
 
+      console.log("PDF downloaded successfully, size:", data.size);
       const arrayBuffer = await data.arrayBuffer();
       const pdfDocument = await PDFDocument.load(arrayBuffer);
+      
+      console.log("PDF loaded, pages:", pdfDocument.getPageCount());
       
       setPdfDoc(pdfDocument);
       setTotalPages(pdfDocument.getPageCount());
@@ -115,8 +138,11 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
       if (fabricCanvas) {
         await loadPage(0, pdfDocument);
       }
+      
+      setLoading(false);
     } catch (error) {
       console.error("Error loading PDF:", error);
+      setLoading(false);
       toast({
         title: "Erro",
         description: `Erro ao carregar PDF: ${error.message}`,
@@ -444,11 +470,20 @@ const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => 
 
             {/* Canvas */}
             <div className="border border-gray-200 rounded-lg overflow-hidden touch-manipulation">
-              <canvas 
-                ref={canvasRef} 
-                className="max-w-full touch-none select-none"
-                style={{ touchAction: 'none' }}
-              />
+              {loading ? (
+                <div className="flex items-center justify-center h-96 bg-gray-50">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                    <p className="text-sm text-gray-600">Carregando documento...</p>
+                  </div>
+                </div>
+              ) : (
+                <canvas 
+                  ref={canvasRef} 
+                  className="max-w-full touch-none select-none"
+                  style={{ touchAction: 'none' }}
+                />
+              )}
             </div>
           </CardContent>
         </Card>

@@ -1,529 +1,415 @@
-import { useState, useRef, useEffect } from "react";
-import { Canvas as FabricCanvas, FabricText } from "fabric";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Type, Edit, Save, Download, Trash2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import * as pdfjsLib from "pdfjs-dist";
+import "pdfjs-dist/build/pdf.worker.entry"; // registra o worker
 import { PDFDocument } from "pdf-lib";
+import { fabric } from "fabric";
 
-interface Document {
-  id: string;
-  file_name: string;
-  file_path: string;
-  original_file_name: string;
+// Se quiser, troque por seus botões/shadcn
+function ToolbarButton(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  const { children, ...rest } = props;
+  return (
+    <button
+      {...rest}
+      className={`px-3 py-2 rounded border text-sm hover:bg-neutral-50 ${rest.className || ""}`}
+    >
+      {children}
+    </button>
+  );
 }
 
-interface PDFEditorProps {
-  document: Document;
-  clientId: string;
-  onSave: () => void;
-  onCancel: () => void;
+type Mode = "pan" | "draw" | "text";
+
+export interface PDFEditorProps {
+  /** Se já tiver a URL (pública ou assinada) do PDF */
+  fileUrl?: string;
+  /** OU: caminho no bucket (ex: clients/123/documents/abc.pdf) */
+  storagePath?: string;
+  /** Bucket do Supabase Storage (padrão: "documents") */
+  bucket?: string;
+  /** Client do Supabase já configurado */
+  supabase: SupabaseClient;
+  /** Zoom inicial (1 = 100%) */
+  initialScale?: number;
+  /** Largura máxima do canvas (para caber no layout) */
+  maxCanvasWidth?: number;
+  /** Callback opcional após salvar */
+  onSaved?: (publicUrlOrSignedUrl: string) => void;
 }
 
-const PDFEditor = ({ document, clientId, onSave, onCancel }: PDFEditorProps) => {
-  console.log("PDFEditor rendered with document:", document);
-  
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
-  const [pdfDoc, setPdfDoc] = useState<PDFDocument | null>(null);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  const [activeTool, setActiveTool] = useState<"select" | "text" | "draw">("select");
-  const [textColor, setTextColor] = useState("#000000");
-  const [textSize, setTextSize] = useState(16);
-  const [drawColor, setDrawColor] = useState("#000000");
-  const [drawWidth, setDrawWidth] = useState(2);
-  const [fileName, setFileName] = useState(document.file_name);
+export default function PDFEditor({
+  fileUrl,
+  storagePath,
+  bucket = "documents",
+  supabase,
+  initialScale = 1,
+  maxCanvasWidth = 1100,
+  onSaved,
+}: PDFEditorProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const pdfCanvasRef = useRef<HTMLCanvasElement>(null); // base (pdf.js)
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null); // overlay (fabric)
+  const fabricRef = useRef<fabric.Canvas | null>(null);
+  const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
+
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+  const [pageNum, setPageNum] = useState(1);
+  const [numPages, setNumPages] = useState(0);
+  const [scale, setScale] = useState(initialScale);
+  const [mode, setMode] = useState<Mode>("pan");
+  const [drawWidth, setDrawWidth] = useState(2);
 
+  // guardamos as anotações por página
+  const pageAnnotations = useRef<Map<number, fabric.Object[]>>(new Map());
+
+  // --- util: obter URL do arquivo ---
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(fileUrl || null);
   useEffect(() => {
-    console.log("PDF load useEffect triggered", { hasFabricCanvas: !!fabricCanvas, document: document?.file_path });
-    
-    // Load PDF after component mounts
-    if (fabricCanvas) {
-      loadPDF();
-    }
-  }, [fabricCanvas]);
-
-  useEffect(() => {
-    console.log("Canvas useEffect triggered", { hasCanvasRef: !!canvasRef.current, hasFabricCanvas: !!fabricCanvas });
-    
-    if (!canvasRef.current) {
-      console.log("No canvas ref available");
-      return;
-    }
-    
-    if (fabricCanvas) {
-      console.log("Canvas already exists");
-      return;
-    }
-
-    try {
-      console.log("Creating new Fabric canvas");
-      const canvas = new FabricCanvas(canvasRef.current, {
-        width: window.innerWidth < 768 ? Math.min(350, window.innerWidth - 40) : 800,
-        height: window.innerWidth < 768 ? 500 : 600,
-        backgroundColor: "#ffffff",
-      });
-
-      canvas.isDrawingMode = false;
-      
-      // Initialize freeDrawingBrush safely
-      if (canvas.freeDrawingBrush) {
-        canvas.freeDrawingBrush.color = drawColor;
-        canvas.freeDrawingBrush.width = drawWidth;
-      }
-
-      console.log("Canvas created successfully", canvas);
-      setFabricCanvas(canvas);
-
-      return () => {
-        console.log("Disposing canvas");
-        if (canvas) {
-          canvas.dispose();
-        }
-      };
-    } catch (error) {
-      console.error("Error creating canvas:", error);
-      setLoading(false);
-      toast({
-        title: "Erro",
-        description: "Erro ao inicializar editor",
-        variant: "destructive",
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!fabricCanvas) return;
-
-    fabricCanvas.isDrawingMode = activeTool === "draw";
-    
-    if (activeTool === "draw" && fabricCanvas.freeDrawingBrush) {
-      fabricCanvas.freeDrawingBrush.color = drawColor;
-      fabricCanvas.freeDrawingBrush.width = drawWidth;
-    }
-  }, [activeTool, drawColor, drawWidth, fabricCanvas]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (fabricCanvas) {
-        fabricCanvas.dispose();
-        setFabricCanvas(null);
-      }
-    };
-  }, [fabricCanvas]);
-
-  const loadPDF = async () => {
-    console.log("Starting loadPDF", { documentPath: document.file_path });
-    
-    try {
-      console.log("Downloading PDF from storage...");
-      const { data, error } = await supabase.storage
-        .from("client-documents")
-        .download(document.file_path);
-
-      if (error) {
-        console.error("Supabase storage error:", error);
-        throw error;
-      }
-
-      console.log("PDF downloaded successfully, size:", data.size, "bytes");
-      
-      // Convert to array buffer
-      const arrayBuffer = await data.arrayBuffer();
-      console.log("ArrayBuffer created, size:", arrayBuffer.byteLength);
-      
-      // Load PDF document
-      console.log("Loading PDF with pdf-lib...");
-      const pdfDocument = await PDFDocument.load(arrayBuffer);
-      console.log("PDF loaded successfully, pages:", pdfDocument.getPageCount());
-      
-      setPdfDoc(pdfDocument);
-      setTotalPages(pdfDocument.getPageCount());
-      
-      // Load first page
-      console.log("Loading first page...");
-      await loadPage(0, pdfDocument);
-      
-      console.log("PDF setup complete, setting loading to false");
-      setLoading(false);
-    } catch (error) {
-      console.error("Error in loadPDF:", error);
-      setLoading(false);
-      toast({
-        title: "Erro",
-        description: `Erro ao carregar PDF: ${error.message}`,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const loadPage = async (pageIndex: number, doc?: PDFDocument) => {
-    console.log("Starting loadPage", { pageIndex, hasPdfDoc: !!(doc || pdfDoc), hasFabricCanvas: !!fabricCanvas });
-    
-    const pdfDocument = doc || pdfDoc;
-    if (!pdfDocument) {
-      console.log("No PDF document available");
-      return;
-    }
-    
-    if (!fabricCanvas) {
-      console.log("No fabric canvas available");
-      return;
-    }
-
-    try {
-      console.log("Clearing canvas and setting up page...");
-      
-      // Clear canvas
-      fabricCanvas.clear();
-      fabricCanvas.backgroundColor = "#ffffff";
-
-      // Show loading indicator
-      const loadingText = new FabricText("Carregando página...", {
-        left: fabricCanvas.width / 2 - 100,
-        top: fabricCanvas.height / 2 - 10,
-        fontSize: 16,
-        fill: "#666666",
-        selectable: false,
-      });
-      
-      fabricCanvas.add(loadingText);
-      fabricCanvas.renderAll();
-
-      console.log("Setting up page content...");
-      
-      // Render PDF page info for now - in production you'd render the actual PDF
-      setTimeout(() => {
-        if (!fabricCanvas) {
-          console.log("Canvas no longer available in timeout");
+    let cancelled = false;
+    (async () => {
+      try {
+        if (fileUrl) {
+          setResolvedUrl(fileUrl);
           return;
         }
-        
-        console.log("Rendering page content...");
-        
-        fabricCanvas.clear();
-        fabricCanvas.backgroundColor = "#ffffff";
+        if (storagePath) {
+          // cria URL assinada para leitura
+          const { data, error } = await supabase.storage
+            .from(bucket)
+            .createSignedUrl(storagePath, 60 * 60); // 1h
+          if (error) throw error;
+          if (!cancelled) setResolvedUrl(data.signedUrl);
+        }
+      } catch (err) {
+        console.error("Erro ao resolver URL do PDF:", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fileUrl, storagePath, bucket, supabase]);
 
-        const pageText = new FabricText(`Documento: ${document.file_name}`, {
-          left: 50,
-          top: 50,
-          fontSize: 18,
-          fill: "#333333",
-          selectable: false,
-        });
+  // --- carregar documento PDF (pdf.js) ---
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!resolvedUrl) return;
+      setLoading(true);
+      try {
+        const loadingTask = pdfjsLib.getDocument({ url: resolvedUrl });
+        const pdf = await loadingTask.promise;
+        if (cancelled) return;
+        pdfDocRef.current = pdf;
+        setNumPages(pdf.numPages);
+        setPageNum(1);
+      } catch (err) {
+        console.error("Erro ao carregar PDF:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [resolvedUrl]);
 
-        const pageInfo = new FabricText(`Página ${pageIndex + 1} de ${totalPages}`, {
-          left: 50,
-          top: 80,
-          fontSize: 14,
-          fill: "#666666",  
-          selectable: false,
-        });
-
-        const instructions = new FabricText("Use as ferramentas acima para adicionar texto ou desenhar", {
-          left: 50,
-          top: 120,
-          fontSize: 12,
-          fill: "#999999",
-          selectable: false,
-        });
-        
-        fabricCanvas.add(pageText);
-        fabricCanvas.add(pageInfo);
-        fabricCanvas.add(instructions);
-        fabricCanvas.renderAll();
-        
-        console.log("Page rendered successfully");
-      }, 100);
-      
-      setCurrentPage(pageIndex);
-      console.log("Page setup complete");
-    } catch (error) {
-      console.error("Error in loadPage:", error);
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar página",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const addText = () => {
-    if (!fabricCanvas) return;
-
-    const text = new FabricText("Clique para editar", {
-      left: 100,
-      top: 100,
-      fontSize: textSize,
-      fill: textColor,
+  // --- inicializar Fabric sobre o overlay canvas ---
+  useEffect(() => {
+    if (!overlayCanvasRef.current) return;
+    const f = new fabric.Canvas(overlayCanvasRef.current, {
+      selection: true,
+      preserveObjectStacking: true,
     });
+    fabricRef.current = f;
 
-    fabricCanvas.add(text);
-    fabricCanvas.setActiveObject(text);
-    fabricCanvas.renderAll();
-  };
+    const onMouseWheel = (opt: fabric.IEvent<WheelEvent>) => {
+      if (mode !== "pan") return;
+      opt.e.preventDefault();
+      opt.e.stopPropagation();
+    };
+    f.on("mouse:wheel", onMouseWheel);
 
-  const clearCanvas = () => {
-    if (!fabricCanvas) return;
-    fabricCanvas.clear();
-    fabricCanvas.backgroundColor = "#ffffff";
-    fabricCanvas.renderAll();
-  };
+    return () => {
+      f.dispose();
+      fabricRef.current = null;
+    };
+  }, [mode]);
 
-  const savePDF = async () => {
-    if (!fabricCanvas || !pdfDoc) return;
+  // --- função: renderizar uma página (pdf.js -> canvas base) e ajustar overlay ---
+  const renderPage = useCallback(async (pageNumber: number) => {
+    const pdf = pdfDocRef.current;
+    const pdfCanvas = pdfCanvasRef.current;
+    const overlayCanvas = overlayCanvasRef.current;
+    const f = fabricRef.current;
+    if (!pdf || !pdfCanvas || !overlayCanvas || !f) return;
 
     setLoading(true);
     try {
-      // Convert canvas to image data
-      const dataURL = fabricCanvas.toDataURL({
-        format: 'png',
-        quality: 1,
-        multiplier: 1
-      });
+      const page = await pdf.getPage(pageNumber);
+      const viewport = page.getViewport({ scale });
 
-      // In a real implementation, you would:
-      // 1. Convert the canvas overlay to PDF annotations
-      // 2. Merge with the original PDF
-      // 3. Save the new PDF
+      // responsivo: limitar largura
+      const desiredWidth = Math.min(viewport.width, maxCanvasWidth);
+      const ratio = desiredWidth / viewport.width;
+      const finalViewport = page.getViewport({ scale: scale * ratio });
 
-      // For now, we'll update the document name and show success
-      const { error } = await supabase
-        .from("client_documents")
-        .update({ file_name: fileName })
-        .eq("id", document.id);
+      const ctx = pdfCanvas.getContext("2d");
+      if (!ctx) return;
 
-      if (error) throw error;
+      pdfCanvas.width = finalViewport.width;
+      pdfCanvas.height = finalViewport.height;
 
-      toast({
-        title: "Sucesso",
-        description: "Documento salvo com sucesso",
-      });
+      // render pdf na base
+      await page.render({
+        canvasContext: ctx,
+        viewport: finalViewport,
+      }).promise;
 
-      onSave();
-    } catch (error) {
-      console.error("Error saving PDF:", error);
-      toast({
-        title: "Erro",
-        description: "Erro ao salvar documento",
-        variant: "destructive",
-      });
+      // ajustar overlay (fabric) para o mesmo tamanho
+      overlayCanvas.width = pdfCanvas.width;
+      overlayCanvas.height = pdfCanvas.height;
+      f.setWidth(overlayCanvas.width);
+      f.setHeight(overlayCanvas.height);
+      f.renderAll();
+
+      // restaurar anotações da página (se existirem)
+      f.clear();
+      const saved = pageAnnotations.current.get(pageNumber);
+      if (saved && saved.length) {
+        // clonar objetos para o fabric atual
+        saved.forEach(obj => {
+          obj.clone(clone => {
+            if (clone) f.add(clone);
+          });
+        });
+        f.renderAll();
+      }
+    } catch (err) {
+      console.error("Erro ao renderizar página:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [scale, maxCanvasWidth]);
 
-  const downloadPDF = async () => {
-    if (!pdfDoc) return;
+  // render da página atual quando pageNum/scale mudarem
+  useEffect(() => {
+    if (!pdfDocRef.current) return;
+    renderPage(pageNum);
+  }, [pageNum, renderPage]);
 
-    try {
-      const pdfBytes = await pdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      
-      const a = window.document.createElement('a');
-      a.href = url;
-      a.download = `${fileName}.pdf`;
-      window.document.body.appendChild(a);
-      a.click();
-      window.document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Error downloading PDF:", error);
-      toast({
-        title: "Erro",
-        description: "Erro ao baixar PDF",
-        variant: "destructive",
-      });
+  // --- troca de modo (pan/draw/text) ---
+  useEffect(() => {
+    const f = fabricRef.current;
+    if (!f) return;
+
+    f.isDrawingMode = mode === "draw";
+    if (mode === "draw") {
+      // @ts-expect-error - fabric typings
+      f.freeDrawingBrush = new fabric.PencilBrush(f);
+      // @ts-expect-error - fabric typings
+      f.freeDrawingBrush.width = drawWidth;
     }
-  };
+  }, [mode, drawWidth]);
 
+  const addText = useCallback(() => {
+    const f = fabricRef.current;
+    if (!f) return;
+    const text = new fabric.IText("Digite aqui", {
+      left: 40,
+      top: 40,
+      fontSize: 16,
+      fill: "#111",
+    });
+    f.add(text);
+    f.setActiveObject(text);
+    f.renderAll();
+  }, []);
+
+  // --- navegar páginas mantendo anotações ---
+  const goToPage = useCallback(
+    async (next: number) => {
+      const f = fabricRef.current;
+      if (f) {
+        // salvar objetos atuais
+        const objs = f.getObjects().map(o => o);
+        pageAnnotations.current.set(pageNum, objs);
+      }
+      setPageNum(next);
+    },
+    [pageNum]
+  );
+
+  // --- salvar: mescla cada overlay (PNG) sobre o PDF original usando pdf-lib ---
+  const handleSave = useCallback(async () => {
+    if (!resolvedUrl) return;
+    try {
+      setSaving(true);
+
+      // garantir que a página atual esteja salva no cache
+      const f = fabricRef.current;
+      if (f) {
+        const objs = f.getObjects().map(o => o);
+        pageAnnotations.current.set(pageNum, objs);
+      }
+
+      // baixar o PDF original
+      const arrayBuf = await (await fetch(resolvedUrl)).arrayBuffer();
+      const pdfDoc = await PDFDocument.load(arrayBuf);
+
+      // para cada página, exportar a sobreposição como PNG e desenhar
+      for (let i = 1; i <= pdfDoc.getPageCount(); i++) {
+        const pdfPage = pdfDoc.getPage(i - 1);
+        const width = pdfPage.getWidth();
+        const height = pdfPage.getHeight();
+
+        // renderizar overlay num canvas temporário com a mesma razão de aspecto da página atual mostrada
+        // Estratégia: usamos o overlay atual como referência de proporção.
+        // Para páginas não visitadas (sem overlay), pulamos.
+        const overlayObjs = pageAnnotations.current.get(i);
+        if (!overlayObjs || overlayObjs.length === 0) continue;
+
+        // Criar um Fabric temporário para rasterizar os objetos da página i com dimensão da página PDF
+        const tempCanvasEl = document.createElement("canvas");
+        tempCanvasEl.width = Math.floor(width);
+        tempCanvasEl.height = Math.floor(height);
+        const tempFabric = new fabric.Canvas(tempCanvasEl, { selection: false });
+
+        // Clonar e escalar objetos da tela atual para o tamanho do PDF
+        // Precisamos da referência do tamanho do overlay do editor (para escalar corretamente)
+        const editorOverlayW = overlayCanvasRef.current?.width || width;
+        const editorOverlayH = overlayCanvasRef.current?.height || height;
+        const scaleX = width / editorOverlayW;
+        const scaleY = height / editorOverlayH;
+
+        for (const obj of overlayObjs) {
+          await new Promise<void>((resolve) => {
+            obj.clone((clone: fabric.Object) => {
+              if (!clone) return resolve();
+              clone.set({
+                left: (clone.left || 0) * scaleX,
+                top: (clone.top || 0) * scaleY,
+                scaleX: (clone.scaleX || 1) * scaleX,
+                scaleY: (clone.scaleY || 1) * scaleY,
+              });
+              tempFabric.add(clone);
+              resolve();
+            });
+          });
+        }
+        tempFabric.renderAll();
+
+        const dataUrl = tempCanvasEl.toDataURL("image/png");
+        const pngBytes = await fetch(dataUrl).then(r => r.arrayBuffer());
+        const png = await pdfDoc.embedPng(pngBytes);
+
+        pdfPage.drawImage(png, {
+          x: 0,
+          y: 0,
+          width,
+          height,
+        });
+
+        tempFabric.dispose();
+      }
+
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: "application/pdf" });
+
+      // subir no supabase
+      if (storagePath) {
+        // upsert (substitui o mesmo arquivo)
+        const { error } = await supabase.storage
+          .from(bucket)
+          .upload(storagePath, blob, {
+            upsert: true,
+            contentType: "application/pdf",
+          });
+        if (error) throw error;
+
+        // gerar URL para retorno (pode ser pública ou assinada)
+        const { data } = await supabase.storage.from(bucket).createSignedUrl(storagePath, 60 * 60);
+        onSaved?.(data?.signedUrl || "");
+        alert("Documento salvo com sucesso!");
+      } else {
+        // Se não tiver storagePath, baixa localmente
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "documento-anotado.pdf";
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+    } catch (err) {
+      console.error("Erro ao salvar:", err);
+      alert("Falha ao salvar o PDF. Veja o console para detalhes.");
+    } finally {
+      setSaving(false);
+    }
+  }, [resolvedUrl, supabase, bucket, storagePath, onSaved, pageNum]);
+
+  // --- UI ---
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="w-full">
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border-b space-y-4 sm:space-y-0">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
-          <div className="w-full sm:w-48">
-            <Label htmlFor="fileName">Nome do Arquivo</Label>
-            <Input
-              id="fileName"
-              value={fileName}
-              onChange={(e) => setFileName(e.target.value)}
-              className="w-full"
-            />
-          </div>
-          
-          <div className="flex items-center space-x-2 flex-wrap">
-            <Button
-              size="sm"
-              variant={activeTool === "select" ? "default" : "outline"}
-              onClick={() => setActiveTool("select")}
-            >
-              Selecionar
-            </Button>
-            <Button
-              size="sm"
-              variant={activeTool === "text" ? "default" : "outline"}
-              onClick={() => setActiveTool("text")}
-            >
-              <Type className="h-4 w-4 mr-1" />
-              Texto
-            </Button>
-            <Button
-              size="sm"
-              variant={activeTool === "draw" ? "default" : "outline"}
-              onClick={() => setActiveTool("draw")}
-            >
-              <Edit className="h-4 w-4 mr-1" />
-              Desenhar
-            </Button>
-          </div>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <ToolbarButton onClick={() => setMode("pan")} className={mode === "pan" ? "bg-neutral-100" : ""}>Mover</ToolbarButton>
+        <ToolbarButton onClick={() => setMode("draw")} className={mode === "draw" ? "bg-neutral-100" : ""}>Caneta</ToolbarButton>
+        <ToolbarButton onClick={() => { setMode("text"); addText(); }}>Texto</ToolbarButton>
+
+        <div className="ml-2 flex items-center gap-2">
+          <label className="text-sm">Espessura</label>
+          <input
+            type="number"
+            min={1}
+            max={12}
+            value={drawWidth}
+            onChange={(e) => setDrawWidth(Number(e.target.value))}
+            className="w-16 rounded border px-2 py-1 text-sm"
+          />
         </div>
 
-        <div className="flex items-center space-x-2 flex-wrap">
-          <Button size="sm" variant="outline" onClick={clearCanvas}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
-          <Button size="sm" variant="outline" onClick={downloadPDF}>
-            <Download className="h-4 w-4" />
-          </Button>
-          <Button size="sm" onClick={savePDF} disabled={loading}>
-            <Save className="h-4 w-4 mr-1" />
-            Salvar
-          </Button>
-          <Button size="sm" variant="outline" onClick={onCancel}>
-            Cancelar
-          </Button>
+        <div className="ml-auto flex items-center gap-2">
+          <ToolbarButton onClick={() => setScale((s) => Math.max(0.5, s - 0.1))}>-</ToolbarButton>
+          <span className="text-sm w-14 text-center">{Math.round(scale * 100)}%</span>
+          <ToolbarButton onClick={() => setScale((s) => Math.min(3, s + 0.1))}>+</ToolbarButton>
+
+          <ToolbarButton
+            onClick={() => goToPage(Math.max(1, pageNum - 1))}
+            disabled={pageNum <= 1}
+          >
+            Anterior
+          </ToolbarButton>
+          <span className="text-sm">{pageNum} / {numPages || "-"}</span>
+          <ToolbarButton
+            onClick={() => goToPage(Math.min(numPages || 1, pageNum + 1))}
+            disabled={pageNum >= (numPages || 1)}
+          >
+            Próxima
+          </ToolbarButton>
+
+          <ToolbarButton onClick={handleSave} disabled={saving}>
+            {saving ? "Salvando..." : "Salvar"}
+          </ToolbarButton>
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row flex-1 space-y-4 lg:space-y-0 lg:space-x-4">
-        {/* Tools Panel */}
-        <Card className="w-full lg:w-64 h-fit">
-          <CardContent className="p-4 space-y-4">
-            {activeTool === "text" && (
-              <>
-                <div>
-                  <Label>Tamanho da Fonte</Label>
-                  <Select value={textSize.toString()} onValueChange={(value) => setTextSize(parseInt(value))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="12">12px</SelectItem>
-                      <SelectItem value="14">14px</SelectItem>
-                      <SelectItem value="16">16px</SelectItem>
-                      <SelectItem value="18">18px</SelectItem>
-                      <SelectItem value="20">20px</SelectItem>
-                      <SelectItem value="24">24px</SelectItem>
-                      <SelectItem value="32">32px</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Cor do Texto</Label>
-                  <Input
-                    type="color"
-                    value={textColor}
-                    onChange={(e) => setTextColor(e.target.value)}
-                  />
-                </div>
-                <Button onClick={addText} className="w-full">
-                  Adicionar Texto
-                </Button>
-              </>
-            )}
-
-            {activeTool === "draw" && (
-              <>
-                <div>
-                  <Label>Largura do Traço</Label>
-                  <Select value={drawWidth.toString()} onValueChange={(value) => setDrawWidth(parseInt(value))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1px</SelectItem>
-                      <SelectItem value="2">2px</SelectItem>
-                      <SelectItem value="3">3px</SelectItem>
-                      <SelectItem value="5">5px</SelectItem>
-                      <SelectItem value="8">8px</SelectItem>
-                      <SelectItem value="12">12px</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Cor do Traço</Label>
-                  <Input
-                    type="color"
-                    value={drawColor}
-                    onChange={(e) => setDrawColor(e.target.value)}
-                  />
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Canvas Area */}
-        <Card className="flex-1">
-          <CardContent className="p-4">
-            {/* Page Navigation */}
-            <div className="flex items-center justify-between mb-4">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={currentPage === 0}
-                onClick={() => loadPage(currentPage - 1)}
-              >
-                Anterior
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                Página {currentPage + 1} de {totalPages}
-              </span>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={currentPage === totalPages - 1}
-                onClick={() => loadPage(currentPage + 1)}
-              >
-                Próxima
-              </Button>
+      {/* Área do canvas (sempre existe) com overlay de loading */}
+      <div ref={containerRef} className="relative w-full overflow-auto rounded border">
+        <canvas ref={pdfCanvasRef} className="block max-w-full select-none" />
+        <canvas
+          ref={overlayCanvasRef}
+          className="pointer-events-auto absolute inset-0 block max-w-full"
+          style={{ touchAction: "none" }}
+        />
+        {loading && (
+          <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neutral-800 mx-auto mb-2"></div>
+              <p className="text-sm text-neutral-700">Carregando documento…</p>
             </div>
-
-            <Separator className="mb-4" />
-
-            {/* Canvas */}
-            <div className="border border-gray-200 rounded-lg overflow-hidden touch-manipulation">
-              {loading ? (
-                <div className="flex items-center justify-center h-96 bg-gray-50">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-                    <p className="text-sm text-gray-600">Carregando documento...</p>
-                  </div>
-                </div>
-              ) : (
-                <canvas 
-                  ref={canvasRef} 
-                  className="max-w-full touch-none select-none"
-                  style={{ touchAction: 'none' }}
-                />
-              )}
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        )}
       </div>
     </div>
   );
-};
-
-export default PDFEditor;
+}

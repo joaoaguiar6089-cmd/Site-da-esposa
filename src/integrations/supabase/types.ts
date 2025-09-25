@@ -339,48 +339,6 @@ export type Database = {
         }
         Relationships: []
       }
-      client_documents: {
-        Row: {
-          client_id: string
-          created_at: string
-          document_type: string
-          file_name: string
-          file_path: string
-          file_size: number
-          id: string
-          notes: string | null
-          original_file_name: string
-          updated_at: string
-          uploaded_by_admin: string | null
-        }
-        Insert: {
-          client_id: string
-          created_at?: string
-          document_type?: string
-          file_name: string
-          file_path: string
-          file_size: number
-          id?: string
-          notes?: string | null
-          original_file_name: string
-          updated_at?: string
-          uploaded_by_admin?: string | null
-        }
-        Update: {
-          client_id?: string
-          created_at?: string
-          document_type?: string
-          file_name?: string
-          file_path?: string
-          file_size?: number
-          id?: string
-          notes?: string | null
-          original_file_name?: string
-          updated_at?: string
-          uploaded_by_admin?: string | null
-        }
-        Relationships: []
-      }
       clients: {
         Row: {
           celular: string

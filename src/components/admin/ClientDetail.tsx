@@ -2,14 +2,13 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Edit, User, Phone, CreditCard, Calendar, MapPin, FileText } from "lucide-react";
+import { ArrowLeft, Edit, User, Phone, CreditCard, Calendar, MapPin } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatCPF } from "@/utils/cpfValidator";
 import ClientHeader from "./ClientHeader";
 import ProcedureHistory from "./ProcedureHistory";
 import PhotoGallery from "./PhotoGallery";
-import DocumentsManager from "./DocumentsManager";
 
 interface Client {
   id: string;
@@ -100,7 +99,7 @@ const ClientDetail = ({
       {/* Abas de Conteúdo */}
       <Card className="border-0 shadow-md">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="historico" className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               Histórico de Procedimentos
@@ -108,10 +107,6 @@ const ClientDetail = ({
             <TabsTrigger value="fotos" className="flex items-center gap-2">
               <User className="h-4 w-4" />
               Galeria de Fotos
-            </TabsTrigger>
-            <TabsTrigger value="documentos" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Documentos
             </TabsTrigger>
           </TabsList>
           
@@ -131,14 +126,6 @@ const ClientDetail = ({
               results={results}
               clientId={client.id}
               onResultUploaded={onResultUploaded}
-            />
-          </TabsContent>
-          
-          <TabsContent value="documentos" className="mt-6">
-            <DocumentsManager
-              clientId={client.id}
-              clientName={`${client.nome} ${client.sobrenome}`}
-              onDocumentUpdated={onClientUpdated}
             />
           </TabsContent>
         </Tabs>

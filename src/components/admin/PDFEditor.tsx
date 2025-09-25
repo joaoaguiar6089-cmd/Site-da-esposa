@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { Canvas as FabricCanvas, FabricText } from "fabric";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,22 +26,150 @@ interface PDFEditorProps {
 const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<FabricCanvas | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [canvasInitialized, setCanvasInitialized] = useState(false);
   const { toast } = useToast();
 
+  // Inicialização do canvas - executada apenas uma vez
   useEffect(() => {
-    if (!canvasRef.current || fabricCanvasRef.current) return;
+    console.log("🔧 Iniciando inicialização do canvas...");
+    
+    if (!canvasRef.current) {
+      console.error("❌ canvasRef.current não está disponível");
+      setIsLoading(false);
+      return;
+    }
+
+    if (fabricCanvasRef.current) {
+      console.log("ℹ️ Canvas já inicializado, pulando...");
+      setIsLoading(false);
+      return;
+    }
 
     try {
+      console.log("🖌️ Criando novo canvas Fabric...");
+      
+      // Dispose do canvas anterior se existir
+      if (fabricCanvasRef.current) {
+        fabricCanvasRef.current.dispose();
+      }
+
       const canvas = new FabricCanvas(canvasRef.current, {
-        width: 800,
-        height: 600,
+        width: Math.min(800, window.innerWidth - 40),
+        height: Math.min(600, window.innerHeight - 200),
         backgroundColor: "#ffffff",
       });
 
       canvas.isDrawingMode = false;
-      fabricCanvasRef.current = canvas;
+      
+      // Configurar brush de desenho de forma segura
+      if (canvas.freeDrawingBrush) {
+        canvas.freeDrawingBrush.color = "#000000";
+        canvas.freeDrawingBrush.width = 2;
+      }
 
-      // Adicionar conteúdo básico
+      fabricCanvasRef.current = canvas;
+      setCanvasInitialized(true);
+      setIsLoading(false);
+      
+      console.log("✅ Canvas criado com sucesso");
+
+      // Adicionar conteúdo inicial
+      setTimeout(() => {
+        if (fabricCanvasRef.current) {
+          const pageText = new FabricText(`Documento: ${document.file_name}`, {
+            left: 50,
+            top: 50,
+            fontSize: 18,
+            fill: "#333333",
+            selectable: false,
+          });
+
+          const instructions = new FabricText("Use as ferramentas para adicionar texto ou desenhar", {
+            left: 50,
+            top: 80,
+            fontSize: 14,
+            fill: "#666666",
+            selectable: false,
+          });
+
+          fabricCanvasRef.current.add(pageText);
+          fabricCanvasRef.current.add(instructions);
+          fabricCanvasRef.current.renderAll();
+          console.log("📝 Conteúdo inicial adicionado ao canvas");
+        }
+      }, 100);
+
+    } catch (error) {
+      console.error("❌ Erro ao criar canvas:", error);
+      setIsLoading(false);
+      toast({
+        title: "Erro",
+        description: "Erro ao inicializar editor",
+        variant: "destructive",
+      });
+    }
+
+    // Cleanup
+    return () => {
+      console.log("🧹 Executando cleanup do canvas...");
+      if (fabricCanvasRef.current) {
+        try {
+          fabricCanvasRef.current.dispose();
+          fabricCanvasRef.current = null;
+          setCanvasInitialized(false);
+        } catch (error) {
+          console.error("Erro no cleanup:", error);
+        }
+      }
+    };
+  }, [document.file_name, toast]);
+
+  const addText = () => {
+    if (!fabricCanvasRef.current) {
+      console.error("❌ Canvas não disponível para adicionar texto");
+      return;
+    }
+
+    try {
+      const text = new FabricText("Clique para editar", {
+        left: 100,
+        top: 150,
+        fontSize: 16,
+        fill: "#000000",
+      });
+
+      fabricCanvasRef.current.add(text);
+      fabricCanvasRef.current.setActiveObject(text);
+      fabricCanvasRef.current.renderAll();
+      console.log("📝 Texto adicionado com sucesso");
+    } catch (error) {
+      console.error("❌ Erro ao adicionar texto:", error);
+    }
+  };
+
+  const toggleDrawing = () => {
+    if (!fabricCanvasRef.current) return;
+
+    const isDrawingMode = !fabricCanvasRef.current.isDrawingMode;
+    fabricCanvasRef.current.isDrawingMode = isDrawingMode;
+    
+    if (isDrawingMode && fabricCanvasRef.current.freeDrawingBrush) {
+      fabricCanvasRef.current.freeDrawingBrush.color = "#000000";
+      fabricCanvasRef.current.freeDrawingBrush.width = 2;
+    }
+    
+    console.log(`🎨 Modo desenho: ${isDrawingMode ? 'ativado' : 'desativado'}`);
+  };
+
+  const clearCanvas = () => {
+    if (!fabricCanvasRef.current) return;
+    
+    try {
+      fabricCanvasRef.current.clear();
+      fabricCanvasRef.current.backgroundColor = "#ffffff";
+      
+      // Recriar conteúdo básico
       const pageText = new FabricText(`Documento: ${document.file_name}`, {
         left: 50,
         top: 50,
@@ -58,75 +186,22 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
         selectable: false,
       });
 
-      canvas.add(pageText);
-      canvas.add(instructions);
-      canvas.renderAll();
-
-      return () => {
-        if (canvas) {
-          canvas.dispose();
-        }
-      };
+      fabricCanvasRef.current.add(pageText);
+      fabricCanvasRef.current.add(instructions);
+      fabricCanvasRef.current.renderAll();
+      console.log("🧹 Canvas limpo e conteúdo recriado");
     } catch (error) {
-      console.error("Error creating canvas:", error);
-      toast({
-        title: "Erro",
-        description: "Erro ao inicializar editor",
-        variant: "destructive",
-      });
+      console.error("❌ Erro ao limpar canvas:", error);
     }
-  }, [document.file_name, toast]);
-
-  const addText = () => {
-    if (!fabricCanvasRef.current) return;
-
-    const text = new FabricText("Clique para editar", {
-      left: 100,
-      top: 150,
-      fontSize: 16,
-      fill: "#000000",
-    });
-
-    fabricCanvasRef.current.add(text);
-    fabricCanvasRef.current.setActiveObject(text);
-    
-    // Removido enterEditing() pois não existe no FabricText
-    fabricCanvasRef.current.renderAll();
-  };
-
-  const clearCanvas = () => {
-    if (!fabricCanvasRef.current) return;
-    
-    fabricCanvasRef.current.clear();
-    fabricCanvasRef.current.backgroundColor = "#ffffff";
-    
-    // Recriar conteúdo básico
-    const pageText = new FabricText(`Documento: ${document.file_name}`, {
-      left: 50,
-      top: 50,
-      fontSize: 18,
-      fill: "#333333",
-      selectable: false,
-    });
-
-    const instructions = new FabricText("Use as ferramentas para adicionar texto ou desenhar", {
-      left: 50,
-      top: 80,
-      fontSize: 14,
-      fill: "#666666",
-      selectable: false,
-    });
-
-    fabricCanvasRef.current.add(pageText);
-    fabricCanvasRef.current.add(instructions);
-    fabricCanvasRef.current.renderAll();
   };
 
   const handleSave = async () => {
     if (!fabricCanvasRef.current) return;
 
     try {
-      // Atualizar nome do documento no Supabase
+      setIsLoading(true);
+      console.log("💾 Iniciando salvamento...");
+
       const { error } = await supabase
         .from("client_documents")
         .update({ 
@@ -142,14 +217,17 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
         description: "Documento salvo com sucesso",
       });
 
+      console.log("✅ Documento salvo com sucesso");
       onSave();
     } catch (error) {
-      console.error("Error saving PDF:", error);
+      console.error("❌ Erro ao salvar documento:", error);
       toast({
         title: "Erro",
         description: "Erro ao salvar documento",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -157,13 +235,16 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
     if (!fabricCanvasRef.current) return;
 
     try {
-      // Converter canvas para imagem
+      console.log("📥 Iniciando download...");
+      
+      // Corrigido: adicionar multiplier obrigatório
       const dataURL = fabricCanvasRef.current.toDataURL({
         format: 'png',
-        quality: 1
+        quality: 1,
+        multiplier: 1 // Adicionado o parâmetro obrigatório
       });
       
-      // Criar link de download
+      // Usar window.document para evitar conflitos
       const link = window.document.createElement('a');
       link.href = dataURL;
       link.download = `${document.file_name.replace('.pdf', '')}_anotado.png`;
@@ -175,8 +256,10 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
         title: "Sucesso",
         description: "Imagem baixada com sucesso",
       });
+      
+      console.log("✅ Download concluído");
     } catch (error) {
-      console.error("Error downloading image:", error);
+      console.error("❌ Erro ao baixar imagem:", error);
       toast({
         title: "Erro",
         description: "Erro ao baixar imagem",
@@ -184,6 +267,22 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
       });
     }
   };
+
+  // Redimensionar canvas quando a janela mudar de tamanho
+  useEffect(() => {
+    const handleResize = () => {
+      if (fabricCanvasRef.current) {
+        fabricCanvasRef.current.setDimensions({
+          width: Math.min(800, window.innerWidth - 40),
+          height: Math.min(600, window.innerHeight - 200)
+        });
+        fabricCanvasRef.current.renderAll();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   return (
     <div className="flex flex-col h-full space-y-4">
@@ -204,6 +303,7 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
               size="sm"
               variant="outline"
               onClick={addText}
+              disabled={isLoading || !canvasInitialized}
             >
               <Type className="h-4 w-4 mr-1" />
               Adicionar Texto
@@ -211,11 +311,8 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => {
-                if (fabricCanvasRef.current) {
-                  fabricCanvasRef.current.isDrawingMode = !fabricCanvasRef.current.isDrawingMode;
-                }
-              }}
+              onClick={toggleDrawing}
+              disabled={isLoading || !canvasInitialized}
             >
               <Edit className="h-4 w-4 mr-1" />
               Desenhar
@@ -224,19 +321,38 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
         </div>
 
         <div className="flex items-center space-x-2 flex-wrap">
-          <Button size="sm" variant="outline" onClick={clearCanvas}>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={clearCanvas}
+            disabled={isLoading || !canvasInitialized}
+          >
             <Trash2 className="h-4 w-4" />
             Limpar
           </Button>
-          <Button size="sm" variant="outline" onClick={handleDownload}>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={handleDownload}
+            disabled={isLoading || !canvasInitialized}
+          >
             <Download className="h-4 w-4" />
             Baixar
           </Button>
-          <Button size="sm" onClick={handleSave}>
+          <Button 
+            size="sm" 
+            onClick={handleSave}
+            disabled={isLoading}
+          >
             <Save className="h-4 w-4 mr-1" />
-            Salvar
+            {isLoading ? "Salvando..." : "Salvar"}
           </Button>
-          <Button size="sm" variant="outline" onClick={onCancel}>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={onCancel}
+            disabled={isLoading}
+          >
             Cancelar
           </Button>
         </div>
@@ -249,18 +365,32 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
             <Separator className="mb-4" />
 
             {/* Canvas */}
-            <div className="border border-gray-200 rounded-lg overflow-hidden touch-manipulation">
-              <canvas 
-                ref={canvasRef} 
-                className="max-w-full touch-none select-none"
-                style={{ touchAction: 'none' }}
-              />
+            <div className="border border-gray-200 rounded-lg overflow-hidden touch-manipulation bg-gray-50">
+              {isLoading ? (
+                <div className="flex items-center justify-center h-96">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                    <p className="text-sm text-gray-600">Inicializando editor...</p>
+                  </div>
+                </div>
+              ) : (
+                <canvas 
+                  ref={canvasRef} 
+                  className="max-w-full touch-none select-none"
+                  style={{ 
+                    touchAction: 'none',
+                    width: '100%',
+                    height: 'auto'
+                  }}
+                />
+              )}
             </div>
             
             <div className="mt-4 text-sm text-muted-foreground">
               <p>• Clique em "Adicionar Texto" para inserir caixas de texto editáveis</p>
               <p>• Use "Desenhar" para fazer anotações livres</p>
               <p>• Arraste para mover elementos</p>
+              <p>• Toque duas vezes para editar texto (mobile)</p>
             </div>
           </CardContent>
         </Card>

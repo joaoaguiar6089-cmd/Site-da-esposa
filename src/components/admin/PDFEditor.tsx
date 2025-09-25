@@ -79,19 +79,30 @@ export default function PDFEditor({
     let cancelled = false;
     (async () => {
       try {
+        console.log("Verificando fileUrl ou storagePath...");
         if (fileUrl) {
+          console.log("Usando fileUrl diretamente:", fileUrl);
           setResolvedUrl(fileUrl);
           return;
         }
         if (storagePath) {
+          console.log("Gerando URL assinada para:", storagePath);
           const { data, error } = await supabase.storage
             .from(bucket)
             .createSignedUrl(storagePath, 60 * 60);
-          if (error) throw error;
-          if (!cancelled) setResolvedUrl(data.signedUrl);
+          if (error) {
+            console.error("Erro ao gerar URL assinada:", error.message);
+            return;
+          }
+          if (!cancelled) {
+            console.log("URL assinada gerada:", data.signedUrl);
+            setResolvedUrl(data.signedUrl);
+          }
+        } else {
+          console.log("Nenhum fileUrl ou storagePath fornecido.");
         }
       } catch (err) {
-        console.error("Erro ao resolver URL do PDF:", err);
+        console.error("Erro ao resolver URL:", err);
       }
     })();
     return () => {
@@ -103,12 +114,18 @@ export default function PDFEditor({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!resolvedUrl) return;
+      if (!resolvedUrl) {
+        console.log("Nenhuma URL resolvida para carregar o PDF.");
+        setLoading(false);
+        return;
+      }
+      console.log("Tentando carregar PDF de:", resolvedUrl);
       setLoading(true);
       try {
         const loadingTask = pdfjsLib.getDocument({ url: resolvedUrl });
         const pdf = await loadingTask.promise;
         if (cancelled) return;
+        console.log("PDF carregado com sucesso, páginas:", pdf.numPages);
         pdfDocRef.current = pdf;
         setNumPages(pdf.numPages);
         setPageNum(1);
@@ -142,7 +159,10 @@ export default function PDFEditor({
     const pdfCanvas = pdfCanvasRef.current;
     const overlayCanvas = overlayCanvasRef.current;
     const f = fabricRef.current;
-    if (!pdf || !pdfCanvas || !overlayCanvas || !f) return;
+    if (!pdf || !pdfCanvas || !overlayCanvas || !f) {
+      console.log("Faltando elementos para renderizar a página.");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -153,11 +173,14 @@ export default function PDFEditor({
       const ratio = desiredWidth / viewport.width;
       const finalViewport = page.getViewport({ scale: scale * ratio });
 
-      const ctx = pdfCanvas.getContext("2d");
-      if (!ctx) return;
-
       pdfCanvas.width = finalViewport.width;
       pdfCanvas.height = finalViewport.height;
+
+      const ctx = pdfCanvas.getContext("2d");
+      if (!ctx) {
+        console.log("Contexto do canvas não disponível.");
+        return;
+      }
 
       await page
         .render({
@@ -197,7 +220,10 @@ export default function PDFEditor({
   }, [scale, maxCanvasWidth]);
 
   useEffect(() => {
-    if (!pdfDocRef.current) return;
+    if (!pdfDocRef.current) {
+      console.log("Nenhum PDF carregado para renderizar.");
+      return;
+    }
     renderPage(pageNum);
   }, [pageNum, renderPage]);
 

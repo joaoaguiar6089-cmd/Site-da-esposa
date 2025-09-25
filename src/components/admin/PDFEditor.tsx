@@ -4,9 +4,19 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // ===== pdf.js (ESM) + Vite: configure o worker via URL =====
 import * as pdfjsLib from "pdfjs-dist";
 import { PDFDocument } from "pdf-lib";
-import { fabric } from "fabric";
 
-// Vite resolve o caminho do worker para URL absoluta:
+// ⛑️ Import do Fabric robusto (cobre default e named export)
+import * as FabricNS from "fabric";
+/**
+ * Em diferentes versões/builds, "fabric" pode vir:
+ * - como named export: { fabric }
+ * - como default export: export default fabric
+ * - ou como o próprio namespace
+ */
+const fabric: typeof import("fabric")["fabric"] =
+  (FabricNS as any).fabric || (FabricNS as any).default || (FabricNS as any);
+
+// Vite resolve a URL do worker corretamente:
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.mjs",
   import.meta.url
@@ -263,7 +273,6 @@ export default function PDFEditor({
         const scaleY = height / editorH;
 
         for (const obj of overlayObjs) {
-          // clonar + reescalar
           // eslint-disable-next-line no-await-in-loop
           await new Promise<void>((resolve) => {
             obj.clone((clone: fabric.Object) => {

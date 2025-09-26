@@ -1,15 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Download, FileText, ExternalLink } from "lucide-react";
+import { FileText, ExternalLink, Upload, Save, Pen, Square, Circle, Minus, RotateCcw, Palette } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import SignatureCanvas from 'react-signature-canvas';
+import { PDFDocument, rgb } from 'pdf-lib';
 
 interface ClientDocument {
   id: string;
   file_name: string;
   file_path: string;
   original_file_name: string;
+  notes?: string;
 }
 
 interface SimplePDFViewerProps {
@@ -19,12 +21,45 @@ interface SimplePDFViewerProps {
   onCancel: () => void;
 }
 
-const SimplePDFViewer = ({ document, onSave, onCancel }: SimplePDFViewerProps) => {
+interface Annotation {
+  type: 'pen' | 'highlight' | 'text';
+  path: string;
+  color: string;
+  width: number;
+  x?: number;
+  y?: number;
+}
+
+const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFViewerProps) => {
   const [pdfUrl, setPdfUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
-  const [dragActive, setDragActive] = useState(false);
+  const [hasNewVersion, setHasNewVersion] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [showMobileEditor, setShowMobileEditor] = useState(false);
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [currentTool, setCurrentTool] = useState<'pen' | 'highlight'>('pen');
+  const [currentColor, setCurrentColor] = useState('#000000');
+  const [penWidth, setPenWidth] = useState(2);
+  const canvasRef = useRef<SignatureCanvas>(null);
   const { toast } = useToast();
+
+  // Detectar dispositivo móvel/tablet
+  useEffect(() => {
+    const checkDevice = () => {
+      const userAgent = navigator.userAgent;
+      const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+      const isTablet = /iPad|Android(?=.*Tablet)|(?=.*\bMobile\b)(?=.*\bSafari\b)/i.test(userAgent);
+      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      
+      setIsMobile(isMobileDevice || isTablet || isTouchDevice);
+    };
+
+    checkDevice();
+    window.addEventListener('resize', checkDevice);
+    return () => window.removeEventListener('resize', checkDevice);
+  }, []);
 
   useEffect(() => {
     loadPDFDocument();
@@ -62,35 +97,6 @@ const SimplePDFViewer = ({ document, onSave, onCancel }: SimplePDFViewerProps) =
     }
   };
 
-  const downloadDocument = async () => {
-    try {
-      const { data, error } = await supabase.storage
-        .from('client-documents')
-        .download(document.file_path);
-
-      if (error) throw error;
-
-      const url = URL.createObjectURL(data);
-      const link = window.document.createElement('a');
-      link.href = url;
-      link.download = document.original_file_name;
-      link.click();
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: "Download Concluído",
-        description: "Documento baixado com sucesso",
-      });
-    } catch (error) {
-      console.error("Erro no download:", error);
-      toast({
-        title: "Erro",
-        description: "Erro ao baixar documento",
-        variant: "destructive",
-      });
-    }
-  };
-
   const openInNewTab = () => {
     if (pdfUrl) {
       window.open(pdfUrl, '_blank');
@@ -110,33 +116,60 @@ const SimplePDFViewer = ({ document, onSave, onCancel }: SimplePDFViewerProps) =
       return;
     }
 
+    setUploadedFile(file);
+    setHasNewVersion(true);
+    
+    toast({
+      title: "Nova Versão Carregada",
+      description: "Arquivo carregado. Visualize as alterações e clique em 'Salvar' para confirmar.",
+    });
+
+    const tempUrl = URL.createObjectURL(file);
+    setPdfUrl(tempUrl);
+  };
+
+  const saveNewVersion = async () => {
+    if (!uploadedFile) return;
+
     try {
       setIsLoading(true);
       
-      // Atualizar o arquivo existente (sobrescrever)
       const { error: uploadError } = await supabase.storage
         .from('client-documents')
-        .update(document.file_path, file, {
+        .update(document.file_path, uploadedFile, {
           contentType: 'application/pdf',
         });
 
       if (uploadError) throw uploadError;
 
+      const now = new Date();
+      const editNote = `Documento editado em ${now.toLocaleString('pt-BR')}`;
+      
+      const { error: dbError } = await supabase
+        .from('client_documents')
+        .update({
+          file_size: uploadedFile.size,
+          notes: `${document.notes || ''} - ${editNote}`,
+          updated_at: now.toISOString()
+        })
+        .eq('id', document.id);
+
+      if (dbError) throw dbError;
+
       toast({
-        title: "✅ Documento Atualizado!",
-        description: `PDF "${document.file_name}" foi substituído com suas edições`,
+        title: "Documento Salvo",
+        description: "PDF foi atualizado com suas edições",
       });
 
-      // Recarregar o documento
-      setTimeout(() => {
-        loadPDFDocument();
-      }, 1000);
-      
+      setHasNewVersion(false);
+      setUploadedFile(null);
+      loadPDFDocument();
+      onSave();
     } catch (error) {
       console.error("Erro ao salvar PDF editado:", error);
       toast({
         title: "Erro",
-        description: "Erro ao atualizar documento",
+        description: "Erro ao salvar documento",
         variant: "destructive",
       });
     } finally {
@@ -144,50 +177,108 @@ const SimplePDFViewer = ({ document, onSave, onCancel }: SimplePDFViewerProps) =
     }
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragActive(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragActive(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragActive(false);
-    
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      const file = files[0];
-      if (file.type === 'application/pdf') {
-        // Simular o evento de input
-        const fakeEvent = {
-          target: { files: [file] }
-        } as React.ChangeEvent<HTMLInputElement>;
-        handleFileUpload(fakeEvent);
-      } else {
-        toast({
-          title: "Arquivo Inválido",
-          description: "Por favor, arraste apenas arquivos PDF",
-          variant: "destructive",
-        });
-      }
+  const clearCanvas = () => {
+    if (canvasRef.current) {
+      canvasRef.current.clear();
     }
   };
+
+  const saveAnnotations = async () => {
+    if (!canvasRef.current || !pdfUrl) return;
+
+    try {
+      setIsLoading(true);
+      
+      // Obter dados do canvas
+      const canvasData = canvasRef.current.toDataURL();
+      
+      // Baixar PDF original
+      const pdfResponse = await fetch(pdfUrl);
+      const pdfArrayBuffer = await pdfResponse.arrayBuffer();
+      
+      // Carregar PDF com pdf-lib
+      const pdfDoc = await PDFDocument.load(pdfArrayBuffer);
+      const pages = pdfDoc.getPages();
+      const firstPage = pages[0];
+      
+      // Converter canvas para imagem
+      const canvasImage = await pdfDoc.embedPng(canvasData);
+      const { width, height } = firstPage.getSize();
+      
+      // Desenhar anotações sobre o PDF
+      firstPage.drawImage(canvasImage, {
+        x: 0,
+        y: 0,
+        width: width,
+        height: height,
+        opacity: 0.8,
+      });
+      
+      // Salvar PDF modificado
+      const pdfBytes = await pdfDoc.save();
+      const modifiedFile = new File([pdfBytes], document.file_name, { type: 'application/pdf' });
+      
+      // Upload do arquivo modificado
+      const { error: uploadError } = await supabase.storage
+        .from('client-documents')
+        .update(document.file_path, modifiedFile, {
+          contentType: 'application/pdf',
+        });
+
+      if (uploadError) throw uploadError;
+
+      toast({
+        title: "Anotações Salvas",
+        description: "PDF atualizado com suas anotações",
+      });
+
+      setShowMobileEditor(false);
+      loadPDFDocument();
+      
+    } catch (error) {
+      console.error("Erro ao salvar anotações:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar anotações",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startMobileEditing = () => {
+    setShowMobileEditor(true);
+  };
+
+  const colors = [
+    { name: 'Preto', value: '#000000' },
+    { name: 'Azul', value: '#0066CC' },
+    { name: 'Vermelho', value: '#CC0000' },
+    { name: 'Verde', value: '#00AA00' },
+    { name: 'Amarelo', value: '#FFAA00' },
+    { name: 'Roxo', value: '#6600CC' },
+  ];
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
-        {/* Header compacto */}
+        {/* Header */}
         <div className="border-b p-3 bg-blue-50 shrink-0">
           <div className="flex items-center gap-3">
             <FileText className="h-5 w-5 text-blue-600" />
             <div className="flex-1">
-              <h3 className="font-semibold text-base">Visualizar: {document.file_name}</h3>
+              <h3 className="font-semibold text-base">
+                Editar: {document.file_name}
+                <span className="ml-2 text-xs bg-gray-200 px-2 py-1 rounded">
+                  {isMobile ? '📱 Modo Mobile' : '🖥️ Modo Desktop'}
+                </span>
+              </h3>
               <p className="text-xs text-blue-700 mt-1">
-                Visualize o documento PDF com scroll completo e zoom nativo.
+                {isMobile 
+                  ? 'Use as ferramentas de anotação otimizadas para touch e Apple Pencil'
+                  : 'Edite o documento PDF usando as ferramentas nativas do navegador'
+                }
               </p>
             </div>
             <span className="text-sm font-medium px-2 py-1 rounded-full bg-blue-100 text-blue-800">
@@ -198,88 +289,129 @@ const SimplePDFViewer = ({ document, onSave, onCancel }: SimplePDFViewerProps) =
           </div>
         </div>
 
-        {/* Controles */}
-        <div className="flex flex-col gap-2 p-3 bg-gray-50 border-b shrink-0">
-          <div className="flex items-center gap-3">
+        {/* Controles - Desktop */}
+        {!isMobile && (
+          <div className="flex items-center gap-3 p-3 bg-gray-50 border-b shrink-0">
             <Button onClick={openInNewTab} disabled={!pdfUrl} size="sm">
               <ExternalLink className="h-4 w-4 mr-2" />
               Nova Aba
             </Button>
             
-            <Button onClick={downloadDocument} disabled={!pdfUrl} variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Baixar Original
-            </Button>
-            
             <div className="flex gap-2 ml-auto">
-              <Button onClick={onSave} size="sm" className="bg-green-600 hover:bg-green-700">
+              {hasNewVersion && (
+                <Button onClick={saveNewVersion} disabled={isLoading} size="sm" className="bg-blue-600 hover:bg-blue-700">
+                  <Save className="h-4 w-4 mr-2" />
+                  {isLoading ? "Salvando..." : "Salvar"}
+                </Button>
+              )}
+              <label className="cursor-pointer">
+                <Button disabled={isLoading} size="sm" className="bg-green-600 hover:bg-green-700" asChild>
+                  <span>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Enviar Nova Versão
+                  </span>
+                </Button>
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </label>
+              <Button onClick={onCancel} variant="outline" size="sm">
                 Fechar
               </Button>
-              <Button onClick={onCancel} variant="outline" size="sm">
+            </div>
+          </div>
+        )}
+
+        {/* Controles - Mobile */}
+        {isMobile && !showMobileEditor && (
+          <div className="flex flex-col gap-2 p-3 bg-gray-50 border-b shrink-0">
+            <div className="flex items-center gap-2">
+              <Button onClick={startMobileEditing} disabled={!pdfUrl} size="sm" className="bg-blue-600 hover:bg-blue-700">
+                <Pen className="h-4 w-4 mr-2" />
+                Iniciar Edição
+              </Button>
+              <Button onClick={openInNewTab} disabled={!pdfUrl} size="sm" variant="outline">
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Nova Aba
+              </Button>
+              <Button onClick={onCancel} variant="outline" size="sm" className="ml-auto">
+                Fechar
+              </Button>
+            </div>
+            <div className="text-sm bg-blue-100 p-2 rounded">
+              💡 <strong>Dica:</strong> Para editar no iPad, toque em "Iniciar Edição" para usar ferramentas otimizadas para Apple Pencil
+            </div>
+          </div>
+        )}
+
+        {/* Ferramentas Mobile - Modo Edição */}
+        {isMobile && showMobileEditor && (
+          <div className="flex flex-col gap-2 p-3 bg-gray-50 border-b shrink-0">
+            {/* Linha 1: Ferramentas */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                onClick={() => setCurrentTool('pen')}
+                size="sm"
+                variant={currentTool === 'pen' ? 'default' : 'outline'}
+              >
+                <Pen className="h-4 w-4" />
+              </Button>
+              <Button
+                onClick={() => setCurrentTool('highlight')}
+                size="sm"
+                variant={currentTool === 'highlight' ? 'default' : 'outline'}
+              >
+                <Square className="h-4 w-4" />
+              </Button>
+              <Button onClick={clearCanvas} size="sm" variant="outline">
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+              
+              {/* Espessura */}
+              <select
+                value={penWidth}
+                onChange={(e) => setPenWidth(Number(e.target.value))}
+                className="text-sm border rounded px-2 py-1"
+              >
+                <option value={1}>Fino</option>
+                <option value={2}>Médio</option>
+                <option value={4}>Grosso</option>
+                <option value={6}>Extra</option>
+              </select>
+            </div>
+            
+            {/* Linha 2: Cores */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {colors.map((color) => (
+                <button
+                  key={color.value}
+                  onClick={() => setCurrentColor(color.value)}
+                  className={`w-8 h-8 rounded-full border-2 ${
+                    currentColor === color.value ? 'border-gray-800' : 'border-gray-300'
+                  }`}
+                  style={{ backgroundColor: color.value }}
+                  title={color.name}
+                />
+              ))}
+            </div>
+            
+            {/* Linha 3: Ações */}
+            <div className="flex items-center gap-2">
+              <Button onClick={saveAnnotations} disabled={isLoading} size="sm" className="bg-green-600 hover:bg-green-700">
+                <Save className="h-4 w-4 mr-2" />
+                {isLoading ? "Salvando..." : "Salvar Anotações"}
+              </Button>
+              <Button onClick={() => setShowMobileEditor(false)} variant="outline" size="sm">
                 Cancelar
               </Button>
             </div>
           </div>
-          
-          {/* Instruções de edição em destaque */}
-          <div className="bg-blue-100 border border-blue-300 rounded p-2 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-blue-600">✏️</span>
-              <strong className="text-blue-800">Como editar:</strong>
-              <span className="text-blue-700">
-                1) Edite o PDF acima • 2) Pressione <kbd className="bg-blue-200 px-1 rounded">Ctrl+S</kbd> para baixar • 3) Use o botão abaixo para fazer upload
-              </span>
-            </div>
-          </div>
-          
-          {/* Upload Zone para arquivo editado */}
-          <div 
-            className={`border-2 border-dashed rounded p-3 transition-colors ${
-              dragActive 
-                ? 'border-green-500 bg-green-100' 
-                : 'border-green-300 bg-green-50'
-            }`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-green-600 text-lg">
-                {dragActive ? '📥' : '📤'}
-              </span>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-green-800">
-                  {dragActive 
-                    ? 'Solte o arquivo PDF aqui!' 
-                    : 'Arquivo editado? Arraste aqui ou clique para selecionar:'
-                  }
-                </p>
-                <label className="cursor-pointer">
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="mt-1 border-green-400 text-green-700 hover:bg-green-100" 
-                    disabled={isLoading}
-                    asChild
-                  >
-                    <span>
-                      {isLoading ? '⏳ Salvando...' : '📁 Selecionar PDF Editado'}
-                    </span>
-                  </Button>
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    disabled={isLoading}
-                  />
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
+        )}
 
-        {/* Área principal do PDF - ocupa todo espaço disponível */}
+        {/* Área do PDF */}
         <div className="flex-1 bg-gray-100 relative overflow-hidden">
           {error ? (
             <div className="absolute inset-0 flex items-center justify-center">
@@ -296,17 +428,42 @@ const SimplePDFViewer = ({ document, onSave, onCancel }: SimplePDFViewerProps) =
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center p-8 bg-white rounded-lg shadow-md">
                 <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-xl font-medium mb-2">Carregando PDF...</p>
+                <p className="text-xl font-medium mb-2">
+                  {isLoading && showMobileEditor ? 'Salvando Anotações...' : 'Carregando PDF...'}
+                </p>
                 <p className="text-sm text-gray-600">Aguarde um momento</p>
               </div>
             </div>
           ) : pdfUrl ? (
-            <iframe
-              src={pdfUrl}
-              className="w-full h-full border-0 bg-white"
-              title={`PDF: ${document.file_name}`}
-              allowFullScreen
-            />
+            <div className="relative w-full h-full">
+              {/* PDF Viewer */}
+              <iframe
+                src={pdfUrl}
+                className="w-full h-full border-0 bg-white"
+                title={`PDF: ${document.file_name}`}
+                allowFullScreen
+              />
+              
+              {/* Canvas de Anotação (Mobile) */}
+              {isMobile && showMobileEditor && (
+                <div className="absolute inset-0 pointer-events-none">
+                  <SignatureCanvas
+                    ref={canvasRef}
+                    canvasProps={{
+                      className: 'w-full h-full pointer-events-auto',
+                      style: { 
+                        background: 'transparent',
+                        touchAction: 'none'
+                      }
+                    }}
+                    backgroundColor="transparent"
+                    penColor={currentColor}
+                    minWidth={penWidth}
+                    maxWidth={penWidth}
+                  />
+                </div>
+              )}
+            </div>
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center p-8 bg-white rounded-lg shadow-md">
@@ -318,16 +475,29 @@ const SimplePDFViewer = ({ document, onSave, onCancel }: SimplePDFViewerProps) =
           )}
         </div>
 
-        {/* Footer com dicas */}
-        <div className="text-sm text-gray-700 bg-yellow-50 p-3 border-t shrink-0">
+        {/* Footer com instruções específicas por plataforma */}
+        <div className="text-sm text-gray-700 bg-green-50 p-3 border-t shrink-0">
           <div className="flex items-center gap-3">
-            <span className="text-lg">⚠️</span>
+            <span className="text-lg">{isMobile ? '📱' : '🖥️'}</span>
             <div className="flex-1">
-              <strong className="text-yellow-800">Importante:</strong>
-              <span className="ml-2">
-                Por limitações de segurança do navegador, não é possível salvar automaticamente as edições do PDF. 
-                Você deve baixar o arquivo editado e fazer upload da nova versão.
-              </span>
+              {isMobile ? (
+                <>
+                  <strong className="text-green-800">iPad/Mobile:</strong>
+                  <span className="ml-2">
+                    Toque em "Iniciar Edição" para usar ferramentas touch otimizadas • 
+                    Suporte completo ao Apple Pencil • 
+                    Anotações são salvas automaticamente no PDF
+                  </span>
+                </>
+              ) : (
+                <>
+                  <strong className="text-green-800">Desktop:</strong>
+                  <span className="ml-2">
+                    1) Edite o PDF acima • 2) Use Ctrl+S para baixar • 3) Upload da nova versão • 
+                    Ou abra em "Nova Aba" para ferramentas completas
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Download, FileText, ExternalLink } from "lucide-react";
+import { FileText, ExternalLink, Upload, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -24,6 +24,8 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
   const [pdfUrl, setPdfUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
+  const [hasNewVersion, setHasNewVersion] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -62,51 +64,31 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
     }
   };
 
-  const downloadDocument = async () => {
-    try {
-      const { data, error } = await supabase.storage
-        .from('client-documents')
-        .download(document.file_path);
-
-      if (error) throw error;
-
-      const url = URL.createObjectURL(data);
-      const link = window.document.createElement('a');
-      link.href = url;
-      link.download = document.original_file_name;
-      link.click();
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: "Download Concluído",
-        description: "Documento baixado com sucesso",
-      });
-    } catch (error) {
-      console.error("Erro no download:", error);
-      toast({
-        title: "Erro",
-        description: "Erro ao baixar documento",
-        variant: "destructive",
-      });
-    }
-  };
-
   const openInNewTab = () => {
     if (pdfUrl) {
       window.open(pdfUrl, '_blank');
     }
   };
 
-  const saveEditedDocument = () => {
-    toast({
-      title: "Instruções para Salvar",
-      description: "Para salvar suas edições: 1) Use Ctrl+S ou Cmd+S no PDF para baixar a versão editada 2) Clique em 'Upload Nova Versão' abaixo para substituir o documento",
-    });
-  };
-
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    setUploadedFile(file);
+    setHasNewVersion(true);
+    
+    toast({
+      title: "Nova Versão Carregada",
+      description: "Arquivo carregado. Visualize as alterações e clique em 'Salvar' para confirmar.",
+    });
+
+    // Criar URL temporário para visualização
+    const tempUrl = URL.createObjectURL(file);
+    setPdfUrl(tempUrl);
+  };
+
+  const saveNewVersion = async () => {
+    if (!uploadedFile) return;
 
     try {
       setIsLoading(true);
@@ -114,7 +96,7 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
       // Atualizar o arquivo existente (sobrescrever)
       const { error: uploadError } = await supabase.storage
         .from('client-documents')
-        .update(document.file_path, file, {
+        .update(document.file_path, uploadedFile, {
           contentType: 'application/pdf',
         });
 
@@ -127,7 +109,7 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
       const { error: dbError } = await supabase
         .from('client_documents')
         .update({
-          file_size: file.size,
+          file_size: uploadedFile.size,
           notes: `${document.notes || ''} - ${editNote}`,
           updated_at: now.toISOString()
         })
@@ -136,10 +118,13 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
       if (dbError) throw dbError;
 
       toast({
-        title: "Documento Atualizado",
-        description: "PDF foi substituído com suas edições",
+        title: "Documento Salvo",
+        description: "PDF foi atualizado com suas edições",
       });
 
+      setHasNewVersion(false);
+      setUploadedFile(null);
+      
       // Recarregar o documento
       loadPDFDocument();
       onSave();
@@ -147,7 +132,7 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
       console.error("Erro ao salvar PDF editado:", error);
       toast({
         title: "Erro",
-        description: "Erro ao atualizar documento",
+        description: "Erro ao salvar documento",
         variant: "destructive",
       });
     } finally {
@@ -183,18 +168,19 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
             Nova Aba
           </Button>
           
-          <Button onClick={downloadDocument} disabled={!pdfUrl} variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Baixar
-          </Button>
-          
           <div className="flex gap-2 ml-auto">
-            <Button onClick={saveEditedDocument} disabled={!pdfUrl} size="sm" variant="outline">
-              💡 Como Salvar
-            </Button>
+            {hasNewVersion && (
+              <Button onClick={saveNewVersion} disabled={isLoading} size="sm" className="bg-blue-600 hover:bg-blue-700">
+                <Save className="h-4 w-4 mr-2" />
+                {isLoading ? "Salvando..." : "Salvar"}
+              </Button>
+            )}
             <label className="cursor-pointer">
               <Button disabled={isLoading} size="sm" className="bg-green-600 hover:bg-green-700" asChild>
-                <span>{isLoading ? "Salvando..." : "📁 Upload Nova Versão"}</span>
+                <span>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Enviar Nova Versão
+                </span>
               </Button>
               <input
                 type="file"
@@ -246,21 +232,6 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
               </div>
             </div>
           )}
-        </div>
-
-        {/* Footer com dicas */}
-        <div className="text-sm text-gray-700 bg-green-50 p-3 border-t shrink-0">
-          <div className="flex items-center gap-3">
-            <span className="text-lg">📝</span>
-            <div className="flex-1">
-              <strong className="text-green-800">Como editar e salvar:</strong>
-              <span className="ml-2">
-                1) Faça suas edições no PDF acima • 
-                2) Use Ctrl+S (ou Cmd+S) para baixar a versão editada • 
-                3) Clique em "Upload Nova Versão" para substituir o documento
-              </span>
-            </div>
-          </div>
         </div>
       </div>
     </div>

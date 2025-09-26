@@ -97,30 +97,30 @@ const SimplePDFViewer = ({ document, onSave, onCancel }: SimplePDFViewerProps) =
   };
 
   return (
-    <div className="space-y-4 p-4 h-full">
-      {/* Status */}
-      <div className="border rounded-lg p-3 bg-blue-50 border-blue-200">
-        <div className="flex items-center gap-2 mb-2">
+    <div className="flex flex-col h-full max-h-[95vh] overflow-hidden">
+      {/* Status compacto */}
+      <div className="border-b p-2 bg-blue-50 shrink-0">
+        <div className="flex items-center gap-2">
           <FileText className="h-4 w-4 text-blue-600" />
           <h3 className="font-semibold text-sm">Documento: {document.file_name}</h3>
+          <span className="text-xs text-blue-700 ml-auto">
+            {isLoading ? "⏳ Carregando..." : 
+             pdfUrl ? "✅ Pronto" : 
+             error ? "❌ Erro" : "Aguardando..."}
+          </span>
         </div>
-        <p className="text-xs text-blue-700">
-          {isLoading ? "⏳ Carregando PDF..." : 
-           pdfUrl ? "✅ PDF carregado e pronto para visualização" : 
-           error ? `❌ ${error}` : "Aguardando..."}
-        </p>
       </div>
 
-      {/* Controles */}
-      <div className="flex flex-wrap items-center gap-2 p-3 bg-gray-50 rounded-lg">
+      {/* Controles compactos */}
+      <div className="flex items-center gap-2 p-2 bg-gray-50 border-b shrink-0">
         <Button onClick={openInNewTab} disabled={!pdfUrl} size="sm">
           <ExternalLink className="h-3 w-3 mr-1" />
-          Abrir em Nova Aba
+          Nova Aba
         </Button>
         
         <Button onClick={downloadDocument} disabled={!pdfUrl} variant="outline" size="sm">
           <Download className="h-3 w-3 mr-1" />
-          Baixar PDF
+          Baixar
         </Button>
         
         <div className="flex gap-1 ml-auto">
@@ -133,63 +133,54 @@ const SimplePDFViewer = ({ document, onSave, onCancel }: SimplePDFViewerProps) =
         </div>
       </div>
 
-      {/* Visualizador */}
-      <Card className="flex-1">
-        <CardContent className="p-0 h-[70vh] overflow-hidden">
-          {error ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center p-8">
-                <FileText className="h-12 w-12 mx-auto mb-4 text-red-400" />
-                <h3 className="text-lg font-medium text-red-600 mb-2">Erro ao Carregar PDF</h3>
-                <p className="text-sm text-gray-600 mb-4">{error}</p>
-                <Button onClick={loadPDFDocument} variant="outline" size="sm">
-                  Tentar Novamente
-                </Button>
-              </div>
+      {/* Área do PDF - ocupa todo espaço restante */}
+      <div className="flex-1 overflow-hidden">
+        {error ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center p-8">
+              <FileText className="h-12 w-12 mx-auto mb-4 text-red-400" />
+              <h3 className="text-lg font-medium text-red-600 mb-2">Erro ao Carregar PDF</h3>
+              <p className="text-sm text-gray-600 mb-4">{error}</p>
+              <Button onClick={loadPDFDocument} variant="outline" size="sm">
+                Tentar Novamente
+              </Button>
             </div>
-          ) : isLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center p-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-lg font-medium">Carregando PDF...</p>
-                <p className="text-sm text-gray-600 mt-2">Aguarde um momento</p>
-              </div>
+          </div>
+        ) : isLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center p-8">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-lg font-medium">Carregando PDF...</p>
+              <p className="text-sm text-gray-600 mt-2">Aguarde um momento</p>
             </div>
-          ) : pdfUrl ? (
-            <div className="w-full h-full relative">
-              <iframe
-                src={pdfUrl}
-                className="w-full h-full border-0 rounded-b"
-                title={`PDF: ${document.file_name}`}
-                style={{ 
-                  minHeight: '100%',
-                  height: '100%',
-                  overflow: 'auto'
-                }}
-              />
+          </div>
+        ) : pdfUrl ? (
+          <iframe
+            src={pdfUrl}
+            className="w-full h-full border-0"
+            title={`PDF: ${document.file_name}`}
+            style={{ 
+              width: '100%',
+              height: '100%',
+              minHeight: '100%'
+            }}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center p-8">
+              <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+              <p className="text-lg font-medium">Nenhum documento carregado</p>
             </div>
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center p-8">
-                <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                <p className="text-lg font-medium">Nenhum documento carregado</p>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </div>
 
-      {/* Instruções */}
-      <div className="text-xs text-gray-600 bg-green-50 p-3 rounded-lg">
-        <div className="flex items-center gap-2 mb-1">
+      {/* Instruções fixas na parte inferior */}
+      <div className="text-xs text-gray-600 bg-green-50 p-2 border-t shrink-0">
+        <div className="flex items-center gap-2">
           <span>📄</span>
-          <strong>Visualizador de PDF Otimizado:</strong>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          <p>• <strong>Scroll Completo:</strong> Use scroll nativo para navegar todo o documento</p>
-          <p>• <strong>Zoom:</strong> Use Ctrl + mouse ou gestos para ampliar</p>
-          <p>• <strong>Mobile:</strong> Totalmente responsivo com gestos touch</p>
-          <p>• <strong>Nova Aba:</strong> Abre em tela cheia para melhor visualização</p>
+          <strong>Dicas:</strong>
+          <span>Use Ctrl+Scroll para zoom • Scroll para navegar • Nova Aba para tela cheia</span>
         </div>
       </div>
     </div>

@@ -395,10 +395,10 @@ const DocumentsManager = ({ clientId, clientName, onDocumentUpdated }: Documents
       {/* Edit PDF Dialog */}
       {editingDocument && (
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-          <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full lg:max-w-6xl lg:max-h-[90vh] p-0">
-            <DialogHeader className="p-6 pb-4">
+          <DialogContent className="max-w-[98vw] max-h-[98vh] w-full h-full p-0 gap-0">
+            <DialogHeader className="p-4 pb-2">
               <DialogTitle>Visualizar: {editingDocument.file_name}</DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-sm">
                 Visualize o documento PDF com scroll completo e zoom nativo.
               </DialogDescription>
             </DialogHeader>

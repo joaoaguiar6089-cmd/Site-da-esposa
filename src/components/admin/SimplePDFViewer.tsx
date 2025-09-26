@@ -19,7 +19,7 @@ interface SimplePDFViewerProps {
   onCancel: () => void;
 }
 
-const SimplePDFViewer = ({ document, onSave, onCancel }: SimplePDFViewerProps) => {
+const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFViewerProps) => {
   const [pdfUrl, setPdfUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
@@ -96,6 +96,65 @@ const SimplePDFViewer = ({ document, onSave, onCancel }: SimplePDFViewerProps) =
     }
   };
 
+  const saveEditedDocument = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Baixar o PDF atual
+      const { data, error } = await supabase.storage
+        .from('client-documents')
+        .download(document.file_path);
+
+      if (error) throw error;
+
+      // Criar um novo nome para o arquivo editado
+      const timestamp = Date.now();
+      const editedFileName = `editado_${timestamp}_${document.original_file_name}`;
+      const editedFilePath = `${document.file_path.split('/')[0]}/editado_${timestamp}_${document.file_path.split('/').pop()}`;
+
+      // Upload do PDF editado
+      const { error: uploadError } = await supabase.storage
+        .from('client-documents')
+        .upload(editedFilePath, data, {
+          contentType: 'application/pdf',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Salvar registro no banco de dados
+      const { error: dbError } = await supabase
+        .from('client_documents')
+        .insert({
+          client_id: clientId,
+          file_name: `Editado - ${document.file_name}`,
+          original_file_name: editedFileName,
+          file_path: editedFilePath,
+          file_size: data.size,
+          document_type: 'pdf',
+          notes: `Documento editado baseado em: ${document.file_name}`
+        });
+
+      if (dbError) throw dbError;
+
+      toast({
+        title: "Documento Salvo",
+        description: "PDF editado foi salvo com sucesso",
+      });
+
+      onSave();
+    } catch (error) {
+      console.error("Erro ao salvar PDF editado:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar documento editado",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
@@ -104,9 +163,9 @@ const SimplePDFViewer = ({ document, onSave, onCancel }: SimplePDFViewerProps) =
           <div className="flex items-center gap-3">
             <FileText className="h-5 w-5 text-blue-600" />
             <div className="flex-1">
-              <h3 className="font-semibold text-base">Visualizar: {document.file_name}</h3>
+              <h3 className="font-semibold text-base">Editar: {document.file_name}</h3>
               <p className="text-xs text-blue-700 mt-1">
-                Visualize o documento PDF com scroll completo e zoom nativo.
+                Edite o documento PDF usando as ferramentas nativas do navegador.
               </p>
             </div>
             <span className="text-sm font-medium px-2 py-1 rounded-full bg-blue-100 text-blue-800">
@@ -118,58 +177,24 @@ const SimplePDFViewer = ({ document, onSave, onCancel }: SimplePDFViewerProps) =
         </div>
 
         {/* Controles */}
-        <div className="flex flex-col gap-2 p-3 bg-gray-50 border-b shrink-0">
-          <div className="flex items-center gap-3">
-            <Button onClick={openInNewTab} disabled={!pdfUrl} size="sm">
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Nova Aba
-            </Button>
-            
-            <Button onClick={downloadDocument} disabled={!pdfUrl} variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Baixar Original
-            </Button>
-            
-            <div className="flex gap-2 ml-auto">
-              <Button onClick={onSave} size="sm" className="bg-green-600 hover:bg-green-700">
-                Fechar
-              </Button>
-              <Button onClick={onCancel} variant="outline" size="sm">
-                Cancelar
-              </Button>
-            </div>
-          </div>
+        <div className="flex items-center gap-3 p-3 bg-gray-50 border-b shrink-0">
+          <Button onClick={openInNewTab} disabled={!pdfUrl} size="sm">
+            <ExternalLink className="h-4 w-4 mr-2" />
+            Nova Aba
+          </Button>
           
-          {/* Instruções de edição em destaque */}
-          <div className="bg-blue-100 border border-blue-300 rounded p-2 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-blue-600">✏️</span>
-              <strong className="text-blue-800">Como editar:</strong>
-              <span className="text-blue-700">
-                1) Edite o PDF acima • 2) Pressione <kbd className="bg-blue-200 px-1 rounded">Ctrl+S</kbd> para baixar • 3) Use o botão abaixo para fazer upload
-              </span>
-            </div>
-          </div>
+          <Button onClick={downloadDocument} disabled={!pdfUrl} variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-2" />
+            Baixar
+          </Button>
           
-          {/* Upload Zone para arquivo editado */}
-          <div className="border-2 border-dashed border-green-300 bg-green-50 rounded p-3">
-            <div className="flex items-center gap-3">
-              <span className="text-green-600 text-lg">📤</span>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-green-800">Arquivo editado? Arraste aqui ou clique para selecionar:</p>
-                <label className="cursor-pointer">
-                  <Button size="sm" variant="outline" className="mt-1 border-green-400 text-green-700 hover:bg-green-100" asChild>
-                    <span>📁 Selecionar PDF Editado</span>
-                  </Button>
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-            </div>
+          <div className="flex gap-2 ml-auto">
+            <Button onClick={saveEditedDocument} disabled={!pdfUrl || isLoading} size="sm" className="bg-green-600 hover:bg-green-700">
+              {isLoading ? "Salvando..." : "Salvar Edições"}
+            </Button>
+            <Button onClick={onCancel} variant="outline" size="sm">
+              Fechar
+            </Button>
           </div>
         </div>
 
@@ -215,10 +240,10 @@ const SimplePDFViewer = ({ document, onSave, onCancel }: SimplePDFViewerProps) =
         {/* Footer com dicas */}
         <div className="text-sm text-gray-700 bg-green-50 p-3 border-t shrink-0">
           <div className="flex items-center gap-3">
-            <span className="text-lg">📄</span>
+            <span className="text-lg">📝</span>
             <div className="flex-1">
-              <strong className="text-green-800">Dicas de navegação:</strong>
-              <span className="ml-2">Use Ctrl+Scroll para zoom • Scroll para navegar páginas • Clique em "Nova Aba" para tela cheia</span>
+              <strong className="text-green-800">Dicas de edição:</strong>
+              <span className="ml-2">Use as ferramentas nativas do PDF • Clique em "Salvar Edições" para salvar suas alterações</span>
             </div>
           </div>
         </div>

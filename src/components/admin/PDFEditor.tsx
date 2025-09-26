@@ -32,71 +32,45 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
 
   // Inicialização do canvas - executada após o DOM estar pronto
   useEffect(() => {
+    if (!canvasRef.current || fabricCanvasRef.current) return;
+
     console.log("🔧 Iniciando inicialização do canvas...");
     
-    const initializeCanvas = () => {
-      // Verificar se o canvasRef está disponível
-      if (!canvasRef.current) {
-        console.log("⏳ Canvas ref não disponível, tentando novamente...");
-        setTimeout(initializeCanvas, 100);
-        return;
-      }
+    try {
+      console.log("🖌️ Criando novo canvas Fabric...");
+      
+      const canvas = new FabricCanvas(canvasRef.current, {
+        width: Math.min(800, window.innerWidth - 40),
+        height: Math.min(600, window.innerHeight - 200),
+        backgroundColor: "#ffffff",
+      });
 
-      if (fabricCanvasRef.current) {
-        console.log("ℹ️ Canvas já inicializado, pulando...");
-        setIsLoading(false);
-        setCanvasInitialized(true);
-        return;
-      }
+      console.log("✅ Canvas Fabric criado com sucesso");
 
-      try {
-        console.log("🖌️ Criando novo canvas Fabric...");
-        console.log("Canvas element:", canvasRef.current);
-        
-        // Dispose do canvas anterior se existir
-        if (fabricCanvasRef.current) {
-          fabricCanvasRef.current.dispose();
-          fabricCanvasRef.current = null;
-        }
+      canvas.isDrawingMode = false;
+      
+      // Configurar brush de desenho
+      canvas.freeDrawingBrush.color = "#000000";
+      canvas.freeDrawingBrush.width = 2;
 
-        const canvas = new FabricCanvas(canvasRef.current, {
-          width: Math.min(800, window.innerWidth - 40),
-          height: Math.min(600, window.innerHeight - 200),
-          backgroundColor: "#ffffff",
-        });
+      fabricCanvasRef.current = canvas;
+      setCanvasInitialized(true);
+      setIsLoading(false);
+      
+      console.log("✅ Canvas configurado com sucesso");
 
-        console.log("✅ Canvas Fabric criado com sucesso");
+      // Adicionar conteúdo inicial
+      addInitialContent(canvas);
 
-        canvas.isDrawingMode = false;
-        
-        // Configurar brush de desenho de forma segura
-        if (canvas.freeDrawingBrush) {
-          canvas.freeDrawingBrush.color = "#000000";
-          canvas.freeDrawingBrush.width = 2;
-        }
-
-        fabricCanvasRef.current = canvas;
-        setCanvasInitialized(true);
-        
-        console.log("✅ Canvas configurado com sucesso");
-
-        // Adicionar conteúdo inicial
-        addInitialContent(canvas);
-
-      } catch (error) {
-        console.error("❌ Erro ao criar canvas:", error);
-        toast({
-          title: "Erro",
-          description: "Erro ao inicializar editor",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    // Iniciar a inicialização
-    initializeCanvas();
+    } catch (error) {
+      console.error("❌ Erro ao criar canvas:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao inicializar editor",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    }
 
     // Cleanup
     return () => {
@@ -111,15 +85,8 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
         }
       }
     };
-  }, [toast]);
+  }, []);
 
-  // Efeito adicional para garantir que o canvas seja inicializado após a renderização
-  useEffect(() => {
-    if (canvasRef.current && !fabricCanvasRef.current && !canvasInitialized) {
-      console.log("🎯 Canvas element disponível, inicializando...");
-      // A inicialização principal já está sendo tratada no useEffect acima
-    }
-  }, [canvasInitialized]);
 
   const addInitialContent = (canvas: FabricCanvas) => {
     try {

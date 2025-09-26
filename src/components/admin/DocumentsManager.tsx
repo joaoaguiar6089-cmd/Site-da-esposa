@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Upload, FileText, Edit, Download, Eye, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -383,6 +383,9 @@ const DocumentsManager = ({ clientId, clientName, onDocumentUpdated }: Documents
           <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full lg:max-w-6xl lg:max-h-[90vh] p-0">
             <DialogHeader className="p-6 pb-4">
               <DialogTitle>Editar: {editingDocument.file_name}</DialogTitle>
+              <DialogDescription>
+                Adicione anotações, texto e desenhos ao documento PDF.
+              </DialogDescription>
             </DialogHeader>
             <div className="flex-1 overflow-hidden">
               <PDFEditor

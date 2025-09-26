@@ -570,4 +570,123 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
                 <div className="flex items-center justify-center gap-2">
                   <Button onClick={handleZoomOut} size="sm" variant="outline" disabled={zoomLevel <= 0.5}>
                     <Minus className="h-4 w-4" />
-                  </But
+                  </Button>
+                  <span className="text-sm bg-gray-100 px-3 py-1 rounded min-w-[60px] text-center font-medium">
+                    {Math.round(zoomLevel * 100)}%
+                  </span>
+                  <Button onClick={handleZoomIn} size="sm" variant="outline" disabled={zoomLevel >= 3}>
+                    ➕
+                  </Button>
+                  <Button onClick={resetZoom} size="sm" variant="outline">
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                {/* Ferramentas */}
+                <div className="flex items-center justify-center gap-2">
+                  <Button
+                    onClick={() => setCurrentTool('pen')}
+                    size="sm"
+                    variant={currentTool === 'pen' ? 'default' : 'outline'}
+                  >
+                    <Pen className="h-4 w-4" />
+                  </Button>
+                  <Button onClick={clearCanvas} size="sm" variant="outline">
+                    🗑️
+                  </Button>
+                </div>
+                
+                {/* Espessura */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Espessura:</span>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="8"
+                    step="0.5"
+                    value={penWidth}
+                    onChange={(e) => setPenWidth(Number(e.target.value))}
+                    className="flex-1"
+                  />
+                  <div className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
+                    <div 
+                      className="rounded-full"
+                      style={{ 
+                        width: `${Math.max(penWidth * 3, 6)}px`, 
+                        height: `${Math.max(penWidth * 3, 6)}px`,
+                        backgroundColor: currentColor 
+                      }}
+                    />
+                    <span className="text-xs">{penWidth}px</span>
+                  </div>
+                </div>
+                
+                {/* Cores */}
+                <div className="flex items-center justify-center gap-2">
+                  {colors.map((color) => (
+                    <button
+                      key={color.value}
+                      onClick={() => setCurrentColor(color.value)}
+                      className={`w-8 h-8 rounded-full border-2 transition-all ${
+                        currentColor === color.value ? 'border-gray-800 scale-110' : 'border-gray-300'
+                      }`}
+                      style={{ backgroundColor: color.value }}
+                      title={color.name}
+                    />
+                  ))}
+                </div>
+                
+                {/* Ações */}
+                <div className="flex gap-2">
+                  <Button onClick={saveAnnotations} disabled={isLoading} size="sm" className="bg-green-600 hover:bg-green-700 flex-1">
+                    <Save className="h-4 w-4 mr-2" />
+                    {isLoading ? "Salvando..." : "Salvar"}
+                  </Button>
+                  <Button onClick={() => setShowMobileEditor(false)} variant="outline" size="sm">
+                    Sair
+                  </Button>
+                </div>
+              </div>
+            </div>
+            
+            {/* Status Info */}
+            <div className="absolute top-4 right-4 bg-black/70 text-white px-3 py-2 rounded-lg text-xs z-10">
+              <div>🔍 Zoom: {Math.round(zoomLevel * 100)}%</div>
+              <div>🖌️ {penWidth}px • {colors.find(c => c.value === currentColor)?.name}</div>
+              <div className="text-yellow-200">👆 Dedo: navegar • ✏️ Pencil: desenhar</div>
+            </div>
+          </>
+        )}
+
+        {/* Footer */}
+        <div className="text-sm text-gray-700 bg-green-50 p-3 border-t shrink-0">
+          <div className="flex items-center gap-3">
+            <span className="text-lg">{isMobile ? '📱' : '🖥️'}</span>
+            <div className="flex-1">
+              {isMobile ? (
+                <>
+                  <strong className="text-green-800">iPad Otimizado:</strong>
+                  <span className="ml-2">
+                    Dedos para navegar/zoom • Apple Pencil apenas para desenhar • 
+                    Controles sempre visíveis • Coordenadas precisas • 
+                    Salvamento automático
+                  </span>
+                </>
+              ) : (
+                <>
+                  <strong className="text-green-800">Desktop:</strong>
+                  <span className="ml-2">
+                    1) Edite o PDF acima • 2) Use Ctrl+S para baixar • 3) Upload da nova versão • 
+                    Ou abra em "Nova Aba" para ferramentas completas
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default SimplePDFViewer;

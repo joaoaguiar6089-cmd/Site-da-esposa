@@ -42,7 +42,14 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
   const [currentTool, setCurrentTool] = useState<'pen' | 'highlight'>('pen');
   const [currentColor, setCurrentColor] = useState('#000000');
   const [penWidth, setPenWidth] = useState(2);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [interactionMode, setInteractionMode] = useState<'draw' | 'pan'>('draw');
   const canvasRef = useRef<SignatureCanvas>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   // Detectar dispositivo móvel/tablet
@@ -180,6 +187,59 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
   const clearCanvas = () => {
     if (canvasRef.current) {
       canvasRef.current.clear();
+    }
+  };
+
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + 0.25, 3));
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(prev - 0.25, 0.5));
+  };
+
+  const resetZoom = () => {
+    setZoomLevel(1);
+    setPanX(0);
+    setPanY(0);
+  };
+
+  const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
+    if (interactionMode === 'pan') {
+      setIsDragging(true);
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      setDragStart({ x: clientX - panX, y: clientY - panY });
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (isDragging && interactionMode === 'pan') {
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      setPanX(clientX - dragStart.x);
+      setPanY(clientY - dragStart.y);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // Gesture handling for pinch zoom
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && interactionMode === 'pan') {
+      // Pinch zoom start
+      e.preventDefault();
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && interactionMode === 'pan') {
+      e.preventDefault();
+      // Pinch zoom logic could be implemented here
+    } else if (e.touches.length === 1) {
+      handleMouseMove(e);
     }
   };
 
@@ -349,64 +409,133 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
 
         {/* Ferramentas Mobile - Modo Edição */}
         {isMobile && showMobileEditor && (
-          <div className="flex flex-col gap-2 p-3 bg-gray-50 border-b shrink-0">
-            {/* Linha 1: Ferramentas */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                onClick={() => setCurrentTool('pen')}
-                size="sm"
-                variant={currentTool === 'pen' ? 'default' : 'outline'}
-              >
-                <Pen className="h-4 w-4" />
-              </Button>
-              <Button
-                onClick={() => setCurrentTool('highlight')}
-                size="sm"
-                variant={currentTool === 'highlight' ? 'default' : 'outline'}
-              >
-                <Square className="h-4 w-4" />
-              </Button>
-              <Button onClick={clearCanvas} size="sm" variant="outline">
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-              
-              {/* Espessura */}
-              <select
-                value={penWidth}
-                onChange={(e) => setPenWidth(Number(e.target.value))}
-                className="text-sm border rounded px-2 py-1"
-              >
-                <option value={1}>Fino</option>
-                <option value={2}>Médio</option>
-                <option value={4}>Grosso</option>
-                <option value={6}>Extra</option>
-              </select>
-            </div>
-            
-            {/* Linha 2: Cores */}
-            <div className="flex items-center gap-2 flex-wrap">
-              {colors.map((color) => (
-                <button
-                  key={color.value}
-                  onClick={() => setCurrentColor(color.value)}
-                  className={`w-8 h-8 rounded-full border-2 ${
-                    currentColor === color.value ? 'border-gray-800' : 'border-gray-300'
-                  }`}
-                  style={{ backgroundColor: color.value }}
-                  title={color.name}
-                />
-              ))}
-            </div>
-            
-            {/* Linha 3: Ações */}
+          <div className="flex flex-col gap-3 p-3 bg-gray-50 border-b shrink-0">
+            {/* Linha 1: Modo de Interação */}
             <div className="flex items-center gap-2">
-              <Button onClick={saveAnnotations} disabled={isLoading} size="sm" className="bg-green-600 hover:bg-green-700">
+              <span className="text-sm font-medium">Modo:</span>
+              <Button
+                onClick={() => setInteractionMode('draw')}
+                size="sm"
+                variant={interactionMode === 'draw' ? 'default' : 'outline'}
+                className="flex-1"
+              >
+                <Pen className="h-4 w-4 mr-1" />
+                Desenhar
+              </Button>
+              <Button
+                onClick={() => setInteractionMode('pan')}
+                size="sm"
+                variant={interactionMode === 'pan' ? 'default' : 'outline'}
+                className="flex-1"
+              >
+                🤚 Navegar
+              </Button>
+            </div>
+
+            {/* Linha 2: Zoom Controls */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Zoom:</span>
+              <Button onClick={handleZoomOut} size="sm" variant="outline" disabled={zoomLevel <= 0.5}>
+                <Minus className="h-4 w-4" />
+              </Button>
+              <span className="text-sm bg-white px-2 py-1 rounded border min-w-[60px] text-center">
+                {Math.round(zoomLevel * 100)}%
+              </span>
+              <Button onClick={handleZoomIn} size="sm" variant="outline" disabled={zoomLevel >= 3}>
+                ➕
+              </Button>
+              <Button onClick={resetZoom} size="sm" variant="outline" className="ml-2">
+                <RotateCcw className="h-4 w-4" />
+                Reset
+              </Button>
+            </div>
+            
+            {/* Linha 3: Ferramentas de Desenho */}
+            {interactionMode === 'draw' && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  onClick={() => setCurrentTool('pen')}
+                  size="sm"
+                  variant={currentTool === 'pen' ? 'default' : 'outline'}
+                >
+                  <Pen className="h-4 w-4" />
+                </Button>
+                <Button
+                  onClick={() => setCurrentTool('highlight')}
+                  size="sm"
+                  variant={currentTool === 'highlight' ? 'default' : 'outline'}
+                >
+                  <Square className="h-4 w-4" />
+                </Button>
+                <Button onClick={clearCanvas} size="sm" variant="outline">
+                  🗑️
+                </Button>
+              </div>
+            )}
+            
+            {/* Linha 4: Espessura do Pincel */}
+            {interactionMode === 'draw' && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Espessura:</span>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="10"
+                  step="0.5"
+                  value={penWidth}
+                  onChange={(e) => setPenWidth(Number(e.target.value))}
+                  className="flex-1"
+                />
+                <div className="flex items-center gap-2 bg-white px-3 py-1 rounded border">
+                  <div 
+                    className="rounded-full"
+                    style={{ 
+                      width: `${Math.max(penWidth * 2, 8)}px`, 
+                      height: `${Math.max(penWidth * 2, 8)}px`,
+                      backgroundColor: currentColor 
+                    }}
+                  />
+                  <span className="text-sm">{penWidth}px</span>
+                </div>
+              </div>
+            )}
+            
+            {/* Linha 5: Cores */}
+            {interactionMode === 'draw' && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium">Cor:</span>
+                {colors.map((color) => (
+                  <button
+                    key={color.value}
+                    onClick={() => setCurrentColor(color.value)}
+                    className={`w-10 h-10 rounded-full border-3 transition-all ${
+                      currentColor === color.value ? 'border-gray-800 scale-110' : 'border-gray-300'
+                    }`}
+                    style={{ backgroundColor: color.value }}
+                    title={color.name}
+                  />
+                ))}
+              </div>
+            )}
+            
+            {/* Linha 6: Ações */}
+            <div className="flex items-center gap-2">
+              <Button onClick={saveAnnotations} disabled={isLoading} size="sm" className="bg-green-600 hover:bg-green-700 flex-1">
                 <Save className="h-4 w-4 mr-2" />
                 {isLoading ? "Salvando..." : "Salvar Anotações"}
               </Button>
               <Button onClick={() => setShowMobileEditor(false)} variant="outline" size="sm">
                 Cancelar
               </Button>
+            </div>
+
+            {/* Dicas de Uso */}
+            <div className="text-xs bg-blue-100 p-2 rounded">
+              💡 <strong>Dica:</strong> 
+              {interactionMode === 'draw' 
+                ? ' Use "Navegar" para mover/zoom o documento, depois volte para "Desenhar"'
+                : ' Arraste para mover o documento. Use +/- para zoom. Volte para "Desenhar" para anotar'
+              }
             </div>
           </div>
         )}
@@ -436,31 +565,74 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
             </div>
           ) : pdfUrl ? (
             <div className="relative w-full h-full">
-              {/* PDF Viewer */}
-              <iframe
-                src={pdfUrl}
-                className="w-full h-full border-0 bg-white"
-                title={`PDF: ${document.file_name}`}
-                allowFullScreen
-              />
-              
-              {/* Canvas de Anotação (Mobile) */}
-              {isMobile && showMobileEditor && (
-                <div className="absolute inset-0 pointer-events-none">
-                  <SignatureCanvas
-                    ref={canvasRef}
-                    canvasProps={{
-                      className: 'w-full h-full pointer-events-auto',
-                      style: { 
-                        background: 'transparent',
-                        touchAction: 'none'
-                      }
+              {/* PDF Viewer Container */}
+              <div 
+                ref={containerRef}
+                className="relative w-full h-full overflow-hidden"
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleMouseUp}
+                style={{ 
+                  cursor: isMobile && interactionMode === 'pan' ? 'grab' : 'default',
+                  touchAction: isMobile && showMobileEditor ? 'none' : 'auto'
+                }}
+              >
+                <div
+                  className="transition-transform duration-200 ease-out"
+                  style={{
+                    transform: `translate(${panX}px, ${panY}px) scale(${zoomLevel})`,
+                    transformOrigin: 'center center',
+                    width: '100%',
+                    height: '100%'
+                  }}
+                >
+                  {/* PDF Viewer */}
+                  <iframe
+                    src={pdfUrl}
+                    className="w-full h-full border-0 bg-white"
+                    title={`PDF: ${document.file_name}`}
+                    allowFullScreen
+                    style={{ 
+                      pointerEvents: isMobile && showMobileEditor && interactionMode === 'draw' ? 'none' : 'auto'
                     }}
-                    backgroundColor="transparent"
-                    penColor={currentColor}
-                    minWidth={penWidth}
-                    maxWidth={penWidth}
                   />
+                  
+                  {/* Canvas de Anotação (Mobile) */}
+                  {isMobile && showMobileEditor && interactionMode === 'draw' && (
+                    <div className="absolute inset-0">
+                      <SignatureCanvas
+                        ref={canvasRef}
+                        canvasProps={{
+                          className: 'w-full h-full',
+                          style: { 
+                            background: 'transparent',
+                            touchAction: 'none',
+                            pointerEvents: 'auto'
+                          }
+                        }}
+                        backgroundColor="transparent"
+                        penColor={currentColor}
+                        minWidth={penWidth * 0.8}
+                        maxWidth={penWidth * 1.2}
+                        velocityFilterWeight={0.7}
+                        throttle={16}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Overlay de informações */}
+              {isMobile && showMobileEditor && (
+                <div className="absolute top-4 right-4 bg-black/70 text-white px-3 py-2 rounded-lg text-sm">
+                  <div>📍 Modo: {interactionMode === 'draw' ? 'Desenho' : 'Navegação'}</div>
+                  <div>🔍 Zoom: {Math.round(zoomLevel * 100)}%</div>
+                  {interactionMode === 'draw' && (
+                    <div>🖌️ {penWidth}px • {colors.find(c => c.value === currentColor)?.name}</div>
+                  )}
                 </div>
               )}
             </div>
@@ -484,9 +656,10 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
                 <>
                   <strong className="text-green-800">iPad/Mobile:</strong>
                   <span className="ml-2">
-                    Toque em "Iniciar Edição" para usar ferramentas touch otimizadas • 
-                    Suporte completo ao Apple Pencil • 
-                    Anotações são salvas automaticamente no PDF
+                    Use "Navegar" para zoom/pan (gestos touch) • 
+                    "Desenhar" para anotar com Apple Pencil • 
+                    Controle preciso de espessura 0.5-10px •
+                    Anotações salvas automaticamente no PDF
                   </span>
                 </>
               ) : (

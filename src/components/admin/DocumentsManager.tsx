@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Upload, FileText, Edit, Download, Eye, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import SimplePDFViewer from "./SimplePDFViewer";
+import AdvancedPDFEditor from "./AdvancedPDFEditor";
 
 interface Document {
   id: string;
@@ -396,27 +396,21 @@ const DocumentsManager = ({ clientId, clientName, onDocumentUpdated }: Documents
       {editingDocument && (
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
           <DialogContent className="max-w-[98vw] max-h-[98vh] w-full h-full p-0 gap-0">
-            <DialogHeader className="p-4 pb-2">
-              <DialogTitle>Visualizar: {editingDocument.file_name}</DialogTitle>
-              <DialogDescription className="text-sm">
-                Visualize o documento PDF com scroll completo e zoom nativo.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex-1 overflow-hidden">
-              <SimplePDFViewer
-                document={editingDocument}
-                clientId={clientId}
-                onSave={() => {
-                  setEditDialogOpen(false);
-                  setEditingDocument(null);
-                  loadDocuments();
-                  onDocumentUpdated();
-                }}
-                onCancel={() => {
-                  setEditDialogOpen(false);
-                  setEditingDocument(null);
-                }}
-              />
+            <div className="h-full">{/* Container para o editor completo */}
+            <AdvancedPDFEditor
+              document={editingDocument}
+              clientId={clientId}
+              onSave={() => {
+                setEditDialogOpen(false);
+                setEditingDocument(null);
+                loadDocuments();
+                onDocumentUpdated();
+              }}
+              onCancel={() => {
+                setEditDialogOpen(false);
+                setEditingDocument(null);
+              }}
+            />
             </div>
           </DialogContent>
         </Dialog>

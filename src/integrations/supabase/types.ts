@@ -417,6 +417,56 @@ export type Database = {
         }
         Relationships: []
       }
+      document_annotations: {
+        Row: {
+          annotation_type: string
+          content: string
+          created_at: string
+          created_by: string
+          document_id: string
+          id: string
+          page_number: number | null
+          position_x: number | null
+          position_y: number | null
+          style_properties: Json | null
+          updated_at: string
+        }
+        Insert: {
+          annotation_type?: string
+          content: string
+          created_at?: string
+          created_by: string
+          document_id: string
+          id?: string
+          page_number?: number | null
+          position_x?: number | null
+          position_y?: number | null
+          style_properties?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          annotation_type?: string
+          content?: string
+          created_at?: string
+          created_by?: string
+          document_id?: string
+          id?: string
+          page_number?: number | null
+          position_x?: number | null
+          position_y?: number | null
+          style_properties?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_annotations_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "client_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_settings: {
         Row: {
           created_at: string

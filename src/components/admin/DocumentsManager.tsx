@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Upload, FileText, Edit, Download, Eye, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import SimplePDFViewer from "./SimplePDFViewer";
+import AdvancedPDFViewer from "./AdvancedPDFViewer";
 
 interface Document {
   id: string;
@@ -397,13 +397,13 @@ const DocumentsManager = ({ clientId, clientName, onDocumentUpdated }: Documents
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
           <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full lg:max-w-6xl lg:max-h-[90vh] p-0">
             <DialogHeader className="p-6 pb-4">
-              <DialogTitle>Visualizar: {editingDocument.file_name}</DialogTitle>
+              <DialogTitle>Editor: {editingDocument.file_name}</DialogTitle>
               <DialogDescription>
-                Visualize e baixe o documento PDF.
+                Visualize, edite e adicione anotações ao documento PDF.
               </DialogDescription>
             </DialogHeader>
             <div className="flex-1 overflow-hidden">
-              <SimplePDFViewer
+              <AdvancedPDFViewer
                 document={editingDocument}
                 clientId={clientId}
                 onSave={() => {

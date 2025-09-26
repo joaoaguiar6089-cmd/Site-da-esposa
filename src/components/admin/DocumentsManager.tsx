@@ -81,7 +81,20 @@ const DocumentsManager = ({ clientId, clientName, onDocumentUpdated }: Documents
 
     setLoading(true);
     try {
-      const filePath = `${clientId}/${Date.now()}_${selectedFile.name}`;
+      // Limpar o nome do arquivo removendo espaços e caracteres especiais
+      const cleanFileName = selectedFile.name
+        .toLowerCase()
+        .replace(/[^a-z0-9.-]/g, '_') // Substitui caracteres especiais por underscore
+        .replace(/_{2,}/g, '_') // Remove underscores duplos
+        .replace(/^_|_$/g, ''); // Remove underscores no início e fim
+      
+      const filePath = `${clientId}/${Date.now()}_${cleanFileName}`;
+      
+      console.log("📤 Uploading document:", { 
+        originalName: selectedFile.name, 
+        cleanName: cleanFileName, 
+        filePath 
+      });
       
       const { error: storageError } = await supabase.storage
         .from("client-documents")
@@ -103,6 +116,8 @@ const DocumentsManager = ({ clientId, clientName, onDocumentUpdated }: Documents
 
       if (dbError) throw dbError;
 
+      console.log("✅ Document uploaded successfully!");
+
       toast({
         title: "Sucesso",
         description: "Documento enviado com sucesso",
@@ -115,7 +130,7 @@ const DocumentsManager = ({ clientId, clientName, onDocumentUpdated }: Documents
       loadDocuments();
       onDocumentUpdated();
     } catch (error) {
-      console.error("Error uploading document:", error);
+      console.error("❌ Error uploading document:", error);
       toast({
         title: "Erro",
         description: "Erro ao enviar documento",

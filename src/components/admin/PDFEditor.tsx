@@ -30,22 +30,13 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
   const [isReady, setIsReady] = useState(false);
   const { toast } = useToast();
 
-  // Inicialização simples e direta
+  // Inicializar canvas quando o componente for montado
   useEffect(() => {
-    // Aguardar um frame para garantir que o DOM está renderizado
-    const timer = setTimeout(() => {
-      if (!canvasRef.current) {
-        console.error("❌ Canvas element não encontrado");
-        return;
-      }
-
-      if (fabricCanvasRef.current) {
-        console.log("ℹ️ Canvas já existe, limpando...");
-        fabricCanvasRef.current.dispose();
-      }
+    const initCanvas = () => {
+      if (!canvasRef.current || fabricCanvasRef.current) return;
 
       try {
-        console.log("🖌️ Criando canvas Fabric...");
+        console.log("🖌️ Inicializando canvas...");
         
         const canvas = new FabricCanvas(canvasRef.current, {
           width: 800,
@@ -53,27 +44,19 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
           backgroundColor: "#ffffff",
         });
 
-        canvas.freeDrawingBrush.color = "#000000";
-        canvas.freeDrawingBrush.width = 2;
-        canvas.isDrawingMode = false;
-
         fabricCanvasRef.current = canvas;
+        setIsReady(true);
         
         // Adicionar conteúdo inicial
         addInitialContent(canvas);
         
-        setIsReady(true);
-        console.log("✅ Canvas pronto!");
-        
+        console.log("✅ Canvas inicializado!");
       } catch (error) {
-        console.error("❌ Erro:", error);
-        toast({
-          title: "Erro",
-          description: "Falha ao inicializar editor",
-          variant: "destructive",
-        });
+        console.error("❌ Erro ao inicializar canvas:", error);
       }
-    }, 100);
+    };
+
+    const timer = setTimeout(initCanvas, 100);
 
     return () => {
       clearTimeout(timer);
@@ -84,13 +67,9 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
     };
   }, [document.id]);
 
-
   const addInitialContent = (canvas: FabricCanvas) => {
     try {
-      canvas.clear();
-      canvas.backgroundColor = "#ffffff";
-
-      const pageText = new FabricText(`Documento: ${document.file_name}`, {
+      const title = new FabricText(`Documento: ${document.file_name}`, {
         left: 50,
         top: 50,
         fontSize: 18,
@@ -98,7 +77,7 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
         selectable: false,
       });
 
-      const instructions = new FabricText("Use as ferramentas para adicionar texto ou desenhar", {
+      const subtitle = new FabricText("Use as ferramentas para adicionar texto ou desenhar", {
         left: 50,
         top: 80,
         fontSize: 14,
@@ -106,62 +85,15 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
         selectable: false,
       });
 
-      const pdfPreview = new FabricText("📄 Visualização do PDF", {
-        left: 50,
-        top: 120,
-        fontSize: 16,
-        fill: "#0066cc",
-        selectable: false,
-      });
-
-      const fileInfo = new FabricText(`Arquivo: ${document.original_file_name}`, {
-        left: 50,
-        top: 150,
-        fontSize: 12,
-        fill: "#666666",
-        selectable: false,
-      });
-
-      const editArea = new FabricText("Área de Edição - Adicione textos e anotações abaixo", {
-        left: 50,
-        top: 180,
-        fontSize: 12,
-        fill: "#999999",
-        selectable: false,
-      });
-
-      // Adicionar uma área interativa para edição
-      const interactiveArea = new FabricText("↓", {
-        left: 50,
-        top: 220,
-        fontSize: 24,
-        fill: "#cccccc",
-        selectable: false,
-      });
-
-      canvas.add(pageText);
-      canvas.add(instructions);
-      canvas.add(pdfPreview);
-      canvas.add(fileInfo);
-      canvas.add(editArea);
-      canvas.add(interactiveArea);
+      canvas.add(title, subtitle);
       canvas.renderAll();
-      
-      console.log("📝 Conteúdo inicial adicionado ao canvas");
     } catch (error) {
       console.error("❌ Erro ao adicionar conteúdo inicial:", error);
     }
   };
 
   const addText = () => {
-    if (!fabricCanvasRef.current || !isReady) {
-      toast({
-        title: "Aviso",
-        description: "Aguarde o carregamento do editor",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!fabricCanvasRef.current || !isReady) return;
 
     try {
       const text = new FabricText("Clique para editar", {
@@ -176,71 +108,32 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
       fabricCanvasRef.current.add(text);
       fabricCanvasRef.current.setActiveObject(text);
       fabricCanvasRef.current.renderAll();
-      console.log("📝 Texto adicionado com sucesso");
     } catch (error) {
       console.error("❌ Erro ao adicionar texto:", error);
-      toast({
-        title: "Erro",
-        description: "Erro ao adicionar texto",
-        variant: "destructive",
-      });
     }
   };
 
   const toggleDrawing = () => {
-    if (!fabricCanvasRef.current || !isReady) {
-      toast({
-        title: "Aviso",
-        description: "Editor não está pronto",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!fabricCanvasRef.current || !isReady) return;
 
     const isDrawingMode = !fabricCanvasRef.current.isDrawingMode;
     fabricCanvasRef.current.isDrawingMode = isDrawingMode;
     
-    // Configurar brush de forma segura
     if (isDrawingMode && fabricCanvasRef.current.freeDrawingBrush) {
       fabricCanvasRef.current.freeDrawingBrush.color = "#000000";
       fabricCanvasRef.current.freeDrawingBrush.width = 2;
     }
-    
-    console.log(`🎨 Modo desenho: ${isDrawingMode ? 'ativado' : 'desativado'}`);
-    
-    toast({
-      title: isDrawingMode ? "Modo Desenho Ativado" : "Modo Desenho Desativado",
-      description: isDrawingMode ? 
-        "Agora você pode desenhar no documento" : 
-        "Modo seleção ativado",
-    });
   };
 
   const clearCanvas = () => {
     if (!fabricCanvasRef.current) return;
     
     try {
-      // Manter apenas os elementos de informação (não editáveis)
-      const backgroundObjects = fabricCanvasRef.current.getObjects().filter(obj => {
-        const text = obj as FabricText;
-        return text.selectable === false;
-      });
-      
       fabricCanvasRef.current.clear();
       fabricCanvasRef.current.backgroundColor = "#ffffff";
-      
-      // Re-adicionar apenas os objetos de fundo
-      backgroundObjects.forEach(obj => fabricCanvasRef.current!.add(obj));
-      fabricCanvasRef.current.renderAll();
-      
-      console.log("🧹 Anotações removidas, mantendo informações do documento");
+      addInitialContent(fabricCanvasRef.current);
     } catch (error) {
       console.error("❌ Erro ao limpar canvas:", error);
-      toast({
-        title: "Erro",
-        description: "Erro ao limpar o canvas",
-        variant: "destructive",
-      });
     }
   };
 
@@ -249,19 +142,13 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
 
     try {
       setIsLoading(true);
-      console.log("💾 Iniciando salvamento...");
-
-      // Salvar como imagem
+      
       const dataURL = fabricCanvasRef.current.toDataURL({
         format: 'png',
         quality: 1,
         multiplier: 1
       });
 
-      // Aqui você pode enviar a imagem para o servidor se necessário
-      console.log("📊 Documento convertido para imagem");
-
-      // Atualizar nome do documento no Supabase
       const { error } = await supabase
         .from("client_documents")
         .update({ 
@@ -277,9 +164,8 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
         description: "Documento salvo com sucesso",
       });
 
-      console.log("✅ Documento salvo com sucesso");
       onSave();
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ Erro ao salvar documento:", error);
       toast({
         title: "Erro",
@@ -295,8 +181,6 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
     if (!fabricCanvasRef.current) return;
 
     try {
-      console.log("📥 Iniciando download...");
-      
       const dataURL = fabricCanvasRef.current.toDataURL({
         format: 'png',
         quality: 1,
@@ -309,20 +193,8 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
       window.document.body.appendChild(link);
       link.click();
       window.document.body.removeChild(link);
-      
-      toast({
-        title: "Sucesso",
-        description: "Imagem baixada com sucesso",
-      });
-      
-      console.log("✅ Download concluído");
     } catch (error) {
       console.error("❌ Erro ao baixar imagem:", error);
-      toast({
-        title: "Erro",
-        description: "Erro ao baixar imagem",
-        variant: "destructive",
-      });
     }
   };
 

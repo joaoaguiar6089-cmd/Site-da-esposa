@@ -310,6 +310,62 @@ const ProcedureHistory = ({
     }
   };
 
+  const handleDeleteAppointment = async (appointmentId: string) => {
+    if (!confirm('Tem certeza que deseja excluir este agendamento? Esta ação não pode ser desfeita.')) return;
+
+    try {
+      setLoading(true);
+      
+      // Primeiro, excluir todos os resultados relacionados ao agendamento
+      const { error: resultsError } = await supabase
+        .from('procedure_results')
+        .delete()
+        .eq('appointment_id', appointmentId);
+
+      if (resultsError) throw resultsError;
+
+      // Excluir especificações do agendamento
+      const { error: specsError } = await supabase
+        .from('appointment_specifications')
+        .delete()
+        .eq('appointment_id', appointmentId);
+
+      if (specsError) throw specsError;
+
+      // Excluir seleções de área do corpo
+      const { error: bodyError } = await supabase
+        .from('appointment_body_selections')
+        .delete()
+        .eq('appointment_id', appointmentId);
+
+      if (bodyError) throw bodyError;
+
+      // Por último, excluir o agendamento
+      const { error: appointmentError } = await supabase
+        .from('appointments')
+        .delete()
+        .eq('id', appointmentId);
+
+      if (appointmentError) throw appointmentError;
+
+      toast({
+        title: "Agendamento excluído",
+        description: "O agendamento foi excluído com sucesso.",
+      });
+
+      onAppointmentUpdated();
+    } catch (error: any) {
+      console.error('Erro ao excluir agendamento:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao excluir agendamento.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (showNewAppointmentForm) {
     return (
       <SimpleAppointmentForm
@@ -419,6 +475,13 @@ const ProcedureHistory = ({
                           onClick={() => handleEditAppointment(appointment)}
                         >
                           <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="destructive"
+                          onClick={() => handleDeleteAppointment(appointment.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                         <Select
                           value={appointment.status}

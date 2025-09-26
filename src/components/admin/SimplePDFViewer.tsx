@@ -10,6 +10,7 @@ interface ClientDocument {
   file_name: string;
   file_path: string;
   original_file_name: string;
+  notes?: string;
 }
 
 interface SimplePDFViewerProps {
@@ -96,58 +97,57 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
     }
   };
 
-  const saveEditedDocument = async () => {
+  const saveEditedDocument = () => {
+    toast({
+      title: "Instruções para Salvar",
+      description: "Para salvar suas edições: 1) Use Ctrl+S ou Cmd+S no PDF para baixar a versão editada 2) Clique em 'Upload Nova Versão' abaixo para substituir o documento",
+    });
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
     try {
       setIsLoading(true);
       
-      // Baixar o PDF atual
-      const { data, error } = await supabase.storage
-        .from('client-documents')
-        .download(document.file_path);
-
-      if (error) throw error;
-
-      // Criar um novo nome para o arquivo editado
-      const timestamp = Date.now();
-      const editedFileName = `editado_${timestamp}_${document.original_file_name}`;
-      const editedFilePath = `${document.file_path.split('/')[0]}/editado_${timestamp}_${document.file_path.split('/').pop()}`;
-
-      // Upload do PDF editado
+      // Atualizar o arquivo existente (sobrescrever)
       const { error: uploadError } = await supabase.storage
         .from('client-documents')
-        .upload(editedFilePath, data, {
+        .update(document.file_path, file, {
           contentType: 'application/pdf',
-          upsert: false
         });
 
       if (uploadError) throw uploadError;
 
-      // Salvar registro no banco de dados
+      // Atualizar registro no banco de dados
+      const now = new Date();
+      const editNote = `Documento editado em ${now.toLocaleString('pt-BR')}`;
+      
       const { error: dbError } = await supabase
         .from('client_documents')
-        .insert({
-          client_id: clientId,
-          file_name: `Editado - ${document.file_name}`,
-          original_file_name: editedFileName,
-          file_path: editedFilePath,
-          file_size: data.size,
-          document_type: 'pdf',
-          notes: `Documento editado baseado em: ${document.file_name}`
-        });
+        .update({
+          file_size: file.size,
+          notes: `${document.notes || ''} - ${editNote}`,
+          updated_at: now.toISOString()
+        })
+        .eq('id', document.id);
 
       if (dbError) throw dbError;
 
       toast({
-        title: "Documento Salvo",
-        description: "PDF editado foi salvo com sucesso",
+        title: "Documento Atualizado",
+        description: "PDF foi substituído com suas edições",
       });
 
+      // Recarregar o documento
+      loadPDFDocument();
       onSave();
     } catch (error) {
       console.error("Erro ao salvar PDF editado:", error);
       toast({
         title: "Erro",
-        description: "Erro ao salvar documento editado",
+        description: "Erro ao atualizar documento",
         variant: "destructive",
       });
     } finally {
@@ -189,9 +189,20 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
           </Button>
           
           <div className="flex gap-2 ml-auto">
-            <Button onClick={saveEditedDocument} disabled={!pdfUrl || isLoading} size="sm" className="bg-green-600 hover:bg-green-700">
-              {isLoading ? "Salvando..." : "Salvar Edições"}
+            <Button onClick={saveEditedDocument} disabled={!pdfUrl} size="sm" variant="outline">
+              💡 Como Salvar
             </Button>
+            <label className="cursor-pointer">
+              <Button disabled={isLoading} size="sm" className="bg-green-600 hover:bg-green-700" asChild>
+                <span>{isLoading ? "Salvando..." : "📁 Upload Nova Versão"}</span>
+              </Button>
+              <input
+                type="file"
+                accept=".pdf"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </label>
             <Button onClick={onCancel} variant="outline" size="sm">
               Fechar
             </Button>
@@ -242,8 +253,12 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
           <div className="flex items-center gap-3">
             <span className="text-lg">📝</span>
             <div className="flex-1">
-              <strong className="text-green-800">Dicas de edição:</strong>
-              <span className="ml-2">Use as ferramentas nativas do PDF • Clique em "Salvar Edições" para salvar suas alterações</span>
+              <strong className="text-green-800">Como editar e salvar:</strong>
+              <span className="ml-2">
+                1) Faça suas edições no PDF acima • 
+                2) Use Ctrl+S (ou Cmd+S) para baixar a versão editada • 
+                3) Clique em "Upload Nova Versão" para substituir o documento
+              </span>
             </div>
           </div>
         </div>

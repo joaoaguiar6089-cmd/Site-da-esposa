@@ -334,7 +334,7 @@ const PDFViewerEditor = ({ document, onSave, onCancel }: PDFViewerEditorProps) =
     if (!canvasRef.current) return;
 
     const dataURL = canvasRef.current.toDataURL('image/png');
-    const link = document.createElement('a');
+    const link = window.document.createElement('a');
     link.href = dataURL;
     link.download = `${document.file_name}_anotado_pag${currentPage}.png`;
     link.click();

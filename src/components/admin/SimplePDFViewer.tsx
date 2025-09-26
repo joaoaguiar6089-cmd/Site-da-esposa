@@ -97,90 +97,96 @@ const SimplePDFViewer = ({ document, onSave, onCancel }: SimplePDFViewerProps) =
   };
 
   return (
-    <div className="flex flex-col h-full max-h-[95vh] overflow-hidden">
-      {/* Status compacto */}
-      <div className="border-b p-2 bg-blue-50 shrink-0">
-        <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4 text-blue-600" />
-          <h3 className="font-semibold text-sm">Documento: {document.file_name}</h3>
-          <span className="text-xs text-blue-700 ml-auto">
-            {isLoading ? "⏳ Carregando..." : 
-             pdfUrl ? "✅ Pronto" : 
-             error ? "❌ Erro" : "Aguardando..."}
-          </span>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
+        {/* Header compacto */}
+        <div className="border-b p-3 bg-blue-50 shrink-0">
+          <div className="flex items-center gap-3">
+            <FileText className="h-5 w-5 text-blue-600" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-base">Visualizar: {document.file_name}</h3>
+              <p className="text-xs text-blue-700 mt-1">
+                Visualize o documento PDF com scroll completo e zoom nativo.
+              </p>
+            </div>
+            <span className="text-sm font-medium px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+              {isLoading ? "⏳ Carregando..." : 
+               pdfUrl ? "✅ Pronto" : 
+               error ? "❌ Erro" : "Aguardando..."}
+            </span>
+          </div>
         </div>
-      </div>
 
-      {/* Controles compactos */}
-      <div className="flex items-center gap-2 p-2 bg-gray-50 border-b shrink-0">
-        <Button onClick={openInNewTab} disabled={!pdfUrl} size="sm">
-          <ExternalLink className="h-3 w-3 mr-1" />
-          Nova Aba
-        </Button>
-        
-        <Button onClick={downloadDocument} disabled={!pdfUrl} variant="outline" size="sm">
-          <Download className="h-3 w-3 mr-1" />
-          Baixar
-        </Button>
-        
-        <div className="flex gap-1 ml-auto">
-          <Button onClick={onSave} size="sm">
-            Fechar
+        {/* Controles */}
+        <div className="flex items-center gap-3 p-3 bg-gray-50 border-b shrink-0">
+          <Button onClick={openInNewTab} disabled={!pdfUrl} size="sm">
+            <ExternalLink className="h-4 w-4 mr-2" />
+            Nova Aba
           </Button>
-          <Button onClick={onCancel} variant="outline" size="sm">
-            Cancelar
+          
+          <Button onClick={downloadDocument} disabled={!pdfUrl} variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-2" />
+            Baixar
           </Button>
+          
+          <div className="flex gap-2 ml-auto">
+            <Button onClick={onSave} size="sm" className="bg-green-600 hover:bg-green-700">
+              Fechar
+            </Button>
+            <Button onClick={onCancel} variant="outline" size="sm">
+              Cancelar
+            </Button>
+          </div>
         </div>
-      </div>
 
-      {/* Área do PDF - ocupa todo espaço restante */}
-      <div className="flex-1 overflow-hidden">
-        {error ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center p-8">
-              <FileText className="h-12 w-12 mx-auto mb-4 text-red-400" />
-              <h3 className="text-lg font-medium text-red-600 mb-2">Erro ao Carregar PDF</h3>
-              <p className="text-sm text-gray-600 mb-4">{error}</p>
-              <Button onClick={loadPDFDocument} variant="outline" size="sm">
-                Tentar Novamente
-              </Button>
+        {/* Área principal do PDF - ocupa todo espaço disponível */}
+        <div className="flex-1 bg-gray-100 relative overflow-hidden">
+          {error ? (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center p-8 bg-white rounded-lg shadow-md max-w-md">
+                <FileText className="h-16 w-16 mx-auto mb-4 text-red-400" />
+                <h3 className="text-xl font-medium text-red-600 mb-3">Erro ao Carregar PDF</h3>
+                <p className="text-sm text-gray-600 mb-6">{error}</p>
+                <Button onClick={loadPDFDocument} variant="outline">
+                  Tentar Novamente
+                </Button>
+              </div>
             </div>
-          </div>
-        ) : isLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center p-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-lg font-medium">Carregando PDF...</p>
-              <p className="text-sm text-gray-600 mt-2">Aguarde um momento</p>
+          ) : isLoading ? (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center p-8 bg-white rounded-lg shadow-md">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-xl font-medium mb-2">Carregando PDF...</p>
+                <p className="text-sm text-gray-600">Aguarde um momento</p>
+              </div>
             </div>
-          </div>
-        ) : pdfUrl ? (
-          <iframe
-            src={pdfUrl}
-            className="w-full h-full border-0"
-            title={`PDF: ${document.file_name}`}
-            style={{ 
-              width: '100%',
-              height: '100%',
-              minHeight: '100%'
-            }}
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center p-8">
-              <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-              <p className="text-lg font-medium">Nenhum documento carregado</p>
+          ) : pdfUrl ? (
+            <iframe
+              src={pdfUrl}
+              className="w-full h-full border-0 bg-white"
+              title={`PDF: ${document.file_name}`}
+              allowFullScreen
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center p-8 bg-white rounded-lg shadow-md">
+                <FileText className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                <p className="text-xl font-medium mb-2">Nenhum documento carregado</p>
+                <p className="text-sm text-gray-600">Selecione um documento para visualizar</p>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
 
-      {/* Instruções fixas na parte inferior */}
-      <div className="text-xs text-gray-600 bg-green-50 p-2 border-t shrink-0">
-        <div className="flex items-center gap-2">
-          <span>📄</span>
-          <strong>Dicas:</strong>
-          <span>Use Ctrl+Scroll para zoom • Scroll para navegar • Nova Aba para tela cheia</span>
+        {/* Footer com dicas */}
+        <div className="text-sm text-gray-700 bg-green-50 p-3 border-t shrink-0">
+          <div className="flex items-center gap-3">
+            <span className="text-lg">📄</span>
+            <div className="flex-1">
+              <strong className="text-green-800">Dicas de navegação:</strong>
+              <span className="ml-2">Use Ctrl+Scroll para zoom • Scroll para navegar páginas • Clique em "Nova Aba" para tela cheia</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

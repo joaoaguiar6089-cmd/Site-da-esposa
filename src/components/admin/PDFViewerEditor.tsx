@@ -8,8 +8,11 @@ import { Type, Save, Download, Trash2, FileText, ZoomIn, ZoomOut, Pen } from "lu
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
-// Configure PDF.js worker to match the API version
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+// Use local worker (no external CDN) to fix loading issues
+if (typeof window !== 'undefined') {
+  // Setting workerSrc to null disables the worker
+  pdfjs.GlobalWorkerOptions.workerSrc = null;
+}
 
 interface ClientDocument {
   id: string;

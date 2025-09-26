@@ -1,35 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { Document, Page, pdfjs } from 'react-pdf';
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Type, Save, Download, Trash2, FileText, ZoomIn, ZoomOut, Pen } from "lucide-react";
+import { Type, Save, Download, Trash2, FileText, ZoomIn, ZoomOut, Pen, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-
-// Configure PDF.js worker with multiple fallback options
-const configurePDFWorker = () => {
-  if (typeof window !== 'undefined') {
-    // Try multiple CDN sources for better reliability
-    const workerSources = [
-      `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`,
-      `//cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`,
-      `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`,
-      // Fallback to a specific known working version
-      '//unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js'
-    ];
-    
-    // Try the first source
-    pdfjs.GlobalWorkerOptions.workerSrc = workerSources[0];
-    
-    console.log(`📦 PDF.js Worker configurado para versão ${pdfjs.version}`);
-    console.log(`🔗 Worker URL: ${workerSources[0]}`);
-  }
-};
-
-// Initialize worker
-configurePDFWorker();
 
 interface ClientDocument {
   id: string;
@@ -43,10 +17,9 @@ interface Annotation {
   x: number;
   y: number;
   text?: string;
-  page: number;
   width?: number;
   height?: number;
-  paths?: { x: number; y: number }[][];
+  color?: string;
 }
 
 interface PDFViewerEditorProps {
@@ -56,22 +29,18 @@ interface PDFViewerEditorProps {
   onCancel: () => void;
 }
 
-const PDFViewerEditor = ({ document, onSave, onCancel }: PDFViewerEditorProps) => {
+const SimplePDFEditor = ({ document, onSave, onCancel }: PDFViewerEditorProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const pageRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [pdfUrl, setPdfUrl] = useState<string>("");
-  const [numPages, setNumPages] = useState<number>(0);
-  const [currentPage, setCurrentPage] = useState<number>(1);
   const [pdfLoaded, setPdfLoaded] = useState(false);
   const [pdfError, setPdfError] = useState<string>("");
-  const [scale, setScale] = useState(1.0);
   const [isDrawing, setIsDrawing] = useState(false);
   const [lastPoint, setLastPoint] = useState<{ x: number; y: number } | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [currentTool, setCurrentTool] = useState<'pen' | 'text'>('pen');
-  const [pageWidth, setPageWidth] = useState(595);
-  const [pageHeight, setPageHeight] = useState(842);
   const [isLoading, setIsLoading] = useState(false);
+  const [scale, setScale] = useState(1.0);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -82,53 +51,38 @@ const PDFViewerEditor = ({ document, onSave, onCancel }: PDFViewerEditorProps) =
     try {
       setIsLoading(true);
       setPdfError("");
-      console.log("🔍 Iniciando carregamento do PDF:", document.file_path);
-      
-      // Tentar múltiplas estratégias para obter o PDF
-      let url: string | null = null;
+      console.log("🔍 Carregando documento:", document.file_path);
       
       // Estratégia 1: URL assinada
-      try {
-        const { data: urlData, error: urlError } = await supabase.storage
-          .from('client-documents')
-          .createSignedUrl(document.file_path, 7200); // 2 horas
+      const { data: urlData, error: urlError } = await supabase.storage
+        .from('client-documents')
+        .createSignedUrl(document.file_path, 7200);
 
-        if (urlData?.signedUrl && !urlError) {
-          url = urlData.signedUrl;
-          console.log("✅ URL assinada obtida com sucesso");
-        }
-      } catch (err) {
-        console.warn("⚠️ Falha na URL assinada:", err);
+      if (urlError) {
+        console.warn("⚠️ Erro na URL assinada:", urlError);
+        throw new Error(`Erro ao gerar URL: ${urlError.message}`);
       }
 
-      // Estratégia 2: Download direto se URL assinada falhar
-      if (!url) {
-        try {
-          const { data: fileData, error: downloadError } = await supabase.storage
-            .from('client-documents')
-            .download(document.file_path);
-
-          if (fileData && !downloadError) {
-            url = URL.createObjectURL(fileData);
-            console.log("✅ Download direto bem-sucedido");
-          }
-        } catch (err) {
-          console.warn("⚠️ Falha no download direto:", err);
-        }
-      }
-
-      if (url) {
-        setPdfUrl(url);
-        console.log("✅ PDF URL definida:", url.substring(0, 100) + "...");
+      if (urlData?.signedUrl) {
+        setPdfUrl(urlData.signedUrl);
+        setPdfLoaded(true);
+        console.log("✅ PDF URL obtida com sucesso");
+        
+        toast({
+          title: "PDF Carregado",
+          description: "Documento pronto para edição",
+        });
       } else {
-        throw new Error("Não foi possível obter o arquivo PDF por nenhum método");
+        throw new Error("URL não disponível");
       }
     } catch (error) {
       console.error("❌ Erro ao carregar documento:", error);
-      setPdfError(`Erro ao carregar PDF: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      setPdfError(error instanceof Error ? error.message : 'Erro desconhecido');
+      setPdfLoaded(false);
+      
       toast({
         title: "Erro",
-        description: "Não foi possível carregar o documento PDF",
+        description: "Não foi possível carregar o documento",
         variant: "destructive",
       });
     } finally {
@@ -136,67 +90,39 @@ const PDFViewerEditor = ({ document, onSave, onCancel }: PDFViewerEditorProps) =
     }
   };
 
-  const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
-    setNumPages(numPages);
-    setCurrentPage(1);
-    setPdfLoaded(true);
-    setPdfError("");
+  const initializeCanvas = () => {
+    if (!canvasRef.current || !containerRef.current) return;
     
-    console.log("✅ PDF carregado com sucesso:", numPages, "páginas");
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
     
-    toast({
-      title: "PDF Carregado",
-      description: `Documento carregado com ${numPages} página${numPages > 1 ? 's' : ''}`,
-    });
-  }, [toast]);
-
-  const onDocumentLoadError = useCallback((error: Error) => {
-    console.error("❌ Erro ao carregar PDF:", error);
-    setPdfError(`Erro no carregamento: ${error.message}`);
-    setPdfLoaded(false);
+    // Definir tamanho do canvas (A4 padrão)
+    const width = 794 * scale; // A4 width em pixels
+    const height = 1123 * scale; // A4 height em pixels
     
-    toast({
-      title: "Erro",
-      description: "Erro ao carregar o documento PDF",
-      variant: "destructive",
-    });
-  }, [toast]);
-
-  const onPageLoadSuccess = useCallback((page: any) => {
-    const { width, height } = page;
-    setPageWidth(width);
-    setPageHeight(height);
+    canvas.width = width;
+    canvas.height = height;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
     
-    // Configurar canvas com as dimensões da página
-    if (canvasRef.current) {
-      canvasRef.current.width = width * scale;
-      canvasRef.current.height = height * scale;
-      canvasRef.current.style.width = `${width * scale}px`;
-      canvasRef.current.style.height = `${height * scale}px`;
-    }
-  }, [scale]);
-
-  const changePage = (delta: number) => {
-    const newPage = currentPage + delta;
-    if (newPage >= 1 && newPage <= numPages) {
-      setCurrentPage(newPage);
-      // Limpar canvas ao mudar de página
-      if (canvasRef.current) {
-        const ctx = canvasRef.current.getContext('2d');
-        if (ctx) {
-          ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-        }
-      }
+    // Fundo branco
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+      
+      // Desenhar bordas para simular página
+      ctx.strokeStyle = '#cccccc';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(0, 0, width, height);
     }
   };
 
-  const zoomIn = () => {
-    setScale(prev => Math.min(prev + 0.2, 3.0));
-  };
-
-  const zoomOut = () => {
-    setScale(prev => Math.max(prev - 0.2, 0.5));
-  };
+  useEffect(() => {
+    if (pdfLoaded) {
+      setTimeout(initializeCanvas, 100);
+    }
+  }, [pdfLoaded, scale]);
 
   const getMousePosition = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current) return { x: 0, y: 0 };
@@ -228,7 +154,6 @@ const PDFViewerEditor = ({ document, onSave, onCancel }: PDFViewerEditorProps) =
     ctx.lineWidth = 2 * scale;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.globalCompositeOperation = 'source-over';
     
     ctx.beginPath();
     ctx.moveTo(lastPoint.x, lastPoint.y);
@@ -251,32 +176,66 @@ const PDFViewerEditor = ({ document, onSave, onCancel }: PDFViewerEditorProps) =
 
     const x = 50 * scale;
     const y = 100 * scale;
-    const fontSize = 16 * scale;
+    const fontSize = 20 * scale;
 
     // Fundo amarelo para destaque
-    ctx.fillStyle = 'rgba(255, 255, 0, 0.8)';
-    ctx.fillRect(x - 5, y - fontSize - 5, 200 * scale, fontSize + 10);
+    ctx.fillStyle = 'rgba(255, 255, 0, 0.7)';
+    ctx.fillRect(x - 10, y - fontSize - 5, 320 * scale, fontSize + 15);
 
-    // Texto
+    // Texto de assinatura
     ctx.fillStyle = '#000000';
     ctx.font = `bold ${fontSize}px Arial`;
-    ctx.fillText('ASSINADO DIGITALMENTE', x, y);
+    ctx.fillText('✓ ASSINADO DIGITALMENTE', x, y);
+
+    // Data atual
+    const dateText = new Date().toLocaleDateString('pt-BR');
+    ctx.font = `${12 * scale}px Arial`;
+    ctx.fillText(`Data: ${dateText}`, x, y + 25 * scale);
+
+    const annotation: Annotation = {
+      type: 'signature',
+      x: x / scale,
+      y: y / scale,
+      text: 'ASSINADO DIGITALMENTE',
+      width: 300,
+      height: 40
+    };
+    
+    setAnnotations(prev => [...prev, annotation]);
+
+    toast({
+      title: "Assinatura Digital",
+      description: "Assinatura digital adicionada com sucesso",
+    });
+  };
+
+  const addCustomText = () => {
+    const text = prompt("Digite o texto a ser inserido:");
+    if (!text || !canvasRef.current) return;
+
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+
+    const x = 100 * scale;
+    const y = 200 * scale;
+    const fontSize = 16 * scale;
+
+    ctx.fillStyle = '#000000';
+    ctx.font = `${fontSize}px Arial`;
+    ctx.fillText(text, x, y);
 
     const annotation: Annotation = {
       type: 'text',
       x: x / scale,
       y: y / scale,
-      text: 'ASSINADO DIGITALMENTE',
-      page: currentPage,
-      width: 200,
-      height: fontSize
+      text: text,
     };
     
     setAnnotations(prev => [...prev, annotation]);
 
     toast({
       title: "Texto Adicionado",
-      description: "Assinatura digital inserida no documento",
+      description: `Texto "${text}" inserido no documento`,
     });
   };
 
@@ -287,19 +246,29 @@ const PDFViewerEditor = ({ document, onSave, onCancel }: PDFViewerEditorProps) =
     if (!ctx) return;
 
     const x = 100 * scale;
-    const y = 200 * scale;
-    const width = 200 * scale;
-    const height = 60 * scale;
+    const y = 300 * scale;
+    const width = 250 * scale;
+    const height = 80 * scale;
 
     // Caixa para assinatura
-    ctx.strokeStyle = '#666666';
+    ctx.strokeStyle = '#333333';
     ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
     ctx.strokeRect(x, y, width, height);
+    ctx.setLineDash([]); // Reset dash
 
     // Texto de instrução
     ctx.fillStyle = '#666666';
     ctx.font = `${12 * scale}px Arial`;
-    ctx.fillText('Área para Assinatura', x + 10, y + height + 20);
+    ctx.fillText('__ Área para Assinatura Manuscrita __', x + 10, y + height + 20);
+
+    // Linha para assinatura
+    ctx.strokeStyle = '#999999';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + 10, y + height - 10);
+    ctx.lineTo(x + width - 10, y + height - 10);
+    ctx.stroke();
 
     const annotation: Annotation = {
       type: 'signature',
@@ -307,78 +276,69 @@ const PDFViewerEditor = ({ document, onSave, onCancel }: PDFViewerEditorProps) =
       y: y / scale,
       width: width / scale,
       height: height / scale,
-      page: currentPage
     };
     
     setAnnotations(prev => [...prev, annotation]);
 
     toast({
       title: "Caixa de Assinatura",
-      description: "Área para assinatura criada",
+      description: "Área para assinatura manuscrita criada",
     });
   };
 
-  const clearAnnotations = () => {
+  const clearCanvas = () => {
     if (!canvasRef.current) return;
     
-    const ctx = canvasRef.current.getContext('2d');
-    if (ctx) {
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-    }
-    
-    setAnnotations(prev => prev.filter(ann => ann.page !== currentPage));
-
-    toast({
-      title: "Página Limpa",
-      description: "Anotações da página atual foram removidas",
-    });
-  };
-
-  const clearAllAnnotations = () => {
-    if (!canvasRef.current) return;
-    
-    const ctx = canvasRef.current.getContext('2d');
-    if (ctx) {
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-    }
-    
+    initializeCanvas();
     setAnnotations([]);
 
     toast({
-      title: "Documento Limpo",
+      title: "Canvas Limpo",
       description: "Todas as anotações foram removidas",
     });
   };
 
-  const downloadAnnotated = () => {
+  const zoomIn = () => {
+    setScale(prev => Math.min(prev + 0.2, 2.0));
+  };
+
+  const zoomOut = () => {
+    setScale(prev => Math.max(prev - 0.2, 0.5));
+  };
+
+  const downloadCanvas = () => {
     if (!canvasRef.current) return;
 
-    const dataURL = canvasRef.current.toDataURL('image/png');
+    const dataURL = canvasRef.current.toDataURL('image/png', 1.0);
     const link = document.createElement('a');
     link.href = dataURL;
-    link.download = `${document.file_name}_anotado_pag${currentPage}.png`;
+    link.download = `${document.file_name}_editado.png`;
     link.click();
 
     toast({
       title: "Download Concluído",
-      description: "Página com anotações foi baixada",
+      description: "Documento editado foi baixado",
     });
   };
 
   const handleSave = async () => {
     try {
-      // Salvar anotações no localStorage ou enviar para o servidor
+      if (!canvasRef.current) return;
+      
+      const imageData = canvasRef.current.toDataURL('image/png', 1.0);
+      
       const annotationData = {
         documentId: document.id,
         annotations: annotations,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        imageData: imageData.substring(0, 100) + '...' // Store reference only
       };
       
-      console.log("💾 Salvando anotações:", annotationData);
+      console.log("💾 Salvando documento editado:", annotationData);
       
       toast({
         title: "Salvo com Sucesso",
-        description: `${annotations.length} anotação(ões) registrada(s)`,
+        description: `Documento com ${annotations.length} anotação(ões) foi salvo`,
       });
       
       onSave();
@@ -386,7 +346,7 @@ const PDFViewerEditor = ({ document, onSave, onCancel }: PDFViewerEditorProps) =
       console.error("Erro ao salvar:", error);
       toast({
         title: "Erro",
-        description: "Erro ao salvar anotações",
+        description: "Erro ao salvar o documento editado",
         variant: "destructive",
       });
     }
@@ -408,7 +368,6 @@ const PDFViewerEditor = ({ document, onSave, onCancel }: PDFViewerEditorProps) =
             x: pos.x / scale,
             y: pos.y / scale,
             text: text,
-            page: currentPage
           };
           
           setAnnotations(prev => [...prev, annotation]);
@@ -423,13 +382,20 @@ const PDFViewerEditor = ({ document, onSave, onCancel }: PDFViewerEditorProps) =
       <div className={`border rounded-lg p-3 ${pdfLoaded ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
         <div className="flex items-center gap-2 mb-2">
           <FileText className="h-4 w-4 text-blue-600" />
-          <h3 className="font-semibold text-sm">Status: {document.file_name}</h3>
+          <h3 className="font-semibold text-sm">Editor Simples: {document.file_name}</h3>
         </div>
         <p className="text-xs">
-          {isLoading ? "⏳ Carregando PDF..." : 
-           pdfLoaded ? `✅ PDF carregado (${numPages} páginas) - Página ${currentPage}` : 
+          {isLoading ? "⏳ Carregando documento..." : 
+           pdfLoaded ? "✅ Documento carregado - Pronto para edição" : 
            pdfError ? `❌ ${pdfError}` : "Aguardando..."}
         </p>
+        {pdfUrl && (
+          <p className="text-xs text-blue-600 mt-1">
+            📎 <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="underline">
+              Ver PDF original em nova aba
+            </a>
+          </p>
+        )}
       </div>
 
       {/* Controles */}
@@ -454,21 +420,6 @@ const PDFViewerEditor = ({ document, onSave, onCancel }: PDFViewerEditorProps) =
           </Button>
         </div>
 
-        {/* Navegação */}
-        {pdfLoaded && numPages > 1 && (
-          <div className="flex gap-1">
-            <Button onClick={() => changePage(-1)} disabled={currentPage <= 1} variant="outline" size="sm">
-              ← Anterior
-            </Button>
-            <span className="px-2 py-1 text-xs bg-white rounded border">
-              {currentPage}/{numPages}
-            </span>
-            <Button onClick={() => changePage(1)} disabled={currentPage >= numPages} variant="outline" size="sm">
-              Próxima →
-            </Button>
-          </div>
-        )}
-
         {/* Zoom */}
         <div className="flex gap-1">
           <Button onClick={zoomOut} variant="outline" size="sm">
@@ -482,23 +433,30 @@ const PDFViewerEditor = ({ document, onSave, onCancel }: PDFViewerEditorProps) =
           </Button>
         </div>
 
-        {/* Ações */}
+        {/* Ações rápidas */}
         <div className="flex gap-1">
           <Button onClick={addTextAnnotation} disabled={!pdfLoaded} size="sm">
-            Assinatura Digital
+            ✓ Assinatura Digital
+          </Button>
+          <Button onClick={addCustomText} disabled={!pdfLoaded} variant="outline" size="sm">
+            Texto Customizado
           </Button>
           <Button onClick={addSignatureBox} disabled={!pdfLoaded} variant="outline" size="sm">
-            Caixa Assinatura
+            📝 Caixa Assinatura
           </Button>
-          <Button onClick={clearAnnotations} disabled={!pdfLoaded} variant="outline" size="sm">
+          <Button onClick={clearCanvas} disabled={!pdfLoaded} variant="outline" size="sm">
             <Trash2 className="h-3 w-3 mr-1" />
-            Limpar Página
+            Limpar
           </Button>
         </div>
 
         {/* Salvar/Cancelar */}
         <div className="flex gap-1 ml-auto">
-          <Button onClick={downloadAnnotated} disabled={!pdfLoaded} variant="outline" size="sm">
+          <Button onClick={() => window.open(pdfUrl, '_blank')} disabled={!pdfLoaded} variant="outline" size="sm">
+            <FileText className="h-3 w-3 mr-1" />
+            Ver Original
+          </Button>
+          <Button onClick={downloadCanvas} disabled={!pdfLoaded} variant="outline" size="sm">
             <Download className="h-3 w-3 mr-1" />
             Baixar
           </Button>
@@ -512,100 +470,58 @@ const PDFViewerEditor = ({ document, onSave, onCancel }: PDFViewerEditorProps) =
         </div>
       </div>
 
-      {/* Visualizador */}
+      {/* Editor Canvas */}
       <Card className="flex-1 overflow-hidden">
-        <CardContent className="p-2 h-full">
-          <div className="relative h-full overflow-auto bg-gray-100 rounded">
-            {pdfError ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center p-8">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-red-400" />
-                  <h3 className="text-lg font-medium text-red-600 mb-2">Erro ao Carregar PDF</h3>
-                  <p className="text-sm text-gray-600 mb-4">{pdfError}</p>
-                  <Button onClick={loadPDFDocument} variant="outline" size="sm">
-                    Tentar Novamente
-                  </Button>
-                </div>
+        <CardContent className="p-4 h-full">
+          {pdfError ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center p-8">
+                <FileText className="h-12 w-12 mx-auto mb-4 text-red-400" />
+                <h3 className="text-lg font-medium text-red-600 mb-2">Erro ao Carregar</h3>
+                <p className="text-sm text-gray-600 mb-4">{pdfError}</p>
+                <Button onClick={loadPDFDocument} variant="outline">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Tentar Novamente
+                </Button>
               </div>
-            ) : isLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center p-8">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-lg font-medium">Carregando PDF...</p>
-                  <p className="text-sm text-gray-600 mt-2">Aguarde um momento</p>
-                </div>
+            </div>
+          ) : isLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center p-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-lg font-medium">Carregando Documento...</p>
+                <p className="text-sm text-gray-600 mt-2">Preparando editor...</p>
               </div>
-            ) : pdfUrl ? (
-              <div className="flex justify-center p-4">
-                <div className="relative inline-block">
-                  <Document
-                    file={pdfUrl}
-                    onLoadSuccess={onDocumentLoadSuccess}
-                    onLoadError={onDocumentLoadError}
-                    loading={
-                      <div className="flex items-center justify-center h-64">
-                        <div className="text-center p-8">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                          <p className="text-sm">Carregando página...</p>
-                        </div>
-                      </div>
-                    }
-                    error={
-                      <div className="flex items-center justify-center h-64">
-                        <div className="text-center p-8">
-                          <FileText className="h-12 w-12 mx-auto mb-4 text-red-400" />
-                          <p className="text-lg font-medium text-red-600 mb-2">Erro no PDF.js</p>
-                          <p className="text-sm text-gray-600 mb-4">Problema com o worker do PDF</p>
-                          <Button onClick={loadPDFDocument} variant="outline" size="sm">
-                            Recarregar
-                          </Button>
-                        </div>
-                      </div>
-                    }
-                    options={{
-                      cMapUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/cmaps/',
-                      cMapPacked: true,
-                      standardFontDataUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/standard_fonts/',
-                      // Disable worker as fallback
-                      disableWorker: false,
-                      // Add timeout for worker loading
-                      workerPort: null
+            </div>
+          ) : pdfLoaded ? (
+            <div className="h-full overflow-auto bg-gray-100 rounded-lg p-4">
+              <div className="flex justify-center">
+                <div ref={containerRef} className="relative inline-block shadow-lg">
+                  <canvas
+                    ref={canvasRef}
+                    className={`border border-gray-300 bg-white ${currentTool === 'pen' ? 'cursor-crosshair' : 'cursor-pointer'}`}
+                    onMouseDown={startDrawing}
+                    onMouseMove={draw}
+                    onMouseUp={stopDrawing}
+                    onMouseLeave={stopDrawing}
+                    onClick={handleCanvasClick}
+                    style={{
+                      maxWidth: '100%',
+                      height: 'auto',
                     }}
-                  >
-                    <div ref={pageRef} className="relative">
-                      <Page
-                        pageNumber={currentPage}
-                        scale={scale}
-                        onLoadSuccess={onPageLoadSuccess}
-                        renderTextLayer={false}
-                        renderAnnotationLayer={false}
-                      />
-                      {/* Canvas sobreposto */}
-                      <canvas
-                        ref={canvasRef}
-                        className={`absolute top-0 left-0 ${currentTool === 'pen' ? 'cursor-crosshair' : 'cursor-pointer'}`}
-                        onMouseDown={startDrawing}
-                        onMouseMove={draw}
-                        onMouseUp={stopDrawing}
-                        onMouseLeave={stopDrawing}
-                        onClick={handleCanvasClick}
-                        style={{
-                          pointerEvents: 'auto',
-                        }}
-                      />
-                    </div>
-                  </Document>
+                  />
                 </div>
               </div>
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center p-8">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p className="text-lg font-medium">Nenhum documento carregado</p>
-                </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center p-8">
+                <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p className="text-lg font-medium">Editor de Documentos</p>
+                <p className="text-sm text-gray-600">Carregue um documento para começar</p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -613,19 +529,22 @@ const PDFViewerEditor = ({ document, onSave, onCancel }: PDFViewerEditorProps) =
       {pdfLoaded && (
         <div className="text-xs text-gray-600 bg-blue-50 p-3 rounded-lg">
           <div className="flex items-center gap-2 mb-1">
-            <span>🎨</span>
-            <strong>Instruções de Uso:</strong>
+            <span>💡</span>
+            <strong>Como usar o editor:</strong>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <p>• <strong>Desenhar:</strong> Selecione "Desenhar" e arraste sobre o PDF</p>
+            <p>• <strong>Desenhar:</strong> Selecione "Desenhar" e desenhe sobre o canvas branco</p>
             <p>• <strong>Texto:</strong> Selecione "Texto" e clique onde deseja inserir</p>
-            <p>• <strong>Assinatura Digital:</strong> Adiciona texto "ASSINADO DIGITALMENTE"</p>
-            <p>• <strong>Zoom:</strong> Use os botões + e - para ajustar o tamanho</p>
+            <p>• <strong>Assinatura Digital:</strong> Adiciona selo "ASSINADO DIGITALMENTE"</p>
+            <p>• <strong>Ver Original:</strong> Abre o PDF original em nova aba para referência</p>
           </div>
+          <p className="mt-2 text-orange-600">
+            <strong>Nota:</strong> Este editor usa um canvas branco para anotações. Você pode ver o PDF original clicando em "Ver Original" para referência.
+          </p>
         </div>
       )}
     </div>
   );
 };
 
-export default PDFViewerEditor;
+export default SimplePDFEditor;

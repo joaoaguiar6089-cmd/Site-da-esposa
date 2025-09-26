@@ -135,7 +135,7 @@ const SimplePDFViewer = ({ document, onSave, onCancel }: SimplePDFViewerProps) =
 
       {/* Visualizador */}
       <Card className="flex-1">
-        <CardContent className="p-2 h-[600px]">
+        <CardContent className="p-0 h-[70vh] overflow-hidden">
           {error ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center p-8">
@@ -156,11 +156,16 @@ const SimplePDFViewer = ({ document, onSave, onCancel }: SimplePDFViewerProps) =
               </div>
             </div>
           ) : pdfUrl ? (
-            <div className="w-full h-full">
+            <div className="w-full h-full relative">
               <iframe
                 src={pdfUrl}
-                className="w-full h-full border-0 rounded"
+                className="w-full h-full border-0 rounded-b"
                 title={`PDF: ${document.file_name}`}
+                style={{ 
+                  minHeight: '100%',
+                  height: '100%',
+                  overflow: 'auto'
+                }}
               />
             </div>
           ) : (
@@ -178,11 +183,14 @@ const SimplePDFViewer = ({ document, onSave, onCancel }: SimplePDFViewerProps) =
       <div className="text-xs text-gray-600 bg-green-50 p-3 rounded-lg">
         <div className="flex items-center gap-2 mb-1">
           <span>📄</span>
-          <strong>Visualizador de PDF Simplificado:</strong>
+          <strong>Visualizador de PDF Otimizado:</strong>
         </div>
-        <p>• Use "Abrir em Nova Aba" para visualizar o PDF em tela cheia</p>
-        <p>• Use "Baixar PDF" para salvar o documento no seu computador</p>
-        <p>• O visualizador integrado permite scroll e zoom nativos do navegador</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <p>• <strong>Scroll Completo:</strong> Use scroll nativo para navegar todo o documento</p>
+          <p>• <strong>Zoom:</strong> Use Ctrl + mouse ou gestos para ampliar</p>
+          <p>• <strong>Mobile:</strong> Totalmente responsivo com gestos touch</p>
+          <p>• <strong>Nova Aba:</strong> Abre em tela cheia para melhor visualização</p>
+        </div>
       </div>
     </div>
   );

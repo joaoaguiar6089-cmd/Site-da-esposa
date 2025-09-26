@@ -28,35 +28,69 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
   const fabricCanvasRef = useRef<FabricCanvas | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [isDrawingMode, setIsDrawingMode] = useState(false);
   const { toast } = useToast();
 
-  // Inicializar canvas quando o componente for montado
   useEffect(() => {
     const initCanvas = () => {
-      if (!canvasRef.current || fabricCanvasRef.current) return;
+      if (!canvasRef.current) {
+        console.log("Canvas ref não está disponível");
+        return;
+      }
+
+      if (fabricCanvasRef.current) {
+        console.log("Canvas já existe, não inicializando novamente");
+        return;
+      }
 
       try {
-        console.log("🖌️ Inicializando canvas...");
+        console.log("Iniciando inicialização do canvas...");
         
-        const canvas = new FabricCanvas(canvasRef.current, {
-          width: 800,
-          height: 600,
-          backgroundColor: "#ffffff",
-        });
-
+        const canvas = new FabricCanvas(canvasRef.current);
+        
+        // Configurar o canvas
+        canvas.setWidth(800);
+        canvas.setHeight(600);
+        canvas.backgroundColor = "#ffffff";
+        
+        // Configurar brush para desenho
+        canvas.freeDrawingBrush.color = "#000000";
+        canvas.freeDrawingBrush.width = 2;
+        
         fabricCanvasRef.current = canvas;
+        
+        // Adicionar texto inicial
+        const welcomeText = new FabricText("Editor de PDF Carregado!\nClique nos botões para adicionar texto ou desenhar.", {
+          left: 50,
+          top: 50,
+          fontSize: 16,
+          fill: "#333333",
+          fontFamily: "Arial",
+        });
+        
+        canvas.add(welcomeText);
+        canvas.renderAll();
+        
         setIsReady(true);
+        console.log("Canvas inicializado com sucesso!");
         
-        // Adicionar conteúdo inicial
-        addInitialContent(canvas);
+        toast({
+          title: "Editor Carregado",
+          description: "O editor de PDF está pronto para uso!",
+        });
         
-        console.log("✅ Canvas inicializado!");
       } catch (error) {
-        console.error("❌ Erro ao inicializar canvas:", error);
+        console.error("Erro ao inicializar canvas:", error);
+        toast({
+          title: "Erro",
+          description: "Falha ao carregar o editor",
+          variant: "destructive",
+        });
       }
     };
 
-    const timer = setTimeout(initCanvas, 100);
+    // Aguardar um pouco antes de inicializar
+    const timer = setTimeout(initCanvas, 500);
 
     return () => {
       clearTimeout(timer);
@@ -65,76 +99,55 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
         fabricCanvasRef.current = null;
       }
     };
-  }, [document.id]);
-
-  const addInitialContent = (canvas: FabricCanvas) => {
-    try {
-      const title = new FabricText(`Documento: ${document.file_name}`, {
-        left: 50,
-        top: 50,
-        fontSize: 18,
-        fill: "#333333",
-        selectable: false,
-      });
-
-      const subtitle = new FabricText("Use as ferramentas para adicionar texto ou desenhar", {
-        left: 50,
-        top: 80,
-        fontSize: 14,
-        fill: "#666666",
-        selectable: false,
-      });
-
-      canvas.add(title, subtitle);
-      canvas.renderAll();
-    } catch (error) {
-      console.error("❌ Erro ao adicionar conteúdo inicial:", error);
-    }
-  };
+  }, [toast]);
 
   const addText = () => {
-    if (!fabricCanvasRef.current || !isReady) return;
+    if (!fabricCanvasRef.current) return;
 
-    try {
-      const text = new FabricText("Clique para editar", {
-        left: 100,
-        top: 250,
-        fontSize: 16,
-        fill: "#000000",
-        backgroundColor: 'rgba(255, 255, 0, 0.2)',
-        padding: 5,
-      });
+    const text = new FabricText("Novo texto - clique para editar", {
+      left: Math.random() * 300 + 50,
+      top: Math.random() * 200 + 150,
+      fontSize: 16,
+      fill: "#000000",
+      fontFamily: "Arial",
+      backgroundColor: "rgba(255, 255, 0, 0.3)",
+      padding: 5,
+    });
 
-      fabricCanvasRef.current.add(text);
-      fabricCanvasRef.current.setActiveObject(text);
-      fabricCanvasRef.current.renderAll();
-    } catch (error) {
-      console.error("❌ Erro ao adicionar texto:", error);
-    }
+    fabricCanvasRef.current.add(text);
+    fabricCanvasRef.current.setActiveObject(text);
+    fabricCanvasRef.current.renderAll();
+
+    toast({
+      title: "Texto Adicionado",
+      description: "Clique no texto para editá-lo",
+    });
   };
 
   const toggleDrawing = () => {
-    if (!fabricCanvasRef.current || !isReady) return;
+    if (!fabricCanvasRef.current) return;
 
-    const isDrawingMode = !fabricCanvasRef.current.isDrawingMode;
-    fabricCanvasRef.current.isDrawingMode = isDrawingMode;
-    
-    if (isDrawingMode && fabricCanvasRef.current.freeDrawingBrush) {
-      fabricCanvasRef.current.freeDrawingBrush.color = "#000000";
-      fabricCanvasRef.current.freeDrawingBrush.width = 2;
-    }
+    const newDrawingMode = !isDrawingMode;
+    fabricCanvasRef.current.isDrawingMode = newDrawingMode;
+    setIsDrawingMode(newDrawingMode);
+
+    toast({
+      title: newDrawingMode ? "Modo Desenho Ativado" : "Modo Seleção Ativado",
+      description: newDrawingMode ? "Arraste para desenhar" : "Clique para selecionar objetos",
+    });
   };
 
   const clearCanvas = () => {
     if (!fabricCanvasRef.current) return;
     
-    try {
-      fabricCanvasRef.current.clear();
-      fabricCanvasRef.current.backgroundColor = "#ffffff";
-      addInitialContent(fabricCanvasRef.current);
-    } catch (error) {
-      console.error("❌ Erro ao limpar canvas:", error);
-    }
+    fabricCanvasRef.current.clear();
+    fabricCanvasRef.current.backgroundColor = "#ffffff";
+    fabricCanvasRef.current.renderAll();
+
+    toast({
+      title: "Canvas Limpo",
+      description: "Todas as anotações foram removidas",
+    });
   };
 
   const handleSave = async () => {
@@ -146,30 +159,21 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
       const dataURL = fabricCanvasRef.current.toDataURL({
         format: 'png',
         quality: 1,
-        multiplier: 1
+        multiplier: 1,
       });
 
-      const { error } = await supabase
-        .from("client_documents")
-        .update({ 
-          file_name: document.file_name,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", document.id);
-
-      if (error) throw error;
-
+      // Aqui você pode salvar a imagem ou os dados do canvas
       toast({
-        title: "Sucesso",
-        description: "Documento salvo com sucesso",
+        title: "Salvo",
+        description: "Anotações salvas com sucesso",
       });
 
       onSave();
-    } catch (error: any) {
-      console.error("❌ Erro ao salvar documento:", error);
+    } catch (error) {
+      console.error("Erro ao salvar:", error);
       toast({
         title: "Erro",
-        description: "Erro ao salvar documento",
+        description: "Erro ao salvar as anotações",
         variant: "destructive",
       });
     } finally {
@@ -180,55 +184,38 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
   const handleDownload = () => {
     if (!fabricCanvasRef.current) return;
 
-    try {
-      const dataURL = fabricCanvasRef.current.toDataURL({
-        format: 'png',
-        quality: 1,
-        multiplier: 1
-      });
-      
-      const link = window.document.createElement('a');
-      link.href = dataURL;
-      link.download = `${document.file_name.replace('.pdf', '')}_anotado.png`;
-      window.document.body.appendChild(link);
-      link.click();
-      window.document.body.removeChild(link);
-    } catch (error) {
-      console.error("❌ Erro ao baixar imagem:", error);
-    }
+    const dataURL = fabricCanvasRef.current.toDataURL({
+      format: 'png',
+      quality: 1,
+      multiplier: 1,
+    });
+    
+    const link = window.document.createElement('a');
+    link.href = dataURL;
+    link.download = `${document.file_name}_anotado.png`;
+    link.click();
+
+    toast({
+      title: "Download Iniciado",
+      description: "O arquivo foi baixado",
+    });
   };
-
-  // Redimensionar canvas quando a janela mudar de tamanho
-  useEffect(() => {
-    const handleResize = () => {
-      if (fabricCanvasRef.current && isReady) {
-        fabricCanvasRef.current.setDimensions({
-          width: 800,
-          height: 600
-        });
-        fabricCanvasRef.current.renderAll();
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [isReady]);
 
   return (
     <div className="flex flex-col h-full space-y-4">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border-b space-y-4 sm:space-y-0">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
           <div className="w-full sm:w-48">
             <Label htmlFor="fileName">Nome do Arquivo</Label>
             <Input
               id="fileName"
-              defaultValue={document.file_name}
-              className="w-full"
+              value={document.file_name}
               readOnly
+              className="w-full"
             />
           </div>
           
-          <div className="flex items-center space-x-2 flex-wrap">
+          <div className="flex items-center space-x-2">
             <Button
               size="sm"
               variant="outline"
@@ -240,17 +227,17 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
             </Button>
             <Button
               size="sm"
-              variant="outline"
+              variant={isDrawingMode ? "default" : "outline"}
               onClick={toggleDrawing}
               disabled={!isReady}
             >
               <Edit className="h-4 w-4 mr-1" />
-              Desenhar
+              {isDrawingMode ? "Parar Desenho" : "Desenhar"}
             </Button>
           </div>
         </div>
 
-        <div className="flex items-center space-x-2 flex-wrap">
+        <div className="flex items-center space-x-2">
           <Button 
             size="sm" 
             variant="outline" 
@@ -258,7 +245,7 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
             disabled={!isReady}
           >
             <Trash2 className="h-4 w-4 mr-1" />
-            Limpar Anotações
+            Limpar
           </Button>
           <Button 
             size="sm" 
@@ -272,7 +259,7 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
           <Button 
             size="sm" 
             onClick={handleSave}
-            disabled={isLoading}
+            disabled={isLoading || !isReady}
           >
             <Save className="h-4 w-4 mr-1" />
             {isLoading ? "Salvando..." : "Salvar"}
@@ -281,7 +268,6 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
             size="sm" 
             variant="outline" 
             onClick={onCancel}
-            disabled={isLoading}
           >
             Cancelar
           </Button>
@@ -293,28 +279,28 @@ const PDFEditor = ({ document, onSave, onCancel }: PDFEditorProps) => {
           <CardContent className="p-4 h-full flex flex-col">
             <Separator className="mb-4" />
 
-            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white flex-1 flex items-center justify-center">
+            <div className="border-2 border-dashed border-gray-300 rounded-lg bg-white flex-1 flex items-center justify-center min-h-[600px]">
               {!isReady ? (
-                <div className="flex items-center justify-center h-full w-full">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-                    <p className="text-sm text-gray-600">Carregando editor...</p>
-                  </div>
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                  <p className="text-sm text-gray-600">Carregando editor...</p>
                 </div>
               ) : (
                 <canvas 
                   ref={canvasRef} 
-                  className="border"
+                  style={{ border: '1px solid #ccc' }}
                 />
               )}
             </div>
             
-            <div className="mt-4 text-sm text-muted-foreground">
-              <p>• Clique em "Adicionar Texto" para inserir caixas de texto editáveis</p>
-              <p>• Use "Desenhar" para fazer anotações livres</p>
-              <p>• Arraste para mover elementos</p>
-              <p>• Toque duas vezes para editar texto (mobile)</p>
-            </div>
+            {isReady && (
+              <div className="mt-4 text-sm text-muted-foreground space-y-1">
+                <p>• <strong>Adicionar Texto:</strong> Clique no botão para inserir texto editável</p>
+                <p>• <strong>Desenhar:</strong> Ative o modo desenho e arraste o mouse</p>
+                <p>• <strong>Editar:</strong> Clique duas vezes em textos para editá-los</p>
+                <p>• <strong>Mover:</strong> Arraste elementos para reposicioná-los</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

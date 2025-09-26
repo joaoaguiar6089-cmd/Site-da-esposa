@@ -169,14 +169,16 @@ const DocumentsManager = ({ clientId, clientName, onDocumentUpdated }: Documents
 
   const viewDocument = async (document: Document) => {
     try {
-      const { data, error } = await supabase.storage
+      // Usar URL assinada para evitar problemas de cache e garantir versão mais recente
+      const { data: urlData, error } = await supabase.storage
         .from("client-documents")
-        .download(document.file_path);
+        .createSignedUrl(document.file_path, 7200);
 
-      if (error) throw error;
+      if (error || !urlData?.signedUrl) {
+        throw new Error('Não foi possível obter o URL do documento');
+      }
 
-      const url = URL.createObjectURL(data);
-      window.open(url, "_blank");
+      window.open(urlData.signedUrl, "_blank");
     } catch (error) {
       console.error("Error viewing document:", error);
       toast({

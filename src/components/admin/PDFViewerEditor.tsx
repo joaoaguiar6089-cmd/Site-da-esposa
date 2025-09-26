@@ -8,8 +8,28 @@ import { Type, Save, Download, Trash2, FileText, ZoomIn, ZoomOut, Pen } from "lu
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
-// Configure PDF.js worker with a more reliable CDN
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Configure PDF.js worker with multiple fallback options
+const configurePDFWorker = () => {
+  if (typeof window !== 'undefined') {
+    // Try multiple CDN sources for better reliability
+    const workerSources = [
+      `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`,
+      `//cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`,
+      `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`,
+      // Fallback to a specific known working version
+      '//unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js'
+    ];
+    
+    // Try the first source
+    pdfjs.GlobalWorkerOptions.workerSrc = workerSources[0];
+    
+    console.log(`📦 PDF.js Worker configurado para versão ${pdfjs.version}`);
+    console.log(`🔗 Worker URL: ${workerSources[0]}`);
+  }
+};
+
+// Initialize worker
+configurePDFWorker();
 
 interface ClientDocument {
   id: string;
@@ -334,7 +354,7 @@ const PDFViewerEditor = ({ document, onSave, onCancel }: PDFViewerEditorProps) =
     if (!canvasRef.current) return;
 
     const dataURL = canvasRef.current.toDataURL('image/png');
-    const link = window.document.createElement('a');
+    const link = document.createElement('a');
     link.href = dataURL;
     link.download = `${document.file_name}_anotado_pag${currentPage}.png`;
     link.click();
@@ -522,10 +542,34 @@ const PDFViewerEditor = ({ document, onSave, onCancel }: PDFViewerEditorProps) =
                     file={pdfUrl}
                     onLoadSuccess={onDocumentLoadSuccess}
                     onLoadError={onDocumentLoadError}
+                    loading={
+                      <div className="flex items-center justify-center h-64">
+                        <div className="text-center p-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                          <p className="text-sm">Carregando página...</p>
+                        </div>
+                      </div>
+                    }
+                    error={
+                      <div className="flex items-center justify-center h-64">
+                        <div className="text-center p-8">
+                          <FileText className="h-12 w-12 mx-auto mb-4 text-red-400" />
+                          <p className="text-lg font-medium text-red-600 mb-2">Erro no PDF.js</p>
+                          <p className="text-sm text-gray-600 mb-4">Problema com o worker do PDF</p>
+                          <Button onClick={loadPDFDocument} variant="outline" size="sm">
+                            Recarregar
+                          </Button>
+                        </div>
+                      </div>
+                    }
                     options={{
                       cMapUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/cmaps/',
                       cMapPacked: true,
                       standardFontDataUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/standard_fonts/',
+                      // Disable worker as fallback
+                      disableWorker: false,
+                      // Add timeout for worker loading
+                      workerPort: null
                     }}
                   >
                     <div ref={pageRef} className="relative">

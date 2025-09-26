@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Upload, FileText, Edit, Download, Eye, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import PDFEditor from "./RealPDFEditor";
+import PDFEditor from "./PDFViewerEditor";
 
 interface Document {
   id: string;

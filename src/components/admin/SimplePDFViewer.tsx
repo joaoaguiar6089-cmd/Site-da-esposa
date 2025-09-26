@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { FileText, ExternalLink, Upload, Save, Pen, Square, Circle, Minus, RotateCcw, Palette } from "lucide-react";
+import { FileText, ExternalLink, Upload, Save, Pen, Square, Minus, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import SignatureCanvas from 'react-signature-canvas';
@@ -41,15 +41,17 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [currentTool, setCurrentTool] = useState<'pen' | 'highlight'>('pen');
   const [currentColor, setCurrentColor] = useState('#000000');
-  const [penWidth, setPenWidth] = useState(2);
+  const [penWidth, setPenWidth] = useState(1);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [interactionMode, setInteractionMode] = useState<'draw' | 'pan'>('draw');
+  const [lastPanPosition, setLastPanPosition] = useState({ x: 0, y: 0 });
+  const [isDrawing, setIsDrawing] = useState(false);
   const canvasRef = useRef<SignatureCanvas>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const pdfContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   // Detectar dispositivo móvel/tablet
@@ -202,45 +204,85 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
     setZoomLevel(1);
     setPanX(0);
     setPanY(0);
+    setLastPanPosition({ x: 0, y: 0 });
   };
 
-  const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
-    if (interactionMode === 'pan') {
-      setIsDragging(true);
-      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-      setDragStart({ x: clientX - panX, y: clientY - panY });
+  // Detectar se é Apple Pencil ou dedo
+  const isPencil = (e: TouchEvent | React.TouchEvent) => {
+    if ('touches' in e && e.touches.length > 0) {
+      const touch = e.touches[0] as any;
+      // Apple Pencil tem propriedades específicas
+      return touch.touchType === 'stylus' || touch.force > 0.5;
     }
+    return false;
   };
 
-  const handleMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
-    if (isDragging && interactionMode === 'pan') {
-      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-      setPanX(clientX - dragStart.x);
-      setPanY(clientY - dragStart.y);
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  // Gesture handling for pinch zoom
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 2 && interactionMode === 'pan') {
-      // Pinch zoom start
-      e.preventDefault();
+    if (!showMobileEditor) return;
+    
+    e.preventDefault();
+    
+    const isApplePencil = isPencil(e);
+    
+    if (isApplePencil) {
+      // Apple Pencil - modo desenho
+      setIsDrawing(true);
+      return;
+    }
+    
+    // Dedo - navegação
+    if (e.touches.length === 1) {
+      setIsDragging(true);
+      const touch = e.touches[0];
+      setDragStart({ 
+        x: touch.clientX - panX, 
+        y: touch.clientY - panY 
+      });
     }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length === 2 && interactionMode === 'pan') {
-      e.preventDefault();
-      // Pinch zoom logic could be implemented here
-    } else if (e.touches.length === 1) {
-      handleMouseMove(e);
+    if (!showMobileEditor) return;
+    
+    e.preventDefault();
+    
+    const isApplePencil = isPencil(e);
+    
+    if (isApplePencil && isDrawing) {
+      // Apple Pencil - deixar o SignatureCanvas lidar
+      return;
     }
+    
+    // Dedo - navegação
+    if (isDragging && e.touches.length === 1) {
+      const touch = e.touches[0];
+      const newPanX = touch.clientX - dragStart.x;
+      const newPanY = touch.clientY - dragStart.y;
+      
+      setPanX(newPanX);
+      setPanY(newPanY);
+      setLastPanPosition({ x: newPanX, y: newPanY });
+    }
+    
+    // Pinch zoom com dois dedos
+    if (e.touches.length === 2) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const distance = Math.sqrt(
+        Math.pow(touch2.clientX - touch1.clientX, 2) + 
+        Math.pow(touch2.clientY - touch1.clientY, 2)
+      );
+      
+      // Lógica de pinch zoom seria implementada aqui
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!showMobileEditor) return;
+    
+    e.preventDefault();
+    setIsDragging(false);
+    setIsDrawing(false);
   };
 
   const saveAnnotations = async () => {
@@ -250,7 +292,8 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
       setIsLoading(true);
       
       // Obter dados do canvas
-      const canvasData = canvasRef.current.toDataURL();
+      const canvas = canvasRef.current.getCanvas();
+      const canvasData = canvas.toDataURL('image/png');
       
       // Baixar PDF original
       const pdfResponse = await fetch(pdfUrl);
@@ -261,17 +304,32 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
       const pages = pdfDoc.getPages();
       const firstPage = pages[0];
       
-      // Converter canvas para imagem
-      const canvasImage = await pdfDoc.embedPng(canvasData);
-      const { width, height } = firstPage.getSize();
+      // Obter dimensões reais do PDF
+      const { width: pdfWidth, height: pdfHeight } = firstPage.getSize();
       
-      // Desenhar anotações sobre o PDF
-      firstPage.drawImage(canvasImage, {
-        x: 0,
-        y: 0,
-        width: width,
-        height: height,
-        opacity: 0.8,
+      // Obter dimensões do canvas
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      
+      // Calcular scaling correto considerando zoom e pan
+      const scaleX = pdfWidth / (canvasWidth / zoomLevel);
+      const scaleY = pdfHeight / (canvasHeight / zoomLevel);
+      
+      // Converter canvas para imagem PNG
+      const pngImageBytes = canvasData.split(',')[1];
+      const pngImage = await pdfDoc.embedPng(`data:image/png;base64,${pngImageBytes}`);
+      
+      // Calcular posição correta no PDF considerando pan
+      const adjustedX = -panX / zoomLevel;
+      const adjustedY = pdfHeight - (canvasHeight / zoomLevel) + (panY / zoomLevel);
+      
+      // Desenhar imagem no PDF com coordenadas corretas
+      firstPage.drawImage(pngImage, {
+        x: adjustedX * scaleX,
+        y: adjustedY * scaleY,
+        width: (canvasWidth / zoomLevel) * scaleX,
+        height: (canvasHeight / zoomLevel) * scaleY,
+        opacity: 1.0,
       });
       
       // Salvar PDF modificado
@@ -292,8 +350,11 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
         description: "PDF atualizado com suas anotações",
       });
 
-      setShowMobileEditor(false);
-      loadPDFDocument();
+      // Limpar canvas e recarregar
+      clearCanvas();
+      setTimeout(() => {
+        loadPDFDocument();
+      }, 1000);
       
     } catch (error) {
       console.error("Erro ao salvar anotações:", error);
@@ -309,6 +370,8 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
 
   const startMobileEditing = () => {
     setShowMobileEditor(true);
+    // Manter posição atual
+    setLastPanPosition({ x: panX, y: panY });
   };
 
   const colors = [
@@ -331,18 +394,18 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
               <h3 className="font-semibold text-base">
                 Editar: {document.file_name}
                 <span className="ml-2 text-xs bg-gray-200 px-2 py-1 rounded">
-                  {isMobile ? '📱 Modo Mobile' : '🖥️ Modo Desktop'}
+                  {isMobile ? '📱 iPad/Mobile' : '🖥️ Desktop'}
                 </span>
               </h3>
               <p className="text-xs text-blue-700 mt-1">
                 {isMobile 
-                  ? 'Use as ferramentas de anotação otimizadas para touch e Apple Pencil'
+                  ? 'Use dedos para navegar/zoom • Apple Pencil para desenhar'
                   : 'Edite o documento PDF usando as ferramentas nativas do navegador'
                 }
               </p>
             </div>
             <span className="text-sm font-medium px-2 py-1 rounded-full bg-blue-100 text-blue-800">
-              {isLoading ? "⏳ Carregando..." : 
+              {isLoading ? "⏳ Processando..." : 
                pdfUrl ? "✅ Pronto" : 
                error ? "❌ Erro" : "Aguardando..."}
             </span>
@@ -385,7 +448,7 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
           </div>
         )}
 
-        {/* Controles - Mobile */}
+        {/* Controles - Mobile (Inicial) */}
         {isMobile && !showMobileEditor && (
           <div className="flex flex-col gap-2 p-3 bg-gray-50 border-b shrink-0">
             <div className="flex items-center gap-2">
@@ -402,140 +465,7 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
               </Button>
             </div>
             <div className="text-sm bg-blue-100 p-2 rounded">
-              💡 <strong>Dica:</strong> Para editar no iPad, toque em "Iniciar Edição" para usar ferramentas otimizadas para Apple Pencil
-            </div>
-          </div>
-        )}
-
-        {/* Ferramentas Mobile - Modo Edição */}
-        {isMobile && showMobileEditor && (
-          <div className="flex flex-col gap-3 p-3 bg-gray-50 border-b shrink-0">
-            {/* Linha 1: Modo de Interação */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Modo:</span>
-              <Button
-                onClick={() => setInteractionMode('draw')}
-                size="sm"
-                variant={interactionMode === 'draw' ? 'default' : 'outline'}
-                className="flex-1"
-              >
-                <Pen className="h-4 w-4 mr-1" />
-                Desenhar
-              </Button>
-              <Button
-                onClick={() => setInteractionMode('pan')}
-                size="sm"
-                variant={interactionMode === 'pan' ? 'default' : 'outline'}
-                className="flex-1"
-              >
-                🤚 Navegar
-              </Button>
-            </div>
-
-            {/* Linha 2: Zoom Controls */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Zoom:</span>
-              <Button onClick={handleZoomOut} size="sm" variant="outline" disabled={zoomLevel <= 0.5}>
-                <Minus className="h-4 w-4" />
-              </Button>
-              <span className="text-sm bg-white px-2 py-1 rounded border min-w-[60px] text-center">
-                {Math.round(zoomLevel * 100)}%
-              </span>
-              <Button onClick={handleZoomIn} size="sm" variant="outline" disabled={zoomLevel >= 3}>
-                ➕
-              </Button>
-              <Button onClick={resetZoom} size="sm" variant="outline" className="ml-2">
-                <RotateCcw className="h-4 w-4" />
-                Reset
-              </Button>
-            </div>
-            
-            {/* Linha 3: Ferramentas de Desenho */}
-            {interactionMode === 'draw' && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button
-                  onClick={() => setCurrentTool('pen')}
-                  size="sm"
-                  variant={currentTool === 'pen' ? 'default' : 'outline'}
-                >
-                  <Pen className="h-4 w-4" />
-                </Button>
-                <Button
-                  onClick={() => setCurrentTool('highlight')}
-                  size="sm"
-                  variant={currentTool === 'highlight' ? 'default' : 'outline'}
-                >
-                  <Square className="h-4 w-4" />
-                </Button>
-                <Button onClick={clearCanvas} size="sm" variant="outline">
-                  🗑️
-                </Button>
-              </div>
-            )}
-            
-            {/* Linha 4: Espessura do Pincel */}
-            {interactionMode === 'draw' && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Espessura:</span>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="10"
-                  step="0.5"
-                  value={penWidth}
-                  onChange={(e) => setPenWidth(Number(e.target.value))}
-                  className="flex-1"
-                />
-                <div className="flex items-center gap-2 bg-white px-3 py-1 rounded border">
-                  <div 
-                    className="rounded-full"
-                    style={{ 
-                      width: `${Math.max(penWidth * 2, 8)}px`, 
-                      height: `${Math.max(penWidth * 2, 8)}px`,
-                      backgroundColor: currentColor 
-                    }}
-                  />
-                  <span className="text-sm">{penWidth}px</span>
-                </div>
-              </div>
-            )}
-            
-            {/* Linha 5: Cores */}
-            {interactionMode === 'draw' && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-medium">Cor:</span>
-                {colors.map((color) => (
-                  <button
-                    key={color.value}
-                    onClick={() => setCurrentColor(color.value)}
-                    className={`w-10 h-10 rounded-full border-3 transition-all ${
-                      currentColor === color.value ? 'border-gray-800 scale-110' : 'border-gray-300'
-                    }`}
-                    style={{ backgroundColor: color.value }}
-                    title={color.name}
-                  />
-                ))}
-              </div>
-            )}
-            
-            {/* Linha 6: Ações */}
-            <div className="flex items-center gap-2">
-              <Button onClick={saveAnnotations} disabled={isLoading} size="sm" className="bg-green-600 hover:bg-green-700 flex-1">
-                <Save className="h-4 w-4 mr-2" />
-                {isLoading ? "Salvando..." : "Salvar Anotações"}
-              </Button>
-              <Button onClick={() => setShowMobileEditor(false)} variant="outline" size="sm">
-                Cancelar
-              </Button>
-            </div>
-
-            {/* Dicas de Uso */}
-            <div className="text-xs bg-blue-100 p-2 rounded">
-              💡 <strong>Dica:</strong> 
-              {interactionMode === 'draw' 
-                ? ' Use "Navegar" para mover/zoom o documento, depois volte para "Desenhar"'
-                : ' Arraste para mover o documento. Use +/- para zoom. Volte para "Desenhar" para anotar'
-              }
+              💡 <strong>Dica:</strong> No iPad, use dedos para navegar/zoom e Apple Pencil apenas para desenhar
             </div>
           </div>
         )}
@@ -558,83 +488,66 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
               <div className="text-center p-8 bg-white rounded-lg shadow-md">
                 <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
                 <p className="text-xl font-medium mb-2">
-                  {isLoading && showMobileEditor ? 'Salvando Anotações...' : 'Carregando PDF...'}
+                  {isLoading && showMobileEditor ? 'Processando Anotações...' : 'Carregando PDF...'}
                 </p>
                 <p className="text-sm text-gray-600">Aguarde um momento</p>
               </div>
             </div>
           ) : pdfUrl ? (
-            <div className="relative w-full h-full">
-              {/* PDF Viewer Container */}
-              <div 
-                ref={containerRef}
-                className="relative w-full h-full overflow-hidden"
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleMouseUp}
-                style={{ 
-                  cursor: isMobile && interactionMode === 'pan' ? 'grab' : 'default',
-                  touchAction: isMobile && showMobileEditor ? 'none' : 'auto'
+            <div 
+              ref={containerRef}
+              className="relative w-full h-full overflow-hidden"
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              style={{ 
+                touchAction: 'none'
+              }}
+            >
+              <div
+                ref={pdfContainerRef}
+                className="transition-transform duration-200 ease-out"
+                style={{
+                  transform: `translate(${panX}px, ${panY}px) scale(${zoomLevel})`,
+                  transformOrigin: 'center center',
+                  width: '100%',
+                  height: '100%'
                 }}
               >
-                <div
-                  className="transition-transform duration-200 ease-out"
-                  style={{
-                    transform: `translate(${panX}px, ${panY}px) scale(${zoomLevel})`,
-                    transformOrigin: 'center center',
-                    width: '100%',
-                    height: '100%'
+                {/* PDF Viewer */}
+                <iframe
+                  src={pdfUrl}
+                  className="w-full h-full border-0 bg-white"
+                  title={`PDF: ${document.file_name}`}
+                  allowFullScreen
+                  style={{ 
+                    pointerEvents: isMobile && showMobileEditor ? 'none' : 'auto'
                   }}
-                >
-                  {/* PDF Viewer */}
-                  <iframe
-                    src={pdfUrl}
-                    className="w-full h-full border-0 bg-white"
-                    title={`PDF: ${document.file_name}`}
-                    allowFullScreen
-                    style={{ 
-                      pointerEvents: isMobile && showMobileEditor && interactionMode === 'draw' ? 'none' : 'auto'
-                    }}
-                  />
-                  
-                  {/* Canvas de Anotação (Mobile) */}
-                  {isMobile && showMobileEditor && interactionMode === 'draw' && (
-                    <div className="absolute inset-0">
-                      <SignatureCanvas
-                        ref={canvasRef}
-                        canvasProps={{
-                          className: 'w-full h-full',
-                          style: { 
-                            background: 'transparent',
-                            touchAction: 'none',
-                            pointerEvents: 'auto'
-                          }
-                        }}
-                        backgroundColor="transparent"
-                        penColor={currentColor}
-                        minWidth={penWidth * 0.8}
-                        maxWidth={penWidth * 1.2}
-                        velocityFilterWeight={0.7}
-                        throttle={16}
-                      />
-                    </div>
-                  )}
-                </div>
+                />
+                
+                {/* Canvas de Anotação (Mobile) */}
+                {isMobile && showMobileEditor && (
+                  <div className="absolute inset-0">
+                    <SignatureCanvas
+                      ref={canvasRef}
+                      canvasProps={{
+                        className: 'w-full h-full',
+                        style: { 
+                          background: 'transparent',
+                          touchAction: 'none',
+                          pointerEvents: 'auto'
+                        }
+                      }}
+                      backgroundColor="transparent"
+                      penColor={currentColor}
+                      minWidth={penWidth * 0.8}
+                      maxWidth={penWidth * 1.2}
+                      velocityFilterWeight={0.7}
+                      throttle={16}
+                    />
+                  </div>
+                )}
               </div>
-
-              {/* Overlay de informações */}
-              {isMobile && showMobileEditor && (
-                <div className="absolute top-4 right-4 bg-black/70 text-white px-3 py-2 rounded-lg text-sm">
-                  <div>📍 Modo: {interactionMode === 'draw' ? 'Desenho' : 'Navegação'}</div>
-                  <div>🔍 Zoom: {Math.round(zoomLevel * 100)}%</div>
-                  {interactionMode === 'draw' && (
-                    <div>🖌️ {penWidth}px • {colors.find(c => c.value === currentColor)?.name}</div>
-                  )}
-                </div>
-              )}
             </div>
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
@@ -647,36 +560,14 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
           )}
         </div>
 
-        {/* Footer com instruções específicas por plataforma */}
-        <div className="text-sm text-gray-700 bg-green-50 p-3 border-t shrink-0">
-          <div className="flex items-center gap-3">
-            <span className="text-lg">{isMobile ? '📱' : '🖥️'}</span>
-            <div className="flex-1">
-              {isMobile ? (
-                <>
-                  <strong className="text-green-800">iPad/Mobile:</strong>
-                  <span className="ml-2">
-                    Use "Navegar" para zoom/pan (gestos touch) • 
-                    "Desenhar" para anotar com Apple Pencil • 
-                    Controle preciso de espessura 0.5-10px •
-                    Anotações salvas automaticamente no PDF
-                  </span>
-                </>
-              ) : (
-                <>
-                  <strong className="text-green-800">Desktop:</strong>
-                  <span className="ml-2">
-                    1) Edite o PDF acima • 2) Use Ctrl+S para baixar • 3) Upload da nova versão • 
-                    Ou abra em "Nova Aba" para ferramentas completas
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default SimplePDFViewer;
+        {/* Controles Mobile Flutuantes - Durante Edição */}
+        {isMobile && showMobileEditor && (
+          <>
+            {/* Painel de Controles Fixo */}
+            <div className="absolute bottom-4 left-4 right-4 bg-white/95 backdrop-blur rounded-lg shadow-lg border p-3 z-10">
+              <div className="flex flex-col gap-3">
+                {/* Zoom Controls */}
+                <div className="flex items-center justify-center gap-2">
+                  <Button onClick={handleZoomOut} size="sm" variant="outline" disabled={zoomLevel <= 0.5}>
+                    <Minus className="h-4 w-4" />
+                  </But

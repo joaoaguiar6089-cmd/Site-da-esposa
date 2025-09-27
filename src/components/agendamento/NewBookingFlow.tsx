@@ -295,6 +295,13 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
         description: "Agendamento criado com sucesso!",
       });
 
+      // Enviar notificações
+      await Promise.all([
+        sendWhatsAppNotification(appointment, client),
+        sendOwnerNotification(appointment, client),
+        sendAdminNotification(appointment, client)
+      ]);
+
     } catch (error) {
       console.error('Erro ao criar agendamento:', error);
       toast({
@@ -304,6 +311,82 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const sendWhatsAppNotification = async (appointment: any, client: Client) => {
+    try {
+      const procedure = procedures.find(p => p.id === appointment.procedure_id);
+      const city = cities.find(c => c.id === appointment.city_id);
+      
+      const { error } = await supabase.functions.invoke('get-whatsapp-template', {
+        body: {
+          templateType: 'confirmacao_agendamento',
+          variables: {
+            cliente_nome: client.nome,
+            data: format(new Date(appointment.appointment_date), "dd/MM/yyyy", { locale: ptBR }),
+            horario: appointment.appointment_time,
+            procedimento: procedure?.name || '',
+            profissional: 'Dra. Karoline'
+          }
+        }
+      });
+
+      if (error) throw error;
+
+      await supabase.functions.invoke('send-whatsapp', {
+        body: {
+          to: client.celular,
+          message: `Olá ${client.nome}! 🎉\n\nSeu agendamento foi realizado!\n\n📅 *Data:* ${format(new Date(appointment.appointment_date), "dd/MM/yyyy", { locale: ptBR })}\n🕐 *Horário:* ${appointment.appointment_time}\n💄 *Procedimento:* ${procedure?.name || ''}\n👩‍⚕️ *Profissional:* Dra. Karoline\n\n📍 *Local:* Av. Brasil 63b, Tefé-AM\nhttps://maps.app.goo.gl/8UqAaCYFJoPiDGYUA?g_st=ipc  \n\nQualquer dúvida, me fala.`
+        }
+      });
+    } catch (error) {
+      console.error('Erro ao enviar WhatsApp:', error);
+    }
+  };
+
+  const sendOwnerNotification = async (appointment: any, client: Client) => {
+    try {
+      const procedure = procedures.find(p => p.id === appointment.procedure_id);
+      const specifications = selectedSpecifications.map(spec => spec.name).join(', ');
+      
+      await supabase.functions.invoke('notify-owner', {
+        body: {
+          type: 'agendamento',
+          clientName: client.nome,
+          clientPhone: client.celular,
+          appointmentDate: appointment.appointment_date,
+          appointmentTime: appointment.appointment_time,
+          procedureName: procedure?.name || '',
+          professionalName: null,
+          notes: appointment.notes || '',
+          specifications: specifications
+        }
+      });
+    } catch (error) {
+      console.error('Erro ao notificar proprietário:', error);
+    }
+  };
+
+  const sendAdminNotification = async (appointment: any, client: Client) => {
+    try {
+      const procedure = procedures.find(p => p.id === appointment.procedure_id);
+      const city = cities.find(c => c.id === appointment.city_id);
+      
+      await supabase.functions.invoke('notify-admins', {
+        body: {
+          type: 'agendamento',
+          clientName: client.nome,
+          clientPhone: client.celular,
+          appointmentDate: appointment.appointment_date,
+          appointmentTime: appointment.appointment_time,
+          procedureName: procedure?.name || '',
+          cityName: city?.city_name || '',
+          notes: appointment.notes || ''
+        }
+      });
+    } catch (error) {
+      console.error('Erro ao notificar admins:', error);
     }
   };
 

@@ -318,16 +318,18 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
     try {
       const procedure = procedures.find(p => p.id === appointment.procedure_id);
       const notes = appointment.notes ? `\n📝 Observações: ${appointment.notes}` : '';
-      
-      const { error } = await supabase.functions.invoke('get-whatsapp-template', {
+
+      // 1) Buscar o template (ajuste o templateType para o que você usa no banco)
+      const { data: templateData, error } = await supabase.functions.invoke('get-whatsapp-template', {
         body: {
-          templateType: 'agendamento_cliente',
+          // use 'confirmacao_cliente' OU 'agendamento_cliente' conforme existe na tabela whatsapp_templates
+          templateType: 'confirmacao_cliente',
           variables: {
             clientName: client.nome,
             appointmentDate: format(new Date(appointment.appointment_date), "dd/MM/yyyy", { locale: ptBR }),
             appointmentTime: appointment.appointment_time,
             procedureName: procedure?.name || '',
-            notes: notes
+            notes
           }
         }
       });
@@ -335,8 +337,34 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
       if (error) {
         console.error('Erro ao buscar template WhatsApp:', error);
       }
-    } catch (error) {
-      console.error('Erro ao enviar WhatsApp:', error);
+
+      // 2) Mensagem de fallback caso o template não venha
+      const fallback = `🩺 *Agendamento Confirmado*
+
+Olá ${client.nome}!
+
+📅 Data: ${format(new Date(appointment.appointment_date), "dd/MM/yyyy", { locale: ptBR })}
+⏰ Horário: ${appointment.appointment_time}
+💉 Procedimento: ${procedure?.name || ''}${notes}
+
+📍 Clínica Dra. Karoline Ferreira
+✨ Aguardamos você!`;
+
+      const message = templateData?.message || fallback;
+
+      // 3) Enviar de fato no WhatsApp
+      const { error: sendError } = await supabase.functions.invoke('send-whatsapp', {
+        body: {
+          to: client.celular,     // pode estar com ou sem +55; o edge function normaliza
+          message
+        }
+      });
+
+      if (sendError) {
+        console.error('Erro ao enviar WhatsApp:', sendError);
+      }
+    } catch (err) {
+      console.error('Erro ao enviar WhatsApp:', err);
     }
   };
 

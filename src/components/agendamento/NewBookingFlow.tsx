@@ -317,29 +317,24 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
   const sendWhatsAppNotification = async (appointment: any, client: Client) => {
     try {
       const procedure = procedures.find(p => p.id === appointment.procedure_id);
-      const city = cities.find(c => c.id === appointment.city_id);
+      const notes = appointment.notes ? `\n📝 Observações: ${appointment.notes}` : '';
       
       const { error } = await supabase.functions.invoke('get-whatsapp-template', {
         body: {
-          templateType: 'confirmacao_agendamento',
+          templateType: 'agendamento_cliente',
           variables: {
-            cliente_nome: client.nome,
-            data: format(new Date(appointment.appointment_date), "dd/MM/yyyy", { locale: ptBR }),
-            horario: appointment.appointment_time,
-            procedimento: procedure?.name || '',
-            profissional: 'Dra. Karoline'
+            clientName: client.nome,
+            appointmentDate: format(new Date(appointment.appointment_date), "dd/MM/yyyy", { locale: ptBR }),
+            appointmentTime: appointment.appointment_time,
+            procedureName: procedure?.name || '',
+            notes: notes
           }
         }
       });
 
-      if (error) throw error;
-
-      await supabase.functions.invoke('send-whatsapp', {
-        body: {
-          to: client.celular,
-          message: `Olá ${client.nome}! 🎉\n\nSeu agendamento foi realizado!\n\n📅 *Data:* ${format(new Date(appointment.appointment_date), "dd/MM/yyyy", { locale: ptBR })}\n🕐 *Horário:* ${appointment.appointment_time}\n💄 *Procedimento:* ${procedure?.name || ''}\n👩‍⚕️ *Profissional:* Dra. Karoline\n\n📍 *Local:* Av. Brasil 63b, Tefé-AM\nhttps://maps.app.goo.gl/8UqAaCYFJoPiDGYUA?g_st=ipc  \n\nQualquer dúvida, me fala.`
-        }
-      });
+      if (error) {
+        console.error('Erro ao buscar template WhatsApp:', error);
+      }
     } catch (error) {
       console.error('Erro ao enviar WhatsApp:', error);
     }

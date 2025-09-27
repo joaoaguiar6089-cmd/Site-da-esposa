@@ -19,6 +19,9 @@ interface Procedure {
   duration: number;
   price: number;
   requires_specifications?: boolean;
+  body_image_url?: string;
+  body_image_url_male?: string;
+  body_selection_type?: string;
 }
 
 interface BookingData {
@@ -372,12 +375,23 @@ const BookingFormStep = ({ onComplete, onBack, preSelectedProcedureId }: Booking
     }
   }, [formData.appointment_date, formData.city_id]);
 
+  // Mostrar especificações automaticamente quando procedimento é selecionado
+  useEffect(() => {
+    const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
+    if (selectedProcedure?.requires_specifications) {
+      setShowSpecifications(true);
+    } else {
+      setShowSpecifications(false);
+      setSelectedSpecifications([]);
+    }
+  }, [formData.procedure_id, procedures]);
+
   const loadData = async () => {
     try {
       // Carregar procedimentos
       const { data: proceduresData, error: proceduresError } = await supabase
         .from('procedures')
-        .select('id, name, description, duration, price, requires_specifications')
+        .select('id, name, description, duration, price, requires_specifications, body_image_url, body_image_url_male, body_selection_type')
         .order('name');
 
       if (proceduresError) throw proceduresError;
@@ -524,7 +538,11 @@ const BookingFormStep = ({ onComplete, onBack, preSelectedProcedureId }: Booking
     // Verificar se o procedimento requer especificações
     const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
     if (selectedProcedure?.requires_specifications && selectedSpecifications.length === 0) {
-      setShowSpecifications(true);
+      toast({
+        title: "Especificação obrigatória",
+        description: "Por favor, selecione pelo menos uma especificação para este procedimento.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -628,6 +646,9 @@ const BookingFormStep = ({ onComplete, onBack, preSelectedProcedureId }: Booking
                 procedureId={formData.procedure_id}
                 onSelectionChange={(data) => setSelectedSpecifications(data.selectedSpecifications)}
                 initialSelections={selectedSpecifications.map(spec => spec.id)}
+                bodySelectionType={procedures.find(p => p.id === formData.procedure_id)?.body_selection_type || ''}
+                bodyImageUrl={procedures.find(p => p.id === formData.procedure_id)?.body_image_url}
+                bodyImageUrlMale={procedures.find(p => p.id === formData.procedure_id)?.body_image_url_male}
               />
             </div>
           )}

@@ -51,8 +51,8 @@ const Agendamento = () => {
   };
 
   const handleNewBookingSuccess = () => {
-    // Vai para a página inicial após sucesso no novo fluxo
-    window.history.back();
+    // Redireciona para área do cliente após sucesso
+    window.location.href = '/area-cliente';
   };
 
   const handleBack = () => {

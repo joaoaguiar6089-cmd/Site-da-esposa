@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getCurrentDateBrazil } from '@/utils/dateUtils';
 import { formatCPF, isValidCPF } from "@/utils/cpfValidator";
 import type { Client } from "@/types/client";
+import ProcedureSpecificationSelector, { ProcedureSpecification } from "./ProcedureSpecificationSelector";
 
 interface Procedure {
   id: string;
@@ -17,6 +18,7 @@ interface Procedure {
   description: string;
   duration: number;
   price: number;
+  requires_specifications?: boolean;
 }
 
 interface BookingData {
@@ -25,6 +27,7 @@ interface BookingData {
   appointment_time: string;
   notes: string;
   city_id: string;
+  specifications?: ProcedureSpecification[];
 }
 
 interface NewBookingFlowProps {
@@ -169,6 +172,22 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
         .single();
 
       if (appointmentError) throw appointmentError;
+
+      // Salvar especificações se houver
+      if (bookingData.specifications && bookingData.specifications.length > 0) {
+        const specificationsData = bookingData.specifications.map(spec => ({
+          appointment_id: appointment.id,
+          specification_id: spec.id,
+          specification_name: spec.name,
+          specification_price: spec.price
+        }));
+
+        const { error: specsError } = await supabase
+          .from('appointment_specifications')
+          .insert(specificationsData);
+
+        if (specsError) throw specsError;
+      }
 
       toast({
         title: "Sucesso!",
@@ -335,10 +354,12 @@ const BookingFormStep = ({ onComplete, onBack, preSelectedProcedureId }: Booking
     notes: "",
     city_id: "",
   });
+  const [selectedSpecifications, setSelectedSpecifications] = useState<ProcedureSpecification[]>([]);
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [loadingTimes, setLoadingTimes] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingProcedures, setLoadingProcedures] = useState(true);
+  const [showSpecifications, setShowSpecifications] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -356,7 +377,7 @@ const BookingFormStep = ({ onComplete, onBack, preSelectedProcedureId }: Booking
       // Carregar procedimentos
       const { data: proceduresData, error: proceduresError } = await supabase
         .from('procedures')
-        .select('id, name, description, duration, price')
+        .select('id, name, description, duration, price, requires_specifications')
         .order('name');
 
       if (proceduresError) throw proceduresError;
@@ -500,7 +521,19 @@ const BookingFormStep = ({ onComplete, onBack, preSelectedProcedureId }: Booking
       return;
     }
 
-    onComplete(formData);
+    // Verificar se o procedimento requer especificações
+    const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
+    if (selectedProcedure?.requires_specifications && selectedSpecifications.length === 0) {
+      setShowSpecifications(true);
+      return;
+    }
+
+    const bookingData: BookingData = {
+      ...formData,
+      specifications: selectedSpecifications
+    };
+
+    onComplete(bookingData);
   };
 
   if (loadingProcedures) {
@@ -587,6 +620,18 @@ const BookingFormStep = ({ onComplete, onBack, preSelectedProcedureId }: Booking
             </Select>
           </div>
 
+          {/* Seletor de especificações se necessário */}
+          {showSpecifications && formData.procedure_id && (
+            <div className="border rounded-lg p-4">
+              <h3 className="font-medium mb-4">Selecione as especificações do procedimento:</h3>
+              <ProcedureSpecificationSelector
+                procedureId={formData.procedure_id}
+                onSelectionChange={(data) => setSelectedSpecifications(data.selectedSpecifications)}
+                initialSelections={selectedSpecifications.map(spec => spec.id)}
+              />
+            </div>
+          )}
+
           <div>
             <label className="text-sm font-medium">Observações</label>
             <Textarea
@@ -597,7 +642,7 @@ const BookingFormStep = ({ onComplete, onBack, preSelectedProcedureId }: Booking
           </div>
           
           <Button type="submit" className="w-full" disabled={loading}>
-            Continuar
+            {showSpecifications && selectedSpecifications.length === 0 ? 'Selecione as especificações' : 'Continuar'}
           </Button>
         </form>
       </CardContent>

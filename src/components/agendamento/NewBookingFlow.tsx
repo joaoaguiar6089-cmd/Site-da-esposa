@@ -4,13 +4,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, CheckCircle, Phone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentDateBrazil } from '@/utils/dateUtils';
-import { formatCPF, isValidCPF } from "@/utils/cpfValidator";
 import type { Client } from "@/types/client";
 import ProcedureSpecificationSelector, { ProcedureSpecification } from "./ProcedureSpecificationSelector";
+import LoginPhone from "./LoginPhone";
+import CadastroCliente from "./CadastroCliente";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface Procedure {
   id: string;
@@ -39,315 +42,13 @@ interface NewBookingFlowProps {
   preSelectedProcedureId?: string;
 }
 
-type FlowStep = 'booking-form' | 'cpf-verification' | 'client-registration';
+type ViewMode = 'form' | 'phone' | 'cadastro' | 'confirmation';
+
+const currency = (value: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0);
 
 const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookingFlowProps) => {
-  const [currentStep, setCurrentStep] = useState<FlowStep>('booking-form');
-  const [bookingData, setBookingData] = useState<BookingData | null>(null);
-  const [cpfInput, setCpfInput] = useState('');
-  const [foundClient, setFoundClient] = useState<Client | null>(null);
-  const [registrationData, setRegistrationData] = useState({
-    nome: '',
-    sobrenome: '',
-    celular: ''
-  });
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
-
-  const handleBookingFormComplete = (data: BookingData) => {
-    setBookingData(data);
-    setCurrentStep('cpf-verification');
-  };
-
-  const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatCPF(e.target.value);
-    setCpfInput(formatted);
-  };
-
-  const handleCPFSubmit = async () => {
-    if (!isValidCPF(cpfInput)) {
-      toast({
-        title: "CPF inválido",
-        description: "Por favor, insira um CPF válido.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('cpf', cpfInput.replace(/[^\d]/g, ''))
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-
-      if (data) {
-        // Cliente encontrado
-        setFoundClient(data);
-        await createAppointment(data);
-      } else {
-        // Cliente não encontrado, vai para cadastro
-        setCurrentStep('client-registration');
-      }
-    } catch (error) {
-      console.error('Erro ao verificar CPF:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao verificar CPF.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleClientRegistration = async () => {
-    if (!registrationData.nome || !registrationData.sobrenome || !registrationData.celular) {
-      toast({
-        title: "Campos obrigatórios",
-        description: "Por favor, preencha todos os campos.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('clients')
-        .insert({
-          cpf: cpfInput.replace(/[^\d]/g, ''),
-          nome: registrationData.nome,
-          sobrenome: registrationData.sobrenome,
-          celular: registrationData.celular
-        })
-        .select()
-        .single();
-
-      if (error) {
-        if (error.code === '23505') {
-          toast({
-            title: "CPF já cadastrado",
-            description: "Este CPF já possui cadastro no sistema.",
-            variant: "destructive",
-          });
-        } else {
-          throw error;
-        }
-        return;
-      }
-
-      setFoundClient(data);
-      await createAppointment(data);
-    } catch (error) {
-      console.error('Erro ao cadastrar cliente:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao cadastrar cliente.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const createAppointment = async (client: Client) => {
-    if (!bookingData) return;
-
-    try {
-      const { data: appointment, error: appointmentError } = await supabase
-        .from('appointments')
-        .insert({
-          client_id: client.id,
-          procedure_id: bookingData.procedure_id,
-          appointment_date: bookingData.appointment_date,
-          appointment_time: bookingData.appointment_time,
-          notes: bookingData.notes || null,
-          city_id: bookingData.city_id,
-          status: 'agendado'
-        })
-        .select()
-        .single();
-
-      if (appointmentError) throw appointmentError;
-
-      // Salvar especificações se houver
-      if (bookingData.specifications && bookingData.specifications.length > 0) {
-        const specificationsData = bookingData.specifications.map(spec => ({
-          appointment_id: appointment.id,
-          specification_id: spec.id,
-          specification_name: spec.name,
-          specification_price: spec.price
-        }));
-
-        const { error: specsError } = await supabase
-          .from('appointment_specifications')
-          .insert(specificationsData);
-
-        if (specsError) throw specsError;
-      }
-
-      toast({
-        title: "Sucesso!",
-        description: "Agendamento criado com sucesso!",
-      });
-
-      onSuccess();
-    } catch (error) {
-      console.error('Erro ao criar agendamento:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao criar agendamento.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const renderBookingForm = () => {
-    return (
-      <BookingFormStep 
-        onComplete={handleBookingFormComplete}
-        onBack={onBack}
-        preSelectedProcedureId={preSelectedProcedureId}
-      />
-    );
-  };
-
-  const renderCPFVerification = () => {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setCurrentStep('booking-form')}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            Confirmar Agendamento
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-muted-foreground">
-            Para finalizar seu agendamento, informe seu CPF:
-          </p>
-          
-          <div>
-            <label className="text-sm font-medium">CPF *</label>
-            <Input
-              value={cpfInput}
-              onChange={handleCPFChange}
-              placeholder="000.000.000-00"
-              maxLength={14}
-            />
-          </div>
-
-          <Button 
-            onClick={handleCPFSubmit}
-            disabled={loading || !isValidCPF(cpfInput)}
-            className="w-full"
-          >
-            {loading ? 'Verificando...' : 'Confirmar Agendamento'}
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  };
-
-  const renderClientRegistration = () => {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setCurrentStep('cpf-verification')}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            Cadastro de Cliente
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-muted-foreground">
-            CPF não encontrado. Vamos fazer seu cadastro:
-          </p>
-
-          <div>
-            <label className="text-sm font-medium">CPF</label>
-            <Input
-              value={cpfInput}
-              disabled
-              className="bg-muted"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium">Nome *</label>
-            <Input
-              value={registrationData.nome}
-              onChange={(e) => setRegistrationData(prev => ({ ...prev, nome: e.target.value }))}
-              placeholder="Seu nome"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium">Sobrenome *</label>
-            <Input
-              value={registrationData.sobrenome}
-              onChange={(e) => setRegistrationData(prev => ({ ...prev, sobrenome: e.target.value }))}
-              placeholder="Seu sobrenome"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium">Celular *</label>
-            <Input
-              value={registrationData.celular}
-              onChange={(e) => setRegistrationData(prev => ({ ...prev, celular: e.target.value }))}
-              placeholder="(00) 00000-0000"
-            />
-          </div>
-
-          <Button 
-            onClick={handleClientRegistration}
-            disabled={loading}
-            className="w-full"
-          >
-            {loading ? 'Cadastrando...' : 'Cadastrar e Agendar'}
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  };
-
-  switch (currentStep) {
-    case 'booking-form':
-      return renderBookingForm();
-    case 'cpf-verification':
-      return renderCPFVerification();
-    case 'client-registration':
-      return renderClientRegistration();
-    default:
-      return renderBookingForm();
-  }
-};
-
-// Componente separado para o formulário de agendamento
-interface BookingFormStepProps {
-  onComplete: (data: BookingData) => void;
-  onBack: () => void;
-  preSelectedProcedureId?: string;
-}
-
-const BookingFormStep = ({ onComplete, onBack, preSelectedProcedureId }: BookingFormStepProps) => {
+  const [currentView, setCurrentView] = useState<ViewMode>('form');
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [cities, setCities] = useState<{id: string, city_name: string}[]>([]);
   const [formData, setFormData] = useState({
@@ -363,6 +64,9 @@ const BookingFormStep = ({ onComplete, onBack, preSelectedProcedureId }: Booking
   const [loading, setLoading] = useState(false);
   const [loadingProcedures, setLoadingProcedures] = useState(true);
   const [showSpecifications, setShowSpecifications] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [pendingPhone, setPendingPhone] = useState<string>('');
+  const [appointmentDetails, setAppointmentDetails] = useState<any>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -523,6 +227,86 @@ const BookingFormStep = ({ onComplete, onBack, preSelectedProcedureId }: Booking
     }
   };
 
+  const handleClientFound = (client: Client) => {
+    setSelectedClient(client);
+    // Proceder diretamente para confirmação do agendamento
+    createAppointment(client);
+  };
+
+  const handleClientNotFound = (phone: string) => {
+    setPendingPhone(phone);
+    setCurrentView('cadastro');
+  };
+
+  const handleClientRegistered = (client: Client) => {
+    setSelectedClient(client);
+    createAppointment(client);
+  };
+
+  const createAppointment = async (client: Client) => {
+    setLoading(true);
+    
+    try {
+      let totalPrice = 0;
+      
+      // Calcular preço total das especificações
+      if (selectedSpecifications && selectedSpecifications.length > 0) {
+        totalPrice = selectedSpecifications.reduce((sum, spec) => sum + (spec.price || 0), 0);
+      }
+
+      const { data: appointment, error: appointmentError } = await supabase
+        .from('appointments')
+        .insert({
+          client_id: client.id,
+          procedure_id: formData.procedure_id,
+          appointment_date: formData.appointment_date,
+          appointment_time: formData.appointment_time,
+          notes: formData.notes || null,
+          city_id: formData.city_id,
+          total_body_areas_price: totalPrice,
+          status: 'agendado'
+        })
+        .select()
+        .single();
+
+      if (appointmentError) throw appointmentError;
+
+      // Salvar especificações se houver
+      if (selectedSpecifications && selectedSpecifications.length > 0) {
+        const specificationsData = selectedSpecifications.map(spec => ({
+          appointment_id: appointment.id,
+          specification_id: spec.id,
+          specification_name: spec.name,
+          specification_price: spec.price
+        }));
+
+        const { error: specsError } = await supabase
+          .from('appointment_specifications')
+          .insert(specificationsData);
+
+        if (specsError) throw specsError;
+      }
+
+      setAppointmentDetails(appointment);
+      setCurrentView('confirmation');
+
+      toast({
+        title: "Sucesso!",
+        description: "Agendamento criado com sucesso!",
+      });
+
+    } catch (error) {
+      console.error('Erro ao criar agendamento:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao criar agendamento.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -546,128 +330,200 @@ const BookingFormStep = ({ onComplete, onBack, preSelectedProcedureId }: Booking
       return;
     }
 
-    const bookingData: BookingData = {
-      ...formData,
-      specifications: selectedSpecifications
-    };
-
-    onComplete(bookingData);
+    setCurrentView('phone');
   };
 
-  if (loadingProcedures) {
-    return <div className="text-center py-8">Carregando...</div>;
-  }
+  const renderCurrentView = () => {
+    switch (currentView) {
+      case 'phone':
+        return (
+          <LoginPhone
+            onClientFound={handleClientFound}
+            onClientNotFound={handleClientNotFound}
+            onBack={() => setCurrentView('form')}
+          />
+        );
+      
+      case 'cadastro':
+        return (
+          <CadastroCliente
+            phone={pendingPhone}
+            onClientRegistered={handleClientRegistered}
+            onBack={() => setCurrentView('phone')}
+          />
+        );
+      
+      case 'confirmation':
+        const procedureName = procedures.find(p => p.id === formData.procedure_id)?.name || '';
+        const cityName = cities.find(c => c.id === formData.city_id)?.city_name || '';
+        
+        return (
+          <Card className="w-full max-w-md mx-auto">
+            <CardHeader className="text-center">
+              <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-green-100 rounded-full">
+                <CheckCircle className="w-6 h-6 text-green-600" />
+              </div>
+              <CardTitle className="text-2xl text-green-700">Agendamento Confirmado!</CardTitle>
+              <p className="text-muted-foreground">
+                Seu agendamento foi realizado com sucesso.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {appointmentDetails && (
+                <div className="p-4 bg-muted rounded-lg space-y-2">
+                  <p><strong>Procedimento:</strong> {procedureName}</p>
+                  <p><strong>Data:</strong> {format(new Date(appointmentDetails.appointment_date), "dd/MM/yyyy", { locale: ptBR })}</p>
+                  <p><strong>Horário:</strong> {appointmentDetails.appointment_time}</p>
+                  <p><strong>Cidade:</strong> {cityName}</p>
+                  {appointmentDetails.total_body_areas_price > 0 && (
+                    <p><strong>Valor Total:</strong> {currency(appointmentDetails.total_body_areas_price)}</p>
+                  )}
+                </div>
+              )}
+              <div className="space-y-2">
+                <Button
+                  onClick={() => window.location.href = '/area-cliente'}
+                  variant="outline"
+                  className="w-full"
+                >
+                  Visualizar Agendamentos
+                </Button>
+                <Button
+                  onClick={onSuccess}
+                  className="w-full"
+                >
+                  Concluir
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      
+      default:
+        if (loadingProcedures) {
+          return <div className="text-center py-8">Carregando...</div>;
+        }
+
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={onBack}>
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                Novo Agendamento
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div>
+                  <label className="text-sm font-medium">Procedimento *</label>
+                  <Select 
+                    value={formData.procedure_id} 
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, procedure_id: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um procedimento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {procedures.map((procedure) => (
+                        <SelectItem key={procedure.id} value={procedure.id}>
+                          {procedure.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Cidade *</label>
+                  <Select 
+                    value={formData.city_id} 
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, city_id: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma cidade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cities.map((city) => (
+                        <SelectItem key={city.id} value={city.id}>
+                          {city.city_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Data *</label>
+                  <Input
+                    type="date"
+                    min={getCurrentDateBrazil()}
+                    value={formData.appointment_date}
+                    onChange={(e) => setFormData(prev => ({ ...prev, appointment_date: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Horário *</label>
+                  <Select 
+                    value={formData.appointment_time} 
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, appointment_time: value }))}
+                    disabled={!formData.appointment_date || !formData.city_id}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={loadingTimes ? "Carregando..." : "Selecione um horário"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableTimes.map((time) => (
+                        <SelectItem key={time} value={time}>
+                          {time}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Seletor de especificações se necessário */}
+                {showSpecifications && formData.procedure_id && (
+                  <div className="border rounded-lg p-4">
+                    <h3 className="font-medium mb-4">Selecione as especificações do procedimento:</h3>
+                    <ProcedureSpecificationSelector
+                      procedureId={formData.procedure_id}
+                      onSelectionChange={(data) => setSelectedSpecifications(data.selectedSpecifications)}
+                      initialSelections={selectedSpecifications.map(spec => spec.id)}
+                      bodySelectionType={procedures.find(p => p.id === formData.procedure_id)?.body_selection_type || ''}
+                      bodyImageUrl={procedures.find(p => p.id === formData.procedure_id)?.body_image_url}
+                      bodyImageUrlMale={procedures.find(p => p.id === formData.procedure_id)?.body_image_url_male}
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-sm font-medium">Observações</label>
+                  <Textarea
+                    value={formData.notes}
+                    onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                    placeholder="Observações opcionais"
+                  />
+                </div>
+                
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {showSpecifications && selectedSpecifications.length === 0 ? 'Selecione as especificações' : 'Continuar'}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        );
+    }
+  };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          Novo Agendamento
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="text-sm font-medium">Procedimento *</label>
-            <Select 
-              value={formData.procedure_id} 
-              onValueChange={(value) => setFormData(prev => ({ ...prev, procedure_id: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um procedimento" />
-              </SelectTrigger>
-              <SelectContent>
-                {procedures.map((procedure) => (
-                  <SelectItem key={procedure.id} value={procedure.id}>
-                    {procedure.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium">Cidade *</label>
-            <Select 
-              value={formData.city_id} 
-              onValueChange={(value) => setFormData(prev => ({ ...prev, city_id: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione uma cidade" />
-              </SelectTrigger>
-              <SelectContent>
-                {cities.map((city) => (
-                  <SelectItem key={city.id} value={city.id}>
-                    {city.city_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium">Data *</label>
-            <Input
-              type="date"
-              min={getCurrentDateBrazil()}
-              value={formData.appointment_date}
-              onChange={(e) => setFormData(prev => ({ ...prev, appointment_date: e.target.value }))}
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium">Horário *</label>
-            <Select 
-              value={formData.appointment_time} 
-              onValueChange={(value) => setFormData(prev => ({ ...prev, appointment_time: value }))}
-              disabled={!formData.appointment_date || !formData.city_id}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={loadingTimes ? "Carregando..." : "Selecione um horário"} />
-              </SelectTrigger>
-              <SelectContent>
-                {availableTimes.map((time) => (
-                  <SelectItem key={time} value={time}>
-                    {time}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Seletor de especificações se necessário */}
-          {showSpecifications && formData.procedure_id && (
-            <div className="border rounded-lg p-4">
-              <h3 className="font-medium mb-4">Selecione as especificações do procedimento:</h3>
-              <ProcedureSpecificationSelector
-                procedureId={formData.procedure_id}
-                onSelectionChange={(data) => setSelectedSpecifications(data.selectedSpecifications)}
-                initialSelections={selectedSpecifications.map(spec => spec.id)}
-                bodySelectionType={procedures.find(p => p.id === formData.procedure_id)?.body_selection_type || ''}
-                bodyImageUrl={procedures.find(p => p.id === formData.procedure_id)?.body_image_url}
-                bodyImageUrlMale={procedures.find(p => p.id === formData.procedure_id)?.body_image_url_male}
-              />
-            </div>
-          )}
-
-          <div>
-            <label className="text-sm font-medium">Observações</label>
-            <Textarea
-              value={formData.notes}
-              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-              placeholder="Observações opcionais"
-            />
-          </div>
-          
-          <Button type="submit" className="w-full" disabled={loading}>
-            {showSpecifications && selectedSpecifications.length === 0 ? 'Selecione as especificações' : 'Continuar'}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4">
+      <div className="max-w-4xl mx-auto">
+        {renderCurrentView()}
+      </div>
+    </div>
   );
 };
 

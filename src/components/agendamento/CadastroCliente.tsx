@@ -8,22 +8,28 @@ import { useToast } from "@/hooks/use-toast";
 import type { Client } from "@/types/client";
 
 interface CadastroClienteProps {
-  cpf: string;
+  cpf?: string;
+  phone?: string;
   onClientRegistered: (client: Client) => void;
   onBack: () => void;
 }
 
-const CadastroCliente = ({ cpf, onClientRegistered, onBack }: CadastroClienteProps) => {
+const CadastroCliente = ({ cpf, phone, onClientRegistered, onBack }: CadastroClienteProps) => {
   const [formData, setFormData] = useState({
     nome: "",
     sobrenome: "",
-    celular: "",
+    cpf: cpf || "",
+    celular: phone || "",
   });
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const formatCPF = (cpf: string) => {
-    return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  const formatCPF = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 11) {
+      return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    }
+    return value;
   };
 
   const formatPhone = (value: string) => {
@@ -35,45 +41,62 @@ const CadastroCliente = ({ cpf, onClientRegistered, onBack }: CadastroClientePro
     return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
   };
 
+  const isValidCPF = (cpf: string) => {
+    const numbers = cpf.replace(/\D/g, '');
+    if (numbers.length !== 11 || /^(\d)\1{10}$/.test(numbers)) return false;
+
+    // Verificação dos dígitos verificadores
+    let sum = 0;
+    for (let i = 0; i < 9; i++) {
+      sum += parseInt(numbers.charAt(i)) * (10 - i);
+    }
+    let checkDigit = 11 - (sum % 11);
+    if (checkDigit === 10 || checkDigit === 11) checkDigit = 0;
+    if (checkDigit !== parseInt(numbers.charAt(9))) return false;
+
+    sum = 0;
+    for (let i = 0; i < 10; i++) {
+      sum += parseInt(numbers.charAt(i)) * (11 - i);
+    }
+    checkDigit = 11 - (sum % 11);
+    if (checkDigit === 10 || checkDigit === 11) checkDigit = 0;
+    if (checkDigit !== parseInt(numbers.charAt(10))) return false;
+
+    return true;
+  };
+
   const handleInputChange = (field: string, value: string) => {
-    if (field === 'celular') {
-      // Remove tudo que não é número
+    if (field === 'cpf') {
+      const formatted = formatCPF(value);
+      setFormData(prev => ({ ...prev, [field]: formatted }));
+    } else if (field === 'celular') {
       const numbers = value.replace(/\D/g, '');
-      // Limita a 11 dígitos
       if (numbers.length <= 11) {
-        setFormData(prev => ({
-          ...prev,
-          [field]: formatPhone(numbers)
-        }));
+        setFormData(prev => ({ ...prev, [field]: formatPhone(numbers) }));
       }
     } else if (field === 'nome' || field === 'sobrenome') {
-      // Remove números e caracteres especiais, permite apenas letras e espaços
       const cleanValue = value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
-      setFormData(prev => ({
-        ...prev,
-        [field]: cleanValue
-      }));
+      setFormData(prev => ({ ...prev, [field]: cleanValue }));
     } else {
-      setFormData(prev => ({
-        ...prev,
-        [field]: value
-      }));
+      setFormData(prev => ({ ...prev, [field]: value }));
     }
   };
 
   const isValidForm = () => {
     const phoneNumbers = formData.celular.replace(/\D/g, '');
+    const cpfNumbers = formData.cpf.replace(/\D/g, '');
+    
     const nomeValid = formData.nome.trim().length >= 2;
     const sobrenomeValid = formData.sobrenome.trim().length >= 2;
     const phoneValid = phoneNumbers.length >= 10 && phoneNumbers.length <= 11;
+    const cpfValid = isValidCPF(formData.cpf);
     
-    return nomeValid && sobrenomeValid && phoneValid;
+    return nomeValid && sobrenomeValid && phoneValid && cpfValid;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Previne múltiplos submits
     if (loading) return;
     
     if (!isValidForm()) {
@@ -89,15 +112,14 @@ const CadastroCliente = ({ cpf, onClientRegistered, onBack }: CadastroClientePro
     
     try {
       const phoneNumbers = formData.celular.replace(/\D/g, '');
+      const cpfNumbers = formData.cpf.replace(/\D/g, '');
       
       const clientData = {
-        cpf: cpf.replace(/\D/g, ''), // Remove formatação do CPF também
+        cpf: cpfNumbers,
         nome: formData.nome.trim(),
         sobrenome: formData.sobrenome.trim(),
         celular: phoneNumbers,
       };
-
-      console.log('Enviando dados:', clientData); // Log para debug
 
       const { data, error } = await supabase
         .from('clients')
@@ -115,7 +137,6 @@ const CadastroCliente = ({ cpf, onClientRegistered, onBack }: CadastroClientePro
         description: "Seus dados foram salvos com sucesso.",
       });
 
-      // Pequeno delay antes de chamar o callback
       setTimeout(() => {
         onClientRegistered(data);
       }, 100);
@@ -143,9 +164,8 @@ const CadastroCliente = ({ cpf, onClientRegistered, onBack }: CadastroClientePro
     }
   };
 
-  // Previne zoom no input em iOS
   const inputStyle = {
-    fontSize: '16px', // Previne zoom automático no iOS
+    fontSize: '16px',
   };
 
   return (
@@ -163,13 +183,34 @@ const CadastroCliente = ({ cpf, onClientRegistered, onBack }: CadastroClientePro
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <div>
             <label className="text-sm font-medium block mb-2">
-              CPF
+              Celular
             </label>
             <Input
               type="text"
-              value={formatCPF(cpf)}
-              disabled
-              className="bg-muted"
+              value={formData.celular}
+              onChange={(e) => handleInputChange('celular', e.target.value)}
+              placeholder="(00) 00000-0000"
+              disabled={!!phone}
+              className={phone ? "bg-muted" : ""}
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="cpf" className="text-sm font-medium block mb-2">
+              CPF *
+            </label>
+            <Input
+              id="cpf"
+              type="text"
+              placeholder="000.000.000-00"
+              value={formData.cpf}
+              onChange={(e) => handleInputChange('cpf', e.target.value)}
+              required
+              autoComplete="off"
+              inputMode="numeric"
+              disabled={!!cpf}
+              className={cpf ? "bg-muted" : ""}
               style={inputStyle}
             />
           </div>
@@ -211,26 +252,6 @@ const CadastroCliente = ({ cpf, onClientRegistered, onBack }: CadastroClientePro
               style={inputStyle}
             />
           </div>
-
-          <div>
-            <label htmlFor="celular" className="text-sm font-medium block mb-2">
-              Celular *
-            </label>
-            <Input
-              id="celular"
-              type="tel"
-              placeholder="(11) 99999-9999"
-              value={formData.celular}
-              onChange={(e) => handleInputChange('celular', e.target.value)}
-              required
-              autoComplete="tel"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              autoCorrect="off"
-              spellCheck="false"
-              style={inputStyle}
-            />
-          </div>
           
           <div className="flex gap-2 pt-2">
             <Button
@@ -247,7 +268,7 @@ const CadastroCliente = ({ cpf, onClientRegistered, onBack }: CadastroClientePro
               type="submit"
               disabled={loading || !isValidForm()}
               className="flex-1"
-              style={{ fontSize: '16px' }} // Previne zoom no iOS
+              style={{ fontSize: '16px' }}
             >
               {loading ? "Cadastrando..." : "Cadastrar"}
             </Button>

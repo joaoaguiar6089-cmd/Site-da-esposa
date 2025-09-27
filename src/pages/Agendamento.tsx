@@ -51,8 +51,8 @@ const Agendamento = () => {
   };
 
   const handleNewBookingSuccess = () => {
-    // Redireciona para área do cliente após sucesso
-    window.location.href = '/area-cliente';
+    // Redireciona para área do cliente após sucesso - já é feito pelo botão interno
+    // Não precisamos fazer nada aqui pois o usuário escolhe se quer visualizar agendamentos ou concluir
   };
 
   const handleBack = () => {

@@ -14,7 +14,14 @@ interface LoginClienteProps {
 }
 
 const LoginCliente = ({ onClientFound, onClientNotFound, onBack }: LoginClienteProps) => {
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(() => {
+    // Tentar recuperar o telefone da sessão
+    const savedPhone = sessionStorage.getItem('booking_phone');
+    if (savedPhone) {
+      return savedPhone.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    }
+    return "";
+  });
   const [cpf, setCpf] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);

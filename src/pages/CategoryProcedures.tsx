@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ProcedureCard from "@/components/ProcedureCard";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
+import { isUUID, createSlug } from "@/lib/utils";
 
 type Procedure = Database['public']['Tables']['procedures']['Row'] & {
   categories?: Database['public']['Tables']['categories']['Row'];
@@ -16,6 +17,7 @@ type Category = Database['public']['Tables']['categories']['Row'];
 
 const CategoryProcedures = () => {
   const { categoryId } = useParams();
+  const navigate = useNavigate();
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [category, setCategory] = useState<Category | null>(null);
   const [loading, setLoading] = useState(true);
@@ -23,27 +25,41 @@ const CategoryProcedures = () => {
   useEffect(() => {
     if (categoryId) {
       loadCategoryData();
-      loadProcedures();
     }
   }, [categoryId]);
 
-  // Scroll automático para o procedimento específico
+  useEffect(() => {
+    if (category) {
+      loadProcedures();
+    }
+  }, [category]);
+
+  // Scroll automático para o procedimento específico (por slug ou UUID)
   useEffect(() => {
     const hash = window.location.hash;
     if (hash && hash.startsWith('#procedure-')) {
+      const procedureIdentifier = hash.replace('#procedure-', '');
+      
       // Aguarda um pouco para garantir que os elementos foram renderizados
       const timer = setTimeout(() => {
-        const element = document.querySelector(hash);
+        // Tenta encontrar o elemento pelo slug ou UUID
+        const element = procedures.find(p => 
+          p.id === procedureIdentifier || createSlug(p.name) === procedureIdentifier
+        );
+        
         if (element) {
-          element.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center'
-          });
-          // Adiciona um destaque temporário
-          element.classList.add('ring-2', 'ring-primary', 'ring-opacity-50');
-          setTimeout(() => {
-            element.classList.remove('ring-2', 'ring-primary', 'ring-opacity-50');
-          }, 2000);
+          const domElement = document.getElementById(`procedure-${element.id}`);
+          if (domElement) {
+            domElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'center'
+            });
+            // Adiciona um destaque temporário
+            domElement.classList.add('ring-2', 'ring-primary', 'ring-opacity-50');
+            setTimeout(() => {
+              domElement.classList.remove('ring-2', 'ring-primary', 'ring-opacity-50');
+            }, 2000);
+          }
         }
       }, 500);
       
@@ -52,21 +68,47 @@ const CategoryProcedures = () => {
   }, [procedures]);
 
   const loadCategoryData = async () => {
+    if (!categoryId) return;
+    
     try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .eq('id', categoryId)
-        .single();
+      // Se for UUID, busca diretamente
+      if (isUUID(categoryId)) {
+        const { data, error } = await supabase
+          .from('categories')
+          .select('*')
+          .eq('id', categoryId)
+          .single();
 
-      if (error) throw error;
-      setCategory(data);
+        if (error) throw error;
+        setCategory(data);
+      } else {
+        // Se não for UUID, busca por slug
+        const { data: allCategories, error } = await supabase
+          .from('categories')
+          .select('*');
+        
+        if (error) throw error;
+        
+        const foundCategory = allCategories?.find(cat => 
+          createSlug(cat.name) === categoryId
+        );
+        
+        if (foundCategory) {
+          setCategory(foundCategory);
+        } else {
+          console.error('Categoria não encontrada');
+          navigate('/');
+        }
+      }
     } catch (error) {
       console.error('Erro ao carregar categoria:', error);
+      navigate('/');
     }
   };
 
   const loadProcedures = async () => {
+    if (!category) return;
+    
     try {
       const { data, error } = await supabase
         .from('procedures')
@@ -74,7 +116,7 @@ const CategoryProcedures = () => {
           *,
           categories (*)
         `)
-        .eq('category_id', categoryId);
+        .eq('category_id', category.id);
 
       if (error) throw error;
       setProcedures(data || []);
@@ -125,18 +167,19 @@ const CategoryProcedures = () => {
           {procedures.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {procedures.map((procedure) => (
-                <ProcedureCard
-                  key={procedure.id}
-                  title={procedure.name}
-                  description={procedure.description || ''}
-                  price={procedure.price ? `A partir de R$ ${procedure.price.toFixed(2)}` : 'Consulte valores'}
-                  image={procedure.image_url || '/placeholder.svg'}
-                  duration={`${procedure.duration} min`}
-                  benefits={procedure.benefits || []}
-                  sessions={procedure.sessions}
-                  indication={procedure.indication || undefined}
-                  procedureId={procedure.id}
-                />
+                <div key={procedure.id} id={`procedure-${procedure.id}`}>
+                  <ProcedureCard
+                    title={procedure.name}
+                    description={procedure.description || ''}
+                    price={procedure.price ? `A partir de R$ ${procedure.price.toFixed(2)}` : 'Consulte valores'}
+                    image={procedure.image_url || '/placeholder.svg'}
+                    duration={`${procedure.duration} min`}
+                    benefits={procedure.benefits || []}
+                    sessions={procedure.sessions}
+                    indication={procedure.indication || undefined}
+                    procedureId={procedure.id}
+                  />
+                </div>
               ))}
             </div>
           ) : (

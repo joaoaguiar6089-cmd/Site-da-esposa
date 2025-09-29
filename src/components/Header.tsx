@@ -3,6 +3,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, Instagram, ChevronDown, ChevronRight, User } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { createSlug } from "@/lib/utils";
 
 interface Category {
   id: string;
@@ -201,7 +202,7 @@ const Header = () => {
                       onMouseLeave={() => setActiveCategory(null)}
                     >
                       <a
-                        href={`/categoria/${category.id}`}
+                        href={`/categoria/${createSlug(category.name)}`}
                         className="flex items-center justify-between px-6 py-3 text-gray-700 hover:bg-red-50/80 hover:text-red-600 transition-all duration-300 group"
                       >
                         <span className="font-medium">{category.name}</span>
@@ -220,7 +221,7 @@ const Header = () => {
                           {category.subcategories.map((subcategory) => (
                             <a
                               key={subcategory.id}
-                              href={`/subcategoria/${subcategory.id}`}
+                              href={`/subcategoria/${createSlug(subcategory.name)}`}
                               className="block px-6 py-2 text-gray-600 hover:bg-red-50/80 hover:text-red-600 transition-all duration-300 hover:translate-x-2"
                             >
                               {subcategory.name}
@@ -228,7 +229,7 @@ const Header = () => {
                           ))}
                           <div className="border-t border-gray-100 mt-2 pt-2">
                             <a
-                              href={`/categoria/${category.id}`}
+                              href={`/categoria/${createSlug(category.name)}`}
                               className="block px-6 py-2 text-red-600 font-medium hover:bg-red-50/80 transition-all duration-300 hover:translate-x-2"
                             >
                               Ver todos os procedimentos
@@ -262,7 +263,7 @@ const Header = () => {
                     featuredProcedures.map((procedure) => (
                       <a
                         key={procedure.id}
-                        href={`/categoria/${procedure.category_id}#procedure-${procedure.id}`}
+                        href={`/categoria/${createSlug(procedure.categories?.name || '')}#procedure-${createSlug(procedure.name)}`}
                         className="flex items-center justify-between px-6 py-3 text-gray-700 hover:bg-red-50/80 hover:text-red-600 transition-all duration-300 group"
                       >
                         <div className="flex flex-col">
@@ -385,11 +386,11 @@ const Header = () => {
                                 </button>
                               ) : (
                                 <a
-                                  href={`/categoria/${category.id}`}
+                                  href={`/categoria/${createSlug(category.name)}`}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setIsOpen(false);
-                                    window.location.href = `/categoria/${category.id}`;
+                                    window.location.href = `/categoria/${createSlug(category.name)}`;
                                   }}
                                   className="block px-4 py-3 text-left bg-white/70 text-gray-700 hover:bg-red-50/80 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/60 hover:border-red-200"
                                 >
@@ -427,11 +428,11 @@ const Header = () => {
                             featuredProcedures.map((procedure) => (
                               <a
                                 key={procedure.id}
-                                href={`/categoria/${procedure.category_id}#procedure-${procedure.id}`}
+                                href={`/categoria/${createSlug(procedure.categories?.name || '')}#procedure-${createSlug(procedure.name)}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setIsOpen(false);
-                                  window.location.href = `/categoria/${procedure.category_id}#procedure-${procedure.id}`;
+                                  window.location.href = `/categoria/${createSlug(procedure.categories?.name || '')}#procedure-${createSlug(procedure.name)}`;
                                 }}
                                 className="block px-4 py-3 text-left bg-white/70 text-gray-700 hover:bg-red-50/80 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/60 hover:border-red-200"
                               >
@@ -476,11 +477,11 @@ const Header = () => {
 
                           {/* Todos os procedimentos */}
                           <a
-                            href={`/categoria/${category.id}`}
+                            href={`/categoria/${createSlug(category.name)}`}
                             onClick={(e) => {
                               e.stopPropagation();
                               setIsOpen(false);
-                              window.location.href = `/categoria/${category.id}`;
+                              window.location.href = `/categoria/${createSlug(category.name)}`;
                             }}
                             className="block px-4 py-2 text-sm bg-white/80 text-gray-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/80 hover:border-red-200 mx-1 font-medium"
                           >
@@ -492,11 +493,11 @@ const Header = () => {
                           {category.subcategories.map((subcategory) => (
                             <a
                               key={subcategory.id}
-                              href={`/subcategoria/${subcategory.id}`}
+                              href={`/subcategoria/${createSlug(subcategory.name)}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setIsOpen(false);
-                                window.location.href = `/subcategoria/${subcategory.id}`;
+                                window.location.href = `/subcategoria/${createSlug(subcategory.name)}`;
                               }}
                               className="block px-4 py-2 text-sm bg-white/80 text-gray-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition-all duration-300 hover:translate-x-1 shadow-sm hover:shadow-md border border-white/80 hover:border-red-200 mx-1"
                             >

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ProcedureCard from "@/components/ProcedureCard";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { isUUID, createSlug } from "@/lib/utils";
 
 interface Procedure {
   id: string;
@@ -32,6 +33,7 @@ interface Subcategory {
 
 const SubcategoryProcedures = () => {
   const { subcategoryId } = useParams();
+  const navigate = useNavigate();
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [subcategory, setSubcategory] = useState<Subcategory | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,27 +41,41 @@ const SubcategoryProcedures = () => {
   useEffect(() => {
     if (subcategoryId) {
       loadSubcategoryData();
-      loadProcedures();
     }
   }, [subcategoryId]);
 
-  // Scroll automático para o procedimento específico
+  useEffect(() => {
+    if (subcategory) {
+      loadProcedures();
+    }
+  }, [subcategory]);
+
+  // Scroll automático para o procedimento específico (por slug ou UUID)
   useEffect(() => {
     const hash = window.location.hash;
     if (hash && hash.startsWith('#procedure-')) {
+      const procedureIdentifier = hash.replace('#procedure-', '');
+      
       // Aguarda um pouco para garantir que os elementos foram renderizados
       const timer = setTimeout(() => {
-        const element = document.querySelector(hash);
+        // Tenta encontrar o elemento pelo slug ou UUID
+        const element = procedures.find(p => 
+          p.id === procedureIdentifier || createSlug(p.name) === procedureIdentifier
+        );
+        
         if (element) {
-          element.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center'
-          });
-          // Adiciona um destaque temporário
-          element.classList.add('ring-2', 'ring-primary', 'ring-opacity-50');
-          setTimeout(() => {
-            element.classList.remove('ring-2', 'ring-primary', 'ring-opacity-50');
-          }, 2000);
+          const domElement = document.getElementById(`procedure-${element.id}`);
+          if (domElement) {
+            domElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'center'
+            });
+            // Adiciona um destaque temporário
+            domElement.classList.add('ring-2', 'ring-primary', 'ring-opacity-50');
+            setTimeout(() => {
+              domElement.classList.remove('ring-2', 'ring-primary', 'ring-opacity-50');
+            }, 2000);
+          }
         }
       }, 500);
       
@@ -68,21 +84,47 @@ const SubcategoryProcedures = () => {
   }, [procedures]);
 
   const loadSubcategoryData = async () => {
+    if (!subcategoryId) return;
+    
     try {
-      const { data, error } = await supabase
-        .from('subcategories')
-        .select('*')
-        .eq('id', subcategoryId)
-        .single();
+      // Se for UUID, busca diretamente
+      if (isUUID(subcategoryId)) {
+        const { data, error } = await supabase
+          .from('subcategories')
+          .select('*')
+          .eq('id', subcategoryId)
+          .single();
 
-      if (error) throw error;
-      setSubcategory(data);
+        if (error) throw error;
+        setSubcategory(data);
+      } else {
+        // Se não for UUID, busca por slug
+        const { data: allSubcategories, error } = await supabase
+          .from('subcategories')
+          .select('*');
+        
+        if (error) throw error;
+        
+        const foundSubcategory = allSubcategories?.find(sub => 
+          createSlug(sub.name) === subcategoryId
+        );
+        
+        if (foundSubcategory) {
+          setSubcategory(foundSubcategory);
+        } else {
+          console.error('Subcategoria não encontrada');
+          navigate('/');
+        }
+      }
     } catch (error) {
       console.error('Erro ao carregar subcategoria:', error);
+      navigate('/');
     }
   };
 
   const loadProcedures = async () => {
+    if (!subcategory) return;
+    
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -94,7 +136,7 @@ const SubcategoryProcedures = () => {
             name
           )
         `)
-        .eq('subcategory_id', subcategoryId);
+        .eq('subcategory_id', subcategory.id);
 
       if (error) throw error;
       setProcedures(data || []);
@@ -149,18 +191,19 @@ const SubcategoryProcedures = () => {
         {procedures.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {procedures.map((procedure) => (
-              <ProcedureCard 
-                key={procedure.id}
-                title={procedure.name}
-                description={procedure.description}
-                indication={procedure.indication}
-                price={procedure.price ? `R$ ${procedure.price}` : "Consultar"}
-                image={procedure.image_url || "/placeholder.svg"}
-                duration={`${procedure.duration} min`}
-                sessions={procedure.sessions}
-                benefits={procedure.benefits || []}
-                procedureId={procedure.id}
-              />
+              <div key={procedure.id} id={`procedure-${procedure.id}`}>
+                <ProcedureCard 
+                  title={procedure.name}
+                  description={procedure.description}
+                  indication={procedure.indication}
+                  price={procedure.price ? `R$ ${procedure.price}` : "Consultar"}
+                  image={procedure.image_url || "/placeholder.svg"}
+                  duration={`${procedure.duration} min`}
+                  sessions={procedure.sessions}
+                  benefits={procedure.benefits || []}
+                  procedureId={procedure.id}
+                />
+              </div>
             ))}
           </div>
         ) : (

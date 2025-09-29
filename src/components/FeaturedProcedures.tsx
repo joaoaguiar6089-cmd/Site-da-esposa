@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { Database } from "@/integrations/supabase/types";
+import { createSlug } from "@/lib/utils";
 
 type Procedure = Database['public']['Tables']['procedures']['Row'] & {
   categories?: Database['public']['Tables']['categories']['Row'];
@@ -110,7 +111,7 @@ const FeaturedProcedures = () => {
               {categories.map((category, index) => (
                 <Link 
                   key={category.id} 
-                  to={`/categoria/${category.id}`}
+                  to={`/categoria/${createSlug(category.name)}`}
                   className="group block animate-fade-in"
                   style={{ animationDelay: `${index * 100}ms` }}
                 >

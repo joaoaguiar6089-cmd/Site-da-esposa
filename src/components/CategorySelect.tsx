@@ -10,6 +10,7 @@ import { ChevronDown, List } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
+import { createSlug } from "@/lib/utils";
 
 type Category = Database['public']['Tables']['categories']['Row'];
 
@@ -35,8 +36,8 @@ const CategorySelect = () => {
     }
   };
 
-  const handleCategorySelect = (categoryId: string) => {
-    navigate(`/categoria/${categoryId}`);
+  const handleCategorySelect = (categoryName: string) => {
+    navigate(`/categoria/${createSlug(categoryName)}`);
   };
 
   if (categories.length === 0) {
@@ -60,7 +61,7 @@ const CategorySelect = () => {
         {categories.map((category) => (
           <DropdownMenuItem
             key={category.id}
-            onClick={() => handleCategorySelect(category.id)}
+            onClick={() => handleCategorySelect(category.name)}
             className="cursor-pointer"
           >
             <div className="flex flex-col">

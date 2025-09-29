@@ -417,17 +417,27 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
 
   const sendWhatsAppNotification = async (client: Client, appointment: any, procedure: any, city: any) => {
     try {
-      await supabase.functions.invoke('send-whatsapp', {
+      // Buscar template formatado
+      const { data: templateData, error: templateError } = await supabase.functions.invoke('get-whatsapp-template', {
         body: {
           templateType: 'agendamento_cliente',
-          to: client.celular,
           variables: {
             clientName: client.nome,
-            appointmentDate: format(parseISO(appointment.appointment_date), "dd/MM/yyyy"),
+            appointmentDate: format(parseISO(appointment.appointment_date), "dd/MM/yyyy", { locale: ptBR }),
             appointmentTime: appointment.appointment_time,
             procedureName: procedure?.name || '',
             cityName: city?.city_name || ''
           }
+        }
+      });
+
+      if (templateError) throw templateError;
+
+      // Enviar mensagem via WhatsApp
+      await supabase.functions.invoke('send-whatsapp', {
+        body: {
+          to: client.celular,
+          message: templateData.message
         }
       });
     } catch (error) {
@@ -497,6 +507,8 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
 
     setCurrentView('phone');
   };
+
+  const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
 
   const renderCurrentView = () => {
     switch (currentView) {
@@ -668,6 +680,50 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                   </Select>
                 </div>
 
+                {/* Box de Descrição do Procedimento Selecionado */}
+                {selectedProcedure && (
+                  <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent shadow-lg">
+                    <CardContent className="p-6">
+                      <div className="flex items-start gap-4">
+                        <div className="p-3 bg-gradient-to-br from-primary to-primary/80 rounded-full shadow-md flex-shrink-0">
+                          <Sparkles className="h-6 w-6 text-primary-foreground" />
+                        </div>
+                        <div className="flex-1 space-y-3">
+                          <h3 className="text-xl font-bold text-foreground">{selectedProcedure.name}</h3>
+                          {selectedProcedure.description && (
+                            <p className="text-sm text-muted-foreground leading-relaxed">
+                              {selectedProcedure.description}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-6 pt-2">
+                            <div className="flex items-center gap-2">
+                              <div className="h-1.5 w-1.5 rounded-full bg-primary"></div>
+                              <span className="text-sm font-medium">Duração:</span>
+                              <span className="text-sm text-muted-foreground">{selectedProcedure.duration}min</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="h-1.5 w-1.5 rounded-full bg-primary"></div>
+                              <span className="text-sm font-medium">Valor:</span>
+                              <span className="text-sm text-primary font-bold">{currency(selectedProcedure.price || 0)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Especificações */}
+                {showSpecifications && (
+                  <div className="space-y-3">
+                    <ProcedureSpecificationSelector
+                      procedureId={formData.procedure_id}
+                      onSelectionChange={(data) => setSelectedSpecifications(data.selectedSpecifications)}
+                      initialSelections={selectedSpecifications.map(s => s.id)}
+                    />
+                  </div>
+                )}
+
                 {/* Cidade */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground">
@@ -741,25 +797,23 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                           unavailable: (date) => {
                             const dateStr = format(date, 'yyyy-MM-dd');
                             return unavailableDates.has(dateStr);
-                          }
+                          },
                         }}
-                        modifiersClassNames={{
-                          available: "bg-green-100 text-green-900 hover:bg-green-200 dark:bg-green-900 dark:text-green-100",
-                          unavailable: "bg-red-100 text-red-900 hover:bg-red-200 dark:bg-red-900 dark:text-red-100 line-through"
+                        modifiersStyles={{
+                          available: {
+                            backgroundColor: 'hsl(var(--success) / 0.2)',
+                            color: 'hsl(var(--success))',
+                            fontWeight: 'bold',
+                          },
+                          unavailable: {
+                            backgroundColor: 'hsl(var(--destructive) / 0.1)',
+                            color: 'hsl(var(--destructive) / 0.5)',
+                            textDecoration: 'line-through',
+                          },
                         }}
-                        className="pointer-events-auto"
                         locale={ptBR}
+                        className="rounded-md border"
                       />
-                      <div className="p-3 border-t text-xs space-y-1">
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-green-100 rounded"></div>
-                          <span>Dias disponíveis</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-red-100 rounded"></div>
-                          <span>Dias indisponíveis</span>
-                        </div>
-                      </div>
                     </PopoverContent>
                   </Popover>
                 </div>
@@ -772,17 +826,17 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                   <Select 
                     value={formData.appointment_time} 
                     onValueChange={(value) => setFormData(prev => ({ ...prev, appointment_time: value }))}
-                    disabled={!formData.appointment_date || !formData.city_id || loadingTimes}
+                    disabled={!formData.appointment_date || loadingTimes}
                   >
                     <SelectTrigger className="h-14 border-2 hover:border-primary/50 transition-all duration-200 bg-background">
                       <SelectValue placeholder={
                         loadingTimes ? "Carregando horários..." : 
-                        !formData.appointment_date ? "Selecione a data primeiro" :
-                        availableTimes.length === 0 ? "Nenhum horário disponível" :
+                        !formData.appointment_date ? "Selecione a data primeiro" : 
+                        availableTimes.length === 0 ? "Sem horários disponíveis" :
                         "Selecione um horário"
                       } />
                     </SelectTrigger>
-                    <SelectContent className="max-h-[300px]">
+                    <SelectContent>
                       {availableTimes.map((time) => (
                         <SelectItem key={time} value={time} className="py-3">
                           <span className="font-medium">{time}</span>
@@ -792,53 +846,35 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                   </Select>
                 </div>
 
-                {/* Especificações */}
-                {showSpecifications && formData.procedure_id && (
-                  <div className="border-2 border-primary/20 rounded-xl p-6 bg-gradient-to-br from-primary/5 to-transparent space-y-4">
-                    <h3 className="font-semibold text-lg flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-primary" />
-                      Especificações do Procedimento
-                    </h3>
-                    <ProcedureSpecificationSelector
-                      procedureId={formData.procedure_id}
-                      onSelectionChange={(data) => setSelectedSpecifications(data.selectedSpecifications)}
-                      initialSelections={selectedSpecifications.map(spec => spec.id)}
-                      bodySelectionType={procedures.find(p => p.id === formData.procedure_id)?.body_selection_type || ''}
-                      bodyImageUrl={procedures.find(p => p.id === formData.procedure_id)?.body_image_url}
-                      bodyImageUrlMale={procedures.find(p => p.id === formData.procedure_id)?.body_image_url_male}
-                    />
-                  </div>
-                )}
-
                 {/* Observações */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground">
-                    Observações
+                    Observações (opcional)
                   </label>
                   <Textarea
                     value={formData.notes}
                     onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                    placeholder="Alguma observação ou dúvida?"
-                    className="min-h-[100px] border-2 hover:border-primary/50 focus:border-primary transition-all duration-200 resize-none"
+                    placeholder="Adicione qualquer observação relevante sobre o agendamento..."
+                    className="min-h-[100px] border-2 hover:border-primary/50 transition-all duration-200"
                   />
                 </div>
-                
-                <div className="flex gap-3 pt-4">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+
+                {/* Botões de Ação */}
+                <div className="flex gap-4 pt-4">
+                  <Button
+                    type="button"
                     onClick={onBack}
-                    className="flex-1 h-14 text-base font-medium"
+                    variant="outline"
+                    className="flex-1 h-12 text-base"
                   >
-                    <ArrowLeft className="w-5 h-5 mr-2" />
-                    Voltar
+                    Cancelar
                   </Button>
-                  <Button 
-                    type="submit" 
-                    className="flex-1 h-14 text-base font-medium bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl transition-all duration-200"
-                    disabled={loading || (showSpecifications && selectedSpecifications.length === 0)}
+                  <Button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 h-12 text-base bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 font-semibold"
                   >
-                    {loading ? 'Processando...' : 'Continuar'}
+                    {loading ? 'Agendando...' : 'Confirmar Agendamento'}
                   </Button>
                 </div>
               </form>
@@ -849,10 +885,8 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-background p-4 py-8">
-      <div className="max-w-5xl mx-auto">
-        {renderCurrentView()}
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 py-8">
+      {renderCurrentView()}
     </div>
   );
 };

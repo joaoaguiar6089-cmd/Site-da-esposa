@@ -14,6 +14,7 @@ import AdminManagement from "@/components/admin/AdminManagement";
 import SecurityAuditLog from "@/components/admin/SecurityAuditLog";
 import HeroImageManager from "@/components/admin/HeroImageManager";
 import ScheduleSettings from "@/components/admin/ScheduleSettings";
+import AdminCityAddresses from "@/components/admin/AdminCityAddresses";
 import PromotionsManagement from "@/components/admin/PromotionsManagement";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import { useToast } from "@/hooks/use-toast";
@@ -91,6 +92,8 @@ const Admin = () => {
         return <HeroImageManager />;
       case "schedule":
         return <ScheduleSettings />;
+      case "city-addresses":
+        return <AdminCityAddresses />;
       case "notifications":
         return <NotificationDebug />;
       case "admins":

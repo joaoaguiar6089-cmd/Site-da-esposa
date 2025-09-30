@@ -1,0 +1,295 @@
+--- a/src/index.css
++++ /mnt/data/patch_work/src/index.css
+@@ -109,4 +109,20 @@
+   body {
+     @apply bg-background text-foreground;
+   }
+-}+}
++
++/* line-clamp utility */
++.line-clamp-3 {
++  display: -webkit-box;
++  -webkit-line-clamp: 3;
++  line-clamp: 3;
++  -webkit-box-orient: vertical;
++  overflow: hidden;
++}
++.line-clamp-4 {
++  display: -webkit-box;
++  -webkit-line-clamp: 4;
++  line-clamp: 4;
++  -webkit-box-orient: vertical;
++  overflow: hidden;
++}
+
+--- a/src/components/agendamento/NewBookingFlow.tsx
++++ /mnt/data/patch_work/src/components/agendamento/NewBookingFlow.tsx
+@@ -70,6 +70,9 @@
+   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+   const [pendingPhone, setPendingPhone] = useState<string>('');
+   const [appointmentDetails, setAppointmentDetails] = useState<any>(null);
++  const [cityAddress, setCityAddress] = useState<string | null>(null);
++  const [cityClinicName, setCityClinicName] = useState<string | null>(null);
++  const [cityMapUrl, setCityMapUrl] = useState<string | null>(null);
+   const [calendarOpen, setCalendarOpen] = useState(false);
+   const [availableDates, setAvailableDates] = useState<Set<string>>(new Set());
+   const [unavailableDates, setUnavailableDates] = useState<Set<string>>(new Set());
+@@ -403,6 +406,21 @@
+       });
+ 
+       setCurrentView('confirmation');
++
++      // Carregar endereço da cidade para exibir na confirmação
++      try {
++        const { data: cs } = await supabase
++          .from('city_settings')
++          .select('clinic_name, address, map_url, city')
++          .eq('id', formData.city_id)
++          .maybeSingle();
++        setCityClinicName(cs?.clinic_name ?? null);
++        setCityAddress(cs?.address ?? null);
++        setCityMapUrl(cs?.map_url ?? null);
++      } catch (e) {
++        console.error('Erro ao carregar endereço da cidade:', e);
++      }
++
+     } catch (error) {
+       console.error('Erro ao criar agendamento:', error);
+       toast({
+@@ -566,6 +584,25 @@
+                       </p>
+                     </div>
+                   </div>
++
++                  <div className="flex items-start gap-3">
++                    <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center mt-0.5">
++                      <div className="w-2 h-2 rounded-full bg-primary"></div>
++                    </div>
++                    <div>
++                      <p className="text-sm text-muted-foreground">Unidade</p>
++                      <p className="font-semibold text-lg">{cityClinicName ?? 'Clínica'} — {cityName}</p>
++                      {cityAddress && (
++                        <p className="text-sm text-muted-foreground mt-1">
++                          {cityAddress}
++                          {cityMapUrl && (
++                            <> • <a className="underline" href={cityMapUrl} target="_blank" rel="noopener noreferrer">Ver no mapa</a></>
++                          )}
++                        </p>
++                      )}
++                    </div>
++                  </div>
++
+                   <div className="flex items-start gap-3">
+                     <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center mt-0.5">
+                       <div className="w-2 h-2 rounded-full bg-primary"></div>
+@@ -691,7 +728,7 @@
+                         <div className="flex-1 space-y-3">
+                           <h3 className="text-xl font-bold text-foreground">{selectedProcedure.name}</h3>
+                           {selectedProcedure.description && (
+-                            <p className="text-sm text-muted-foreground leading-relaxed">
++                            <p className="text-sm text-muted-foreground leading-relaxed overflow-hidden break-words [overflow-wrap:anywhere] line-clamp-4"">
+                               {selectedProcedure.description}
+                             </p>
+                           )}
+
+--- a/src/components/agendamento/AgendamentoForm.tsx
++++ /mnt/data/patch_work/src/components/agendamento/AgendamentoForm.tsx
+@@ -7,7 +7,7 @@
+ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+-import { ArrowLeft, Calendar, Check, ChevronsUpDown, X } from "lucide-react";
++import { ArrowLeft, Calendar, Check, ChevronsUpDown, X, MessageCircle } from "lucide-react";
+ import { supabase } from "@/integrations/supabase/client";
+ import { useToast } from "@/hooks/use-toast";
+ import { cn } from "@/lib/utils";
+@@ -99,6 +99,22 @@
+   const [cancelling, setCancelling] = useState(false);
+   const [currentAppointment, setCurrentAppointment] = useState<any>(null);
+   const { toast } = useToast();
++
++  const [whatsappNumber, setWhatsappNumber] = useState<string>('');
++
++  useEffect(() => {
++    (async () => {
++      try {
++        const { data: whatsappData } = await supabase
++          .from('site_settings')
++          .select('setting_value')
++          .eq('setting_key', 'social_media_whatsapp_public')
++          .maybeSingle();
++        if (whatsappData?.setting_value) setWhatsappNumber(whatsappData.setting_value);
++      } catch (e) { console.error('Erro ao carregar WhatsApp:', e); }
++    })();
++  }, []);
++
+ 
+   const loadProcedures = async () => {
+     try {
+@@ -840,7 +856,21 @@
+               <CardTitle className="text-2xl bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                 {editingId ? "Editar Agendamento" : "Novo Agendamento"}
+               </CardTitle>
+-            </div>
++            
++            {whatsappNumber && (
++              <div className="mt-2 flex justify-center">
++                <a
++                  href={`https://wa.me/${whatsappNumber.replace(/\D/g, '')}`}
++                  target="_blank"
++                  rel="noopener noreferrer"
++                  className="inline-flex items-center gap-2 px-3 py-2 border rounded-xl text-sm hover:bg-slate-50"
++                >
++                  <MessageCircle className="w-4 h-4" />
++                  Tirar dúvida no WhatsApp
++                </a>
++              </div>
++            )}
++</div>
+             <div className="space-y-1">
+               <p className="text-lg font-semibold text-foreground">
+                 {client.nome} {client.sobrenome}
+
+--- a/src/pages/Admin.tsx
++++ /mnt/data/patch_work/src/pages/Admin.tsx
+@@ -14,6 +14,7 @@
+ import SecurityAuditLog from "@/components/admin/SecurityAuditLog";
+ import HeroImageManager from "@/components/admin/HeroImageManager";
+ import ScheduleSettings from "@/components/admin/ScheduleSettings";
++import AdminCityAddresses from "@/components/admin/AdminCityAddresses";
+ import PromotionsManagement from "@/components/admin/PromotionsManagement";
+ import AdminSidebar from "@/components/admin/AdminSidebar";
+ import { useToast } from "@/hooks/use-toast";
+@@ -97,6 +98,8 @@
+         return <AdminManagement />;
+       case "security":
+         return <SecurityAuditLog />;
++      case "city-addresses":
++        return <AdminCityAddresses />;
+       default:
+         return <AdminDashboard />;
+     }
+
+--- a/src/components/admin/AdminSidebar.tsx
++++ /mnt/data/patch_work/src/components/admin/AdminSidebar.tsx
+@@ -1,6 +1,6 @@
+ import { Button } from "@/components/ui/button";
+ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+-import { Menu, BarChart3, Calendar, Users, User, UserPlus, Tag, Stethoscope, MessageSquare, Shield, Image, Clock, Badge } from "lucide-react";
++import { Menu, BarChart3, Calendar, Users, User, UserPlus, Tag, Stethoscope, MessageSquare, Shield, Image, Clock, Badge, MapPin } from "lucide-react";
+ import { useState, useCallback } from "react";
+ 
+ interface AdminSidebarProps {
+@@ -31,6 +31,7 @@
+     { id: "promotions", label: "Feed", icon: Badge },
+     { id: "hero-image", label: "Imagem Principal", icon: Image },
+     { id: "schedule", label: "Horários", icon: Clock },
++    { id: "city-addresses", label: "Endereços das Unidades", icon: MapPin },
+     { id: "notifications", label: "Notificações", icon: MessageSquare },
+     { id: "admins", label: "Administradores", icon: Shield },
+     { id: "security", label: "Segurança", icon: Shield },
+
+--- /dev/null
++++ b/src/components/admin/AdminCityAddresses.tsx
+@@ -0,0 +1,87
+import React, { useEffect, useState, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
+
+type Row = {
+  id: string;
+  city: string;
+  clinic_name: string | null;
+  address: string | null;
+  map_url: string | null;
+};
+
+export default function AdminCityAddresses() {
+  const [rows, setRows] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchRows = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("city_settings")
+      .select("id, city, clinic_name, address, map_url")
+      .order("city", { ascending: true });
+    if (!error) setRows((data ?? []) as Row[]);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchRows(); }, [fetchRows]);
+
+  const saveRow = async (idx: number) => {
+    const r = rows[idx];
+    const { error } = await supabase
+      .from("city_settings")
+      .update({
+        clinic_name: r.clinic_name,
+        address: r.address,
+        map_url: r.map_url
+      })
+      .eq("id", r.id);
+    if (!error) await fetchRows();
+  };
+
+  if (loading) return <div className="p-4">Carregando…</div>;
+
+  return (
+    <div className="space-y-4">
+      {rows.map((r, idx) => (
+        <Card key={r.id}>
+          <CardContent className="p-4 space-y-3">
+            <div className="font-medium">{r.city}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="text-sm">
+                <div className="text-slate-600 mb-1">Nome da unidade</div>
+                <Input
+                  value={r.clinic_name ?? ""}
+                  onChange={(e) => setRows(prev => prev.map((x,i)=> i===idx? {...x, clinic_name: e.target.value}: x))}
+                  placeholder="Ex.: Unidade Manaus – Centro"
+                />
+              </label>
+              <label className="text-sm">
+                <div className="text-slate-600 mb-1">Link do mapa (opcional)</div>
+                <Input
+                  value={r.map_url ?? ""}
+                  onChange={(e) => setRows(prev => prev.map((x,i)=> i===idx? {...x, map_url: e.target.value}: x))}
+                  placeholder="https://maps.google.com/…"
+                />
+              </label>
+              <label className="text-sm sm:col-span-2">
+                <div className="text-slate-600 mb-1">Endereço completo</div>
+                <Textarea
+                  value={r.address ?? ""}
+                  onChange={(e) => setRows(prev => prev.map((x,i)=> i===idx? {...x, address: e.target.value}: x))}
+                  placeholder="Rua, número, bairro, complemento"
+                />
+              </label>
+            </div>
+            <div className="flex justify-end">
+              <Button onClick={() => saveRow(idx)}>Salvar</Button>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+
+--- /dev/null
++++ b/supabase/migrations/20250930_add_city_address_fields.sql
+@@ -0,0 +1,8
+-- Add address fields for clinics by city
+alter table public.city_settings
+add column if not exists clinic_name text,
+add column if not exists address text,
+add column if not exists map_url text;
+
+-- Optional index on city
+create index if not exists idx_city_settings_city on public.city_settings (city);
+

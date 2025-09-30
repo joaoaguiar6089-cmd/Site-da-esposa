@@ -53,7 +53,7 @@ const currency = (value: number) =>
 const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookingFlowProps) => {
   const [currentView, setCurrentView] = useState<ViewMode>('form');
   const [procedures, setProcedures] = useState<Procedure[]>([]);
-  const [cities, setCities] = useState<{id: string, city_name: string}[]>([]);
+  const [cities, setCities] = useState<{id: string, city_name: string, clinic_name?: string, address?: string, map_url?: string, is_active: boolean, display_order: number}[]>([]);
   const [formData, setFormData] = useState({
     procedure_id: preSelectedProcedureId || "",
     appointment_date: "",

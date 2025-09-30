@@ -21,9 +21,16 @@ export default function AdminCityAddresses() {
     setLoading(true);
     const { data, error } = await supabase
       .from("city_settings")
-      .select("id, city, clinic_name, address, map_url")
-      .order("city", { ascending: true });
-    if (!error) setRows((data ?? []) as Row[]);
+      .select("id, city_name, clinic_name, address, map_url") as any;
+    if (!error && data) {
+      setRows(data.map((d: any) => ({ 
+        id: d.id,
+        city: d.city_name || d.city,
+        clinic_name: d.clinic_name,
+        address: d.address,
+        map_url: d.map_url
+      })));
+    }
     setLoading(false);
   }, []);
 
@@ -37,7 +44,7 @@ export default function AdminCityAddresses() {
         clinic_name: r.clinic_name,
         address: r.address,
         map_url: r.map_url
-      })
+      } as any)
       .eq("id", r.id);
     if (!error) await fetchRows();
   };

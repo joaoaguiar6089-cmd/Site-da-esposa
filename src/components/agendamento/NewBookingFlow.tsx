@@ -731,27 +731,27 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                 {selectedProcedure && (
                   <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent shadow-lg">
                     <CardContent className="p-6">
-                      <div className="flex items-start gap-4">
+                      <div className="flex items-start gap-4 min-w-0">
                         <div className="p-3 bg-gradient-to-br from-primary to-primary/80 rounded-full shadow-md flex-shrink-0">
                           <Sparkles className="h-6 w-6 text-primary-foreground" />
                         </div>
-                        <div className="flex-1 space-y-3">
-                          <h3 className="text-xl font-bold text-foreground">{selectedProcedure.name}</h3>
+                        <div className="flex-1 space-y-3 min-w-0">
+                          <h3 className="text-xl font-bold text-foreground break-words">{selectedProcedure.name}</h3>
                           {selectedProcedure.description && (
-                            <p className="text-sm text-muted-foreground leading-relaxed overflow-hidden break-words [overflow-wrap:anywhere] line-clamp-4">
+                            <p className="text-sm text-muted-foreground leading-relaxed break-words hyphens-auto">
                               {selectedProcedure.description}
                             </p>
                           )}
-                          <div className="flex items-center gap-6 pt-2">
+                          <div className="flex flex-wrap items-center gap-4 pt-2">
                             <div className="flex items-center gap-2">
-                              <div className="h-1.5 w-1.5 rounded-full bg-primary"></div>
+                              <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></div>
                               <span className="text-sm font-medium">Duração:</span>
-                              <span className="text-sm text-muted-foreground">{selectedProcedure.duration}min</span>
+                              <span className="text-sm text-muted-foreground whitespace-nowrap">{selectedProcedure.duration}min</span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <div className="h-1.5 w-1.5 rounded-full bg-primary"></div>
+                              <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></div>
                               <span className="text-sm font-medium">Valor:</span>
-                              <span className="text-sm text-primary font-bold">{currency(selectedProcedure.price || 0)}</span>
+                              <span className="text-sm text-primary font-bold whitespace-nowrap">{currency(selectedProcedure.price || 0)}</span>
                             </div>
                           </div>
                         </div>

@@ -329,20 +329,20 @@ const CitySettings = () => {
                     />
                   </div>
                   <div className="md:col-span-2 flex justify-end">
-                    <Button
-                      onClick={async () => {
-                        const c = cities[idx];
-                        await supabase.from('city_settings').update({
-                          clinic_name: c.clinic_name || null,
-                          address: c.address || null,
-                          map_url: c.map_url || null
-                        }).eq('id', c.id);
-                        toast({ title: 'Endereço salvo', description: `Endereço de "${c.city_name}" atualizado.` });
-                        loadCities();
-                      }}
-                    >
-                      Salvar endereço
-                    </Button>
+                      <Button
+                        onClick={async () => {
+                          const c = cities[idx];
+                          await supabase.from('city_settings').update({
+                            clinic_name: c.clinic_name || null,
+                            address: c.address || null,
+                            map_url: c.map_url || null
+                          } as any).eq('id', c.id);
+                          toast({ title: 'Endereço salvo', description: `Endereço de "${c.city_name}" atualizado.` });
+                          loadCities();
+                        }}
+                      >
+                        Salvar endereço
+                      </Button>
                   </div>
                 </div>
               );

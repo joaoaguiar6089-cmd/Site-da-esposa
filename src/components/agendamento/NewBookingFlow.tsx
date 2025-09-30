@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { ArrowLeft, CheckCircle, Calendar as CalendarIcon, MessageCircle, Sparkles } from "lucide-react";
+import { ArrowLeft, CheckCircle, Calendar as CalendarIcon, MessageCircle, Sparkles, Loader2, MapPin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentDateBrazil } from '@/utils/dateUtils';
@@ -603,8 +603,6 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                       </div>
                     );
                   })()}
-                    </div>
-                  </div>
                   {appointmentDetails.total_body_areas_price > 0 && (
                     <div className="pt-3 border-t border-border/50">
                       <p className="text-sm text-muted-foreground">Valor Total</p>

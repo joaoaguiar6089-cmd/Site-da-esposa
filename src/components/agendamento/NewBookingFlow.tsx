@@ -53,7 +53,13 @@ const currency = (value: number) =>
 const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookingFlowProps) => {
   const [currentView, setCurrentView] = useState<ViewMode>('form');
   const [procedures, setProcedures] = useState<Procedure[]>([]);
-  const [cities, setCities] = useState<{id: string, city_name: string, clinic_name?: string, address?: string, map_url?: string, is_active: boolean, display_order: number}[]>([]);
+  const [cities, setCities] = useState<{
+    id: string,
+    city_name: string,
+    clinic_name?: string | null,
+    address?: string | null,
+    map_url?: string | null
+  }[]>([]);
   const [formData, setFormData] = useState({
     procedure_id: preSelectedProcedureId || "",
     appointment_date: "",
@@ -332,6 +338,7 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
 
   const handleClientFound = (client: Client) => {
     setSelectedClient(client);
+    setLoading(true);
     createAppointment(client);
   };
 
@@ -342,6 +349,7 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
 
   const handleClientRegistered = (client: Client) => {
     setSelectedClient(client);
+    setLoading(true);
     createAppointment(client);
   };
 
@@ -548,7 +556,13 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
               </p>
             </CardHeader>
             <CardContent className="space-y-6">
-              {appointmentDetails && (
+              {loading && (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+                  <p className="text-lg text-muted-foreground">Processando agendamento...</p>
+                </div>
+              )}
+              {!loading && appointmentDetails && (
                 <div className="p-6 bg-gradient-to-br from-muted/50 to-muted/30 rounded-xl space-y-3 border border-border/50">
                   <div className="flex items-start gap-3">
                     <Sparkles className="w-5 h-5 text-primary mt-0.5" />
@@ -566,18 +580,23 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center mt-0.5">
-                      <div className="w-2 h-2 rounded-full bg-primary"></div>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Cidade</p>
-                      <p className="font-semibold text-lg">{cityName}</p>
-                    </div>
-                  </div>
-                  {/* Endereço da clínica conforme cidade selecionada */}
                   {(() => {
-                    const cityRec = cities.find(c => c.id === formData.city_id);
+                    const cityRec = cities.find(c => c.id === appointmentDetails?.city_id);
+                    return (
+                      <div className="flex items-start gap-3">
+                        <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center mt-0.5">
+                          <div className="w-2 h-2 rounded-full bg-primary"></div>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Cidade</p>
+                          <p className="font-semibold text-lg">{cityRec?.city_name || cityName}</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  {/* Endereço da clínica conforme cidade do agendamento */}
+                  {(() => {
+                    const cityRec = cities.find(c => c.id === appointmentDetails?.city_id);
                     const clinicName = cityRec?.clinic_name;
                     const address = cityRec?.address;
                     const mapUrl = cityRec?.map_url;
@@ -587,7 +606,7 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                         <MapPin className="w-5 h-5 text-primary mt-0.5" />
                         <div>
                           <p className="text-sm text-muted-foreground">Unidade</p>
-                          <p className="font-semibold">{clinicName ? `${clinicName} — ${cityName}` : cityName}</p>
+                          <p className="font-semibold">{clinicName ? `${clinicName} — ${cityRec?.city_name || cityName}` : cityRec?.city_name || cityName}</p>
                           {address && (
                             <p className="text-sm text-foreground mt-1">
                               {address}

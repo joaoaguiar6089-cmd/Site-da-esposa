@@ -575,6 +575,36 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                       <p className="font-semibold text-lg">{cityName}</p>
                     </div>
                   </div>
+                  {/* Endereço da clínica conforme cidade selecionada */}
+                  {(() => {
+                    const cityRec = cities.find(c => c.id === formData.city_id);
+                    const clinicName = cityRec?.clinic_name;
+                    const address = cityRec?.address;
+                    const mapUrl = cityRec?.map_url;
+                    if (!address && !clinicName) return null;
+                    return (
+                      <div className="flex items-start gap-3">
+                        <MapPin className="w-5 h-5 text-primary mt-0.5" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Unidade</p>
+                          <p className="font-semibold">{clinicName ? `${clinicName} — ${cityName}` : cityName}</p>
+                          {address && (
+                            <p className="text-sm text-foreground mt-1">
+                              {address}
+                              {mapUrl ? (
+                                <>
+                                  {" • "}
+                                  <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="underline">Ver no mapa</a>
+                                </>
+                              ) : null}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                    </div>
+                  </div>
                   {appointmentDetails.total_body_areas_price > 0 && (
                     <div className="pt-3 border-t border-border/50">
                       <p className="text-sm text-muted-foreground">Valor Total</p>
@@ -635,10 +665,10 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                   Preencha os dados abaixo para realizar seu agendamento
                 </p>
               </div>
-              {whatsappNumber && (
+              {true && (
                 <div className="flex justify-center">
                   <a
-                    href={`https://wa.me/${whatsappNumber.replace(/\D/g, '')}`}
+                    href={"https://wa.me/5597984387295"}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105"
@@ -691,7 +721,7 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                         <div className="flex-1 space-y-3">
                           <h3 className="text-xl font-bold text-foreground">{selectedProcedure.name}</h3>
                           {selectedProcedure.description && (
-                            <p className="text-sm text-muted-foreground leading-relaxed">
+                            <p className="text-sm text-muted-foreground leading-relaxed overflow-hidden break-words [overflow-wrap:anywhere] line-clamp-4">
                               {selectedProcedure.description}
                             </p>
                           )}
@@ -874,7 +904,7 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                     disabled={loading}
                     className="flex-1 h-12 text-base bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 font-semibold"
                   >
-                    {loading ? 'Agendando...' : 'Confirmar Agendamento'}
+                    {loading ? (<span className='inline-flex items-center gap-2'><Loader2 className='h-4 w-4 animate-spin' /> Processando...</span>) : 'Confirmar Agendamento'}
                   </Button>
                 </div>
               </form>

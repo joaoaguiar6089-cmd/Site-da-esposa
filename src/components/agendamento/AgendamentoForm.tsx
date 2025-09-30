@@ -8,6 +8,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Calendar, Check, ChevronsUpDown, X } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -841,6 +842,27 @@ Para reagendar, entre em contato conosco.`;
                 {editingId ? "Editar Agendamento" : "Novo Agendamento"}
               </CardTitle>
             </div>
+            {/* Botão de dúvidas no WhatsApp */}
+            <div className="absolute right-6 top-6 hidden sm:block">
+              <a
+                href="https://wa.me/5597984387295"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm hover:bg-slate-50"
+              >
+                <MessageCircle className="h-4 w-4" />
+                Tirar dúvida no WhatsApp
+              </a>
+            </div>
+            <a
+              href="https://wa.me/5597984387295"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="sm:hidden fixed right-4 bottom-4 inline-flex items-center gap-2 rounded-full shadow-lg border bg-white px-4 py-3 text-sm z-40"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Dúvidas
+            </a>
             <div className="space-y-1">
               <p className="text-lg font-semibold text-foreground">
                 {client.nome} {client.sobrenome}

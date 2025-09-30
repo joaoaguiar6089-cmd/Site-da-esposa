@@ -15,6 +15,9 @@ interface City {
   city_name: string;
   is_active: boolean;
   display_order: number;
+  clinic_name?: string | null;
+  address?: string | null;
+  map_url?: string | null;
 }
 
 interface CityAvailability {
@@ -287,7 +290,65 @@ const CitySettings = () => {
       <Card>
         <CardContent className="p-6">
           <div className="text-center">Carregando configurações de cidades...</div>
-        </CardContent>
+        {/* Endereço da Unidade (por cidade) */}
+        {selectedCityId && (
+          <div className="mt-6 p-4 border rounded-lg space-y-3">
+            <h4 className="font-medium">Endereço da Unidade</h4>
+            {(() => {
+              const idx = cities.findIndex(c => c.id === selectedCityId);
+              if (idx === -1) return <p className="text-sm text-muted-foreground">Selecione uma cidade.</p>;
+              const city = cities[idx];
+              return (
+                <div className="grid md:grid-cols-2 gap-3">
+                  <div className="md:col-span-1">
+                    <label className="text-sm text-muted-foreground">Nome da unidade</label>
+                    <Input
+                      className="mt-1"
+                      value={city.clinic_name || ""}
+                      onChange={(e) => setCities(prev => prev.map((c,i)=> i===idx ? { ...c, clinic_name: e.target.value } : c))}
+                      placeholder="Ex.: Unidade Manaus – Centro"
+                    />
+                  </div>
+                  <div className="md:col-span-1">
+                    <label className="text-sm text-muted-foreground">Link do mapa (opcional)</label>
+                    <Input
+                      className="mt-1"
+                      value={city.map_url || ""}
+                      onChange={(e) => setCities(prev => prev.map((c,i)=> i===idx ? { ...c, map_url: e.target.value } : c))}
+                      placeholder="https://maps.google.com/…"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-sm text-muted-foreground">Endereço completo</label>
+                    <Textarea
+                      className="mt-1"
+                      value={city.address || ""}
+                      onChange={(e) => setCities(prev => prev.map((c,i)=> i===idx ? { ...c, address: e.target.value } : c))}
+                      placeholder="Rua, número, bairro, complemento"
+                    />
+                  </div>
+                  <div className="md:col-span-2 flex justify-end">
+                    <Button
+                      onClick={async () => {
+                        const c = cities[idx];
+                        await supabase.from('city_settings').update({
+                          clinic_name: c.clinic_name || null,
+                          address: c.address || null,
+                          map_url: c.map_url || null
+                        }).eq('id', c.id);
+                        toast({ title: 'Endereço salvo', description: `Endereço de "${c.city_name}" atualizado.` });
+                        loadCities();
+                      }}
+                    >
+                      Salvar endereço
+                    </Button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+      </CardContent>
       </Card>
     );
   }

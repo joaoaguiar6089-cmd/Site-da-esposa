@@ -37,6 +37,9 @@ const CitySettings = () => {
   const [newCityName, setNewCityName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [selectionMode, setSelectionMode] = useState<"specific" | "range">("specific");
+  const [rangeStart, setRangeStart] = useState<Date | undefined>();
+  const [rangeEnd, setRangeEnd] = useState<Date | undefined>();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -166,11 +169,37 @@ const CitySettings = () => {
     }
   };
 
+  // Função para formatar data sem conversão de timezone
+  const formatDateLocal = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const handleSaveDateRange = async () => {
-    if (!selectedCityId || selectedDates.length === 0) {
+    if (!selectedCityId) {
       toast({
         title: "Seleção obrigatória",
-        description: "Selecione uma cidade e pelo menos uma data.",
+        description: "Selecione uma cidade.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectionMode === "specific" && selectedDates.length === 0) {
+      toast({
+        title: "Seleção obrigatória",
+        description: "Selecione pelo menos uma data.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectionMode === "range" && (!rangeStart || !rangeEnd)) {
+      toast({
+        title: "Seleção obrigatória",
+        description: "Selecione data inicial e final do intervalo.",
         variant: "destructive",
       });
       return;
@@ -178,57 +207,71 @@ const CitySettings = () => {
 
     setSaving(true);
     try {
-      // Ordenar datas selecionadas
-      const sortedDates = selectedDates.sort((a, b) => a.getTime() - b.getTime());
-      
-      // Agrupar datas consecutivas em períodos
-      const periods: { start: Date; end: Date | null }[] = [];
-      let currentStart = sortedDates[0];
-      let currentEnd = sortedDates[0];
-
-      for (let i = 1; i < sortedDates.length; i++) {
-        const currentDate = sortedDates[i];
-        const daysDiff = Math.abs(currentDate.getTime() - currentEnd.getTime()) / (1000 * 60 * 60 * 24);
-        
-        if (daysDiff <= 1) {
-          // Data consecutiva
-          currentEnd = currentDate;
-        } else {
-          // Nova sequência
-          periods.push({
-            start: currentStart,
-            end: currentStart.getTime() === currentEnd.getTime() ? null : currentEnd
-          });
-          currentStart = currentDate;
-          currentEnd = currentDate;
-        }
-      }
-      
-      // Adicionar último período
-      periods.push({
-        start: currentStart,
-        end: currentStart.getTime() === currentEnd.getTime() ? null : currentEnd
-      });
-
-      // Inserir períodos no banco
-      const insertsPromises = periods.map(period => 
-        supabase
+      if (selectionMode === "range" && rangeStart && rangeEnd) {
+        // Modo intervalo - salvar como um único período
+        await supabase
           .from('city_availability')
           .insert({
             city_id: selectedCityId,
-            date_start: period.start.toISOString().split('T')[0],
-            date_end: period.end ? period.end.toISOString().split('T')[0] : null
-          })
-      );
+            date_start: formatDateLocal(rangeStart),
+            date_end: formatDateLocal(rangeEnd)
+          });
 
-      await Promise.all(insertsPromises);
+        toast({
+          title: "Disponibilidade salva",
+          description: `Intervalo de ${rangeStart.toLocaleDateString('pt-BR')} a ${rangeEnd.toLocaleDateString('pt-BR')} salvo com sucesso.`,
+        });
 
-      toast({
-        title: "Disponibilidade salva",
-        description: `${periods.length} período(s) de disponibilidade foram salvos.`,
-      });
+        setRangeStart(undefined);
+        setRangeEnd(undefined);
+      } else {
+        // Modo dias específicos - agrupar datas consecutivas
+        const sortedDates = selectedDates.sort((a, b) => a.getTime() - b.getTime());
+        const periods: { start: Date; end: Date | null }[] = [];
+        let currentStart = sortedDates[0];
+        let currentEnd = sortedDates[0];
 
-      setSelectedDates([]);
+        for (let i = 1; i < sortedDates.length; i++) {
+          const currentDate = sortedDates[i];
+          const daysDiff = Math.abs(currentDate.getTime() - currentEnd.getTime()) / (1000 * 60 * 60 * 24);
+          
+          if (daysDiff <= 1) {
+            currentEnd = currentDate;
+          } else {
+            periods.push({
+              start: currentStart,
+              end: currentStart.getTime() === currentEnd.getTime() ? null : currentEnd
+            });
+            currentStart = currentDate;
+            currentEnd = currentDate;
+          }
+        }
+        
+        periods.push({
+          start: currentStart,
+          end: currentStart.getTime() === currentEnd.getTime() ? null : currentEnd
+        });
+
+        const insertsPromises = periods.map(period => 
+          supabase
+            .from('city_availability')
+            .insert({
+              city_id: selectedCityId,
+              date_start: formatDateLocal(period.start),
+              date_end: period.end ? formatDateLocal(period.end) : null
+            })
+        );
+
+        await Promise.all(insertsPromises);
+
+        toast({
+          title: "Disponibilidade salva",
+          description: `${periods.length} período(s) de disponibilidade foram salvos.`,
+        });
+
+        setSelectedDates([]);
+      }
+
       loadAvailability();
     } catch (error) {
       console.error('Erro ao salvar disponibilidade:', error);
@@ -329,20 +372,20 @@ const CitySettings = () => {
                     />
                   </div>
                   <div className="md:col-span-2 flex justify-end">
-                    <Button
-                      onClick={async () => {
-                        const c = cities[idx];
-                        await supabase.from('city_settings').update({
-                          clinic_name: c.clinic_name || null,
-                          address: c.address || null,
-                          map_url: c.map_url || null
-                        }).eq('id', c.id);
-                        toast({ title: 'Endereço salvo', description: `Endereço de "${c.city_name}" atualizado.` });
-                        loadCities();
-                      }}
-                    >
-                      Salvar endereço
-                    </Button>
+                      <Button
+                        onClick={async () => {
+                          const c = cities[idx];
+                          await supabase.from('city_settings').update({
+                            clinic_name: c.clinic_name || null,
+                            address: c.address || null,
+                            map_url: c.map_url || null
+                          } as any).eq('id', c.id);
+                          toast({ title: 'Endereço salvo', description: `Endereço de "${c.city_name}" atualizado.` });
+                          loadCities();
+                        }}
+                      >
+                        Salvar endereço
+                      </Button>
                   </div>
                 </div>
               );
@@ -422,22 +465,87 @@ const CitySettings = () => {
             <div className="grid md:grid-cols-2 gap-6">
               {/* Calendário para seleção */}
               <div>
-                <h4 className="font-medium mb-2">Selecionar Dias Disponíveis</h4>
-                <Calendar
-                  mode="multiple"
-                  selected={selectedDates}
-                  onSelect={(dates) => setSelectedDates(dates || [])}
-                  className={cn("p-3 pointer-events-auto border rounded-md")}
-                  disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                />
-                
-                <Button 
-                  onClick={handleSaveDateRange}
-                  disabled={saving || selectedDates.length === 0}
-                  className="w-full mt-3"
-                >
-                  {saving ? "Salvando..." : `Salvar ${selectedDates.length} dia(s) selecionado(s)`}
-                </Button>
+                <div className="mb-4">
+                  <h4 className="font-medium mb-2">Modo de Seleção</h4>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={selectionMode === "specific" ? "default" : "outline"}
+                      onClick={() => {
+                        setSelectionMode("specific");
+                        setRangeStart(undefined);
+                        setRangeEnd(undefined);
+                      }}
+                      className="flex-1"
+                    >
+                      Dias Específicos
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={selectionMode === "range" ? "default" : "outline"}
+                      onClick={() => {
+                        setSelectionMode("range");
+                        setSelectedDates([]);
+                      }}
+                      className="flex-1"
+                    >
+                      Intervalo de Datas
+                    </Button>
+                  </div>
+                </div>
+
+                {selectionMode === "specific" ? (
+                  <>
+                    <h4 className="font-medium mb-2">Selecionar Dias Disponíveis</h4>
+                    <Calendar
+                      mode="multiple"
+                      selected={selectedDates}
+                      onSelect={(dates) => setSelectedDates(dates || [])}
+                      className={cn("p-3 pointer-events-auto border rounded-md")}
+                    />
+                    
+                    <Button 
+                      onClick={handleSaveDateRange}
+                      disabled={saving || selectedDates.length === 0}
+                      className="w-full mt-3"
+                    >
+                      {saving ? "Salvando..." : `Salvar ${selectedDates.length} dia(s) selecionado(s)`}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <h4 className="font-medium mb-2">Selecionar Intervalo</h4>
+                    <div className="space-y-3">
+                      <div>
+                        <Label>Data Inicial</Label>
+                        <Calendar
+                          mode="single"
+                          selected={rangeStart}
+                          onSelect={setRangeStart}
+                          className={cn("p-3 pointer-events-auto border rounded-md")}
+                        />
+                      </div>
+                      <div>
+                        <Label>Data Final</Label>
+                        <Calendar
+                          mode="single"
+                          selected={rangeEnd}
+                          onSelect={setRangeEnd}
+                          className={cn("p-3 pointer-events-auto border rounded-md")}
+                          disabled={(date) => rangeStart ? date < rangeStart : false}
+                        />
+                      </div>
+                    </div>
+                    
+                    <Button 
+                      onClick={handleSaveDateRange}
+                      disabled={saving || !rangeStart || !rangeEnd}
+                      className="w-full mt-3"
+                    >
+                      {saving ? "Salvando..." : "Salvar Intervalo"}
+                    </Button>
+                  </>
+                )}
               </div>
 
               {/* Lista de disponibilidades */}

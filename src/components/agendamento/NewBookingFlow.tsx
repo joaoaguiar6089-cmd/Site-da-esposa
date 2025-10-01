@@ -137,6 +137,12 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
     }
   };
 
+  // Função para converter string de data (YYYY-MM-DD) em Date sem conversão de timezone
+  const parseLocalDate = (dateStr: string): Date => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
   const loadCityAvailability = async () => {
     if (!formData.city_id) return;
 
@@ -146,7 +152,10 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
         .select('*')
         .eq('city_id', formData.city_id);
 
-      if (availabilityData) {
+      console.log('Carregando disponibilidade para cidade:', formData.city_id);
+      console.log('Dados de disponibilidade:', availabilityData);
+
+      if (availabilityData && availabilityData.length > 0) {
         const available = new Set<string>();
         const unavailable = new Set<string>();
         const today = new Date();
@@ -159,8 +168,11 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
 
         // Marcar períodos disponíveis
         availabilityData.forEach(period => {
-          const start = new Date(period.date_start);
-          const end = period.date_end ? new Date(period.date_end) : sixMonthsLater;
+          const start = parseLocalDate(period.date_start);
+          // Se date_end for null, considera apenas o dia de date_start
+          const end = period.date_end ? parseLocalDate(period.date_end) : start;
+          
+          console.log('Período:', { start, end, date_start: period.date_start, date_end: period.date_end });
           
           for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             const dateStr = format(d, 'yyyy-MM-dd');
@@ -169,8 +181,13 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
           }
         });
 
+        console.log('Datas disponíveis:', Array.from(available));
         setAvailableDates(available);
         setUnavailableDates(unavailable);
+      } else {
+        console.log('Nenhum dado de disponibilidade encontrado para cidade:', formData.city_id);
+        setAvailableDates(new Set());
+        setUnavailableDates(new Set());
       }
     } catch (error) {
       console.error('Erro ao carregar disponibilidade da cidade:', error);
@@ -731,27 +748,27 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                 {selectedProcedure && (
                   <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent shadow-lg">
                     <CardContent className="p-6">
-                      <div className="flex items-start gap-4">
+                      <div className="flex items-start gap-4 min-w-0">
                         <div className="p-3 bg-gradient-to-br from-primary to-primary/80 rounded-full shadow-md flex-shrink-0">
                           <Sparkles className="h-6 w-6 text-primary-foreground" />
                         </div>
-                        <div className="flex-1 space-y-3">
-                          <h3 className="text-xl font-bold text-foreground">{selectedProcedure.name}</h3>
+                        <div className="flex-1 space-y-3 min-w-0">
+                          <h3 className="text-xl font-bold text-foreground break-words">{selectedProcedure.name}</h3>
                           {selectedProcedure.description && (
-                            <p className="text-sm text-muted-foreground leading-relaxed overflow-hidden break-words [overflow-wrap:anywhere] line-clamp-4">
+                            <p className="text-sm text-muted-foreground leading-relaxed break-words hyphens-auto">
                               {selectedProcedure.description}
                             </p>
                           )}
-                          <div className="flex items-center gap-6 pt-2">
+                          <div className="flex flex-wrap items-center gap-4 pt-2">
                             <div className="flex items-center gap-2">
-                              <div className="h-1.5 w-1.5 rounded-full bg-primary"></div>
+                              <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></div>
                               <span className="text-sm font-medium">Duração:</span>
-                              <span className="text-sm text-muted-foreground">{selectedProcedure.duration}min</span>
+                              <span className="text-sm text-muted-foreground whitespace-nowrap">{selectedProcedure.duration}min</span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <div className="h-1.5 w-1.5 rounded-full bg-primary"></div>
+                              <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></div>
                               <span className="text-sm font-medium">Valor:</span>
-                              <span className="text-sm text-primary font-bold">{currency(selectedProcedure.price || 0)}</span>
+                              <span className="text-sm text-primary font-bold whitespace-nowrap">{currency(selectedProcedure.price || 0)}</span>
                             </div>
                           </div>
                         </div>
@@ -837,7 +854,12 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                           const dateStr = format(date, 'yyyy-MM-dd');
                           const today = new Date();
                           today.setHours(0, 0, 0, 0);
-                          return date < today;
+                          
+                          // Desabilita datas anteriores a hoje
+                          if (date < today) return true;
+                          
+                          // Desabilita datas que não estão disponíveis
+                          return !availableDates.has(dateStr);
                         }}
                         modifiers={{
                           available: (date) => {

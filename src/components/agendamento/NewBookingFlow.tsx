@@ -767,6 +767,9 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                       procedureId={formData.procedure_id}
                       onSelectionChange={(data) => setSelectedSpecifications(data.selectedSpecifications)}
                       initialSelections={selectedSpecifications.map(s => s.id)}
+                      bodySelectionType={selectedProcedure?.body_selection_type ?? null}
+                      bodyImageUrl={selectedProcedure?.body_image_url ?? null}
+                      bodyImageUrlMale={selectedProcedure?.body_image_url_male ?? null}
                     />
                   </div>
                 )}

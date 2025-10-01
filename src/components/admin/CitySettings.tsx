@@ -169,6 +169,14 @@ const CitySettings = () => {
     }
   };
 
+  // Função para formatar data sem conversão de timezone
+  const formatDateLocal = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const handleSaveDateRange = async () => {
     if (!selectedCityId) {
       toast({
@@ -205,8 +213,8 @@ const CitySettings = () => {
           .from('city_availability')
           .insert({
             city_id: selectedCityId,
-            date_start: rangeStart.toISOString().split('T')[0],
-            date_end: rangeEnd.toISOString().split('T')[0]
+            date_start: formatDateLocal(rangeStart),
+            date_end: formatDateLocal(rangeEnd)
           });
 
         toast({
@@ -249,8 +257,8 @@ const CitySettings = () => {
             .from('city_availability')
             .insert({
               city_id: selectedCityId,
-              date_start: period.start.toISOString().split('T')[0],
-              date_end: period.end ? period.end.toISOString().split('T')[0] : null
+              date_start: formatDateLocal(period.start),
+              date_end: period.end ? formatDateLocal(period.end) : null
             })
         );
 

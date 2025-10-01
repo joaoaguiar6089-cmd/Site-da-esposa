@@ -137,6 +137,12 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
     }
   };
 
+  // Função para converter string de data (YYYY-MM-DD) em Date sem conversão de timezone
+  const parseLocalDate = (dateStr: string): Date => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
   const loadCityAvailability = async () => {
     if (!formData.city_id) return;
 
@@ -146,7 +152,10 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
         .select('*')
         .eq('city_id', formData.city_id);
 
-      if (availabilityData) {
+      console.log('Carregando disponibilidade para cidade:', formData.city_id);
+      console.log('Dados de disponibilidade:', availabilityData);
+
+      if (availabilityData && availabilityData.length > 0) {
         const available = new Set<string>();
         const unavailable = new Set<string>();
         const today = new Date();
@@ -159,8 +168,10 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
 
         // Marcar períodos disponíveis
         availabilityData.forEach(period => {
-          const start = new Date(period.date_start);
-          const end = period.date_end ? new Date(period.date_end) : sixMonthsLater;
+          const start = parseLocalDate(period.date_start);
+          const end = period.date_end ? parseLocalDate(period.date_end) : sixMonthsLater;
+          
+          console.log('Período:', { start, end, date_start: period.date_start, date_end: period.date_end });
           
           for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             const dateStr = format(d, 'yyyy-MM-dd');
@@ -169,8 +180,13 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
           }
         });
 
+        console.log('Datas disponíveis:', Array.from(available));
         setAvailableDates(available);
         setUnavailableDates(unavailable);
+      } else {
+        console.log('Nenhum dado de disponibilidade encontrado para cidade:', formData.city_id);
+        setAvailableDates(new Set());
+        setUnavailableDates(new Set());
       }
     } catch (error) {
       console.error('Erro ao carregar disponibilidade da cidade:', error);

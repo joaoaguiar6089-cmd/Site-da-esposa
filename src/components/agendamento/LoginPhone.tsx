@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Phone } from "lucide-react";
+import { ArrowLeft, Phone, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import type { Client } from "@/types/client";
@@ -131,7 +131,14 @@ const LoginPhone = ({ onClientFound, onClientNotFound, onBack }: LoginPhoneProps
               disabled={loading || !isValidPhone(phone)}
               className="flex-1"
             >
-              {loading ? "Verificando..." : "Confirmar"}
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Verificando...
+                </>
+              ) : (
+                "Confirmar"
+              )}
             </Button>
           </div>
         </form>

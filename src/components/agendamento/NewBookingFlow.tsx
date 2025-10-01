@@ -169,7 +169,8 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
         // Marcar períodos disponíveis
         availabilityData.forEach(period => {
           const start = parseLocalDate(period.date_start);
-          const end = period.date_end ? parseLocalDate(period.date_end) : sixMonthsLater;
+          // Se date_end for null, considera apenas o dia de date_start
+          const end = period.date_end ? parseLocalDate(period.date_end) : start;
           
           console.log('Período:', { start, end, date_start: period.date_start, date_end: period.date_end });
           

@@ -71,10 +71,13 @@ const LoginPhone = ({ onClientFound, onClientNotFound, onBack }: LoginPhoneProps
       if (client) {
         // Cliente encontrado, confirma agendamento automaticamente
         onClientFound(client);
-      } else {
-        // Cliente não encontrado, precisa cadastrar
-        onClientNotFound(cleanPhone);
+        return;
       }
+
+      // Cliente nao encontrado, precisa cadastrar
+      onClientNotFound(cleanPhone);
+      setLoading(false);
+      return;
     } catch (error) {
       console.error('Erro ao buscar cliente:', error);
       toast({
@@ -82,7 +85,6 @@ const LoginPhone = ({ onClientFound, onClientNotFound, onBack }: LoginPhoneProps
         description: "Erro ao verificar telefone. Tente novamente.",
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };

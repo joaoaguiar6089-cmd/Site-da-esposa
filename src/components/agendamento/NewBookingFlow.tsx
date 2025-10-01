@@ -850,7 +850,12 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                           const dateStr = format(date, 'yyyy-MM-dd');
                           const today = new Date();
                           today.setHours(0, 0, 0, 0);
-                          return date < today;
+                          
+                          // Desabilita datas anteriores a hoje
+                          if (date < today) return true;
+                          
+                          // Desabilita datas que não estão disponíveis
+                          return !availableDates.has(dateStr);
                         }}
                         modifiers={{
                           available: (date) => {

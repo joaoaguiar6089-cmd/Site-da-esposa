@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { Calendar as CalendarIcon, Clock, User, Phone, Edit, Trash2, MessageSqua
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { formatLocationBlock } from "@/utils/location";
 import { format, parseISO, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import AgendamentoForm from "@/components/agendamento/AgendamentoForm";
@@ -153,20 +154,19 @@ const AdminCalendar = () => {
   // Atualizar status do agendamento
   const updateAppointmentStatus = async (id: string, newStatus: string) => {
     try {
-      // Primeiro, buscar os dados do agendamento para notificações
       const { data: appointmentData, error: fetchError } = await supabase
         .from('appointments')
         .select(`
           *,
           clients (*),
-          procedures (name, price, duration)
+          procedures (name, price, duration),
+          city_settings (city_name, clinic_name, address, map_url)
         `)
         .eq('id', id)
         .single();
 
       if (fetchError) throw fetchError;
 
-      // Verificar se era confirmado e está sendo cancelado
       const wasConfirmed = appointmentData?.status === 'confirmado';
       const isCanceling = newStatus === 'cancelado';
 
@@ -177,43 +177,93 @@ const AdminCalendar = () => {
 
       if (error) throw error;
 
-      // Se mudou para "confirmado", enviar notificação WhatsApp para o cliente
+      const formatDateToBrazil = (dateString: string) => {
+        if (!dateString) return '';
+
+        try {
+          if (dateString.includes('-') && dateString.length === 10) {
+            const [year, month, day] = dateString.split('-');
+            if (year && month && day) {
+              return `${day}/${month}/${year}`;
+            }
+          }
+          return dateString;
+        } catch (error) {
+          return dateString;
+        }
+      };
+
+      const buildFallbackMessage = (
+        heading: string,
+        intro: string,
+        outro: string,
+        templateData?: { message?: string | null; variables?: unknown | null },
+      ) => {
+        const detailsLines = [
+          `- Data: ${formatDateToBrazil(appointmentData.appointment_date)}`,
+          `- Horário: ${appointmentData.appointment_time}`,
+          `- Procedimento: ${appointmentData.procedures.name}`,
+        ];
+
+        if (appointmentData.notes) {
+          detailsLines.push(`- Observações: ${appointmentData.notes}`);
+        }
+
+        const locationBlock = formatLocationBlock(
+          (templateData as any)?.variables,
+          appointmentData.city_settings,
+          {
+            defaultCityName: appointmentData.city_settings?.city_name || 'Tefé-AM',
+            defaultClinicName: 'Clínica Dra. Karoline Ferreira',
+          },
+        );
+
+        if (locationBlock) {
+          locationBlock.split('\n').forEach((line) => detailsLines.push(line));
+        }
+
+        const fallback = [
+          heading,
+          '',
+          `Olá ${appointmentData.clients.nome}!`,
+          '',
+          intro,
+          detailsLines.join('\n'),
+          '',
+          outro,
+        ].join('\n');
+
+        return (templateData as any)?.message || fallback;
+      };
+
       if (newStatus === 'confirmado' && appointmentData) {
         try {
-          const formatDateToBrazil = (dateString: string) => {
-            if (!dateString) return '';
-            
-            try {
-              if (dateString.includes('-') && dateString.length === 10) {
-                const [year, month, day] = dateString.split('-');
-                if (year && month && day) {
-                  return `${day}/${month}/${year}`;
-                }
-              }
-              return dateString;
-            } catch (error) {
-              return dateString;
-            }
-          };
-
           const { data: templateData } = await supabase.functions.invoke('get-whatsapp-template', {
             body: {
               templateType: 'confirmacao_cliente',
+              cityId: appointmentData.city_id,
               variables: {
                 clientName: appointmentData.clients.nome,
                 appointmentDate: formatDateToBrazil(appointmentData.appointment_date),
                 appointmentTime: appointmentData.appointment_time,
                 procedureName: appointmentData.procedures.name,
-                notes: appointmentData.notes ? `\n📝 Observações: ${appointmentData.notes}` : ''
-              }
-            }
+                notes: appointmentData.notes ? `\nObservações: ${appointmentData.notes}` : '',
+              },
+            },
           });
+
+          const message = buildFallbackMessage(
+            '🩺 *Agendamento Confirmado*',
+            'Seu agendamento foi confirmado:',
+            '✨ Aguardamos você!',
+            templateData as any,
+          );
 
           await supabase.functions.invoke('send-whatsapp', {
             body: {
               to: appointmentData.clients.celular,
-              message: templateData?.message || `🩺 *Agendamento Confirmado*\n\nOlá ${appointmentData.clients.nome}!\n\nSeu agendamento foi confirmado:\n\n📅 Data: ${formatDateToBrazil(appointmentData.appointment_date)}\n⏰ Horário: ${appointmentData.appointment_time}\n💉 Procedimento: ${appointmentData.procedures.name}\n\n📍 Clínica Dra. Karoline Ferreira\nTefé-AM\n\n✨ Aguardamos você!`
-            }
+              message,
+            },
           });
 
           console.log('Notificação de confirmação enviada para:', appointmentData.clients.celular);
@@ -222,42 +272,34 @@ const AdminCalendar = () => {
         }
       }
 
-      // Se era confirmado e está sendo cancelado, enviar notificação de cancelamento para o cliente
       if (wasConfirmed && isCanceling && appointmentData) {
         try {
-          const formatDateToBrazil = (dateString: string) => {
-            if (!dateString) return '';
-            
-            try {
-              if (dateString.includes('-') && dateString.length === 10) {
-                const [year, month, day] = dateString.split('-');
-                if (year && month && day) {
-                  return `${day}/${month}/${year}`;
-                }
-              }
-              return dateString;
-            } catch (error) {
-              return dateString;
-            }
-          };
-
           const { data: templateData } = await supabase.functions.invoke('get-whatsapp-template', {
             body: {
               templateType: 'cancelamento_cliente',
+              cityId: appointmentData.city_id,
               variables: {
                 clientName: appointmentData.clients.nome,
                 appointmentDate: formatDateToBrazil(appointmentData.appointment_date),
                 appointmentTime: appointmentData.appointment_time,
-                procedureName: appointmentData.procedures.name
-              }
-            }
+                procedureName: appointmentData.procedures.name,
+                notes: appointmentData.notes ? `\nObservações: ${appointmentData.notes}` : '',
+              },
+            },
           });
+
+          const message = buildFallbackMessage(
+            '❌ *Agendamento Cancelado*',
+            'Informamos que seu agendamento foi cancelado:',
+            '📞 Para reagendar, entre em contato conosco.',
+            templateData as any,
+          );
 
           await supabase.functions.invoke('send-whatsapp', {
             body: {
               to: appointmentData.clients.celular,
-              message: templateData?.message || `❌ *Agendamento Cancelado*\n\nOlá ${appointmentData.clients.nome}!\n\nInformamos que seu agendamento foi cancelado:\n\n📅 Data: ${formatDateToBrazil(appointmentData.appointment_date)}\n⏰ Horário: ${appointmentData.appointment_time}\n💉 Procedimento: ${appointmentData.procedures.name}\n\n📞 Para reagendar, entre em contato conosco.\n\n🏥 Clínica Dra. Karoline Ferreira\nTefé-AM`
-            }
+              message,
+            },
           });
 
           console.log('Notificação de cancelamento enviada para:', appointmentData.clients.celular);
@@ -267,19 +309,18 @@ const AdminCalendar = () => {
       }
 
       toast({
-        title: "Status atualizado",
-        description: "Status do agendamento atualizado com sucesso.",
+        title: 'Status atualizado',
+        description: 'Status do agendamento atualizado com sucesso.',
       });
 
-      // Recarregar agendamentos
       loadAppointments();
       setDialogOpen(false);
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
       toast({
-        title: "Erro",
-        description: "Erro ao atualizar status do agendamento.",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'Erro ao atualizar status do agendamento.',
+        variant: 'destructive',
       });
     }
   };

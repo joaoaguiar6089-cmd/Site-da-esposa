@@ -1,9 +1,49 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+type NullableString = string | null | undefined;
+
+const safeTrim = (value: NullableString): string => (typeof value === 'string' ? value.trim() : '');
+
+const buildClinicLocation = (city?: {
+  city_name?: NullableString;
+  clinic_name?: NullableString;
+  address?: NullableString;
+  map_url?: NullableString;
+} | null): string => {
+  if (!city) return '';
+
+  const clinicName = safeTrim(city.clinic_name);
+  const cityName = safeTrim(city.city_name);
+  let header = clinicName;
+
+  if (cityName) {
+    if (header) {
+      const lowerHeader = header.toLowerCase();
+      const lowerCity = cityName.toLowerCase();
+      if (!lowerHeader.includes(lowerCity)) {
+        header = `${header} - ${cityName}`;
+      }
+    } else {
+      header = cityName;
+    }
+  }
+
+  const lines: string[] = [];
+  if (header) lines.push(header);
+
+  const address = safeTrim(city.address);
+  if (address) lines.push(address);
+
+  const mapUrl = safeTrim(city.map_url);
+  if (mapUrl) lines.push(mapUrl);
+
+  return lines.join('\n');
 };
 
 const handler = async (req: Request): Promise<Response> => {
@@ -14,14 +54,22 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { templateType, variables } = await req.json();
+    const body = await req.json();
+    const {
+      templateType,
+      variables = {},
+      cityId,
+    }: {
+      templateType: string;
+      variables?: Record<string, NullableString>;
+      cityId?: string | null;
+    } = body;
 
-    console.log('Getting template:', { templateType, variables });
+    console.log('Getting template:', { templateType, variables, cityId });
 
-    // Get template from database
     const { data: template, error } = await supabase
       .from('whatsapp_templates')
       .select('template_content')
@@ -33,23 +81,50 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error(`Template ${templateType} not found`);
     }
 
-    // Replace variables in template
-    let message = template.template_content;
-    
-    if (variables) {
-      Object.keys(variables).forEach(key => {
-        const placeholder = `{${key}}`;
-        message = message.replace(new RegExp(placeholder, 'g'), variables[key] || '');
-      });
+    const mergedVariables: Record<string, string> = {};
+
+    Object.entries(variables || {}).forEach(([key, value]) => {
+      mergedVariables[key] = safeTrim(value);
+    });
+
+    if (cityId) {
+      const { data: cityData, error: cityError } = await supabase
+        .from('city_settings')
+        .select('city_name, clinic_name, address, map_url')
+        .eq('id', cityId)
+        .maybeSingle();
+
+      const errorCode = (cityError as { code?: string } | null)?.code;
+      if (cityError && errorCode !== 'PGRST116') {
+        console.error('Error fetching city info:', cityError);
+      }
+
+      if (cityData) {
+        mergedVariables.cityName = safeTrim(cityData.city_name);
+        mergedVariables.clinicName = safeTrim(cityData.clinic_name);
+        mergedVariables.clinicAddress = safeTrim(cityData.address);
+        mergedVariables.clinicMapUrl = safeTrim(cityData.map_url);
+        mergedVariables.clinicLocation = buildClinicLocation(cityData);
+      }
     }
+
+    let message = template.template_content;
+
+    Object.entries(mergedVariables).forEach(([key, value]) => {
+      const placeholder = `{${key}}`;
+      const escaped = placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      message = message.replace(new RegExp(escaped, 'g'), value);
+    });
 
     console.log('Generated message:', message.substring(0, 100) + '...');
 
-    return new Response(JSON.stringify({ message }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-
+    return new Response(
+      JSON.stringify({ message, variables: mergedVariables }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
+    );
   } catch (error: any) {
     console.error('Error in get-whatsapp-template function:', error);
     return new Response(
@@ -57,7 +132,7 @@ const handler = async (req: Request): Promise<Response> => {
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      },
     );
   }
 };

@@ -667,7 +667,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
 
           const ownerNotifyData = {
             type: editingId ? 'alteracao' : 'agendamento',
-            clientName: ${client.nome} ,
+            clientName: `${client.nome} ${client.sobrenome}`,
             clientPhone: client.celular,
             appointmentDate: formData.appointment_date,
             appointmentTime: formData.appointment_time,
@@ -757,16 +757,18 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         try {
           const cancelNotifyData = {
             type: 'cancelamento',
-            clientName: ${client.nome} ,
+            clientName: `${client.nome} ${client.sobrenome}`,
             clientPhone: client.celular,
             appointmentDate: currentAppointment.appointment_date,
             appointmentTime: currentAppointment.appointment_time,
             procedureName: currentAppointment.procedures?.name || '',
             professionalName: null,
             notes: currentAppointment.notes || '',
-            specifications: currentAppointment.appointment_specifications?
-              ?.map(spec => spec.specification_name)
-              .join(', ') || '',
+            specifications: currentAppointment.appointment_specifications
+              ? currentAppointment.appointment_specifications
+                  .map(spec => spec.specification_name)
+                  .join(', ')
+              : '',
             cityId: currentAppointment.city_id || null,
             cityName: cities.find(city => city.id === currentAppointment.city_id)?.city_name || ''
           };

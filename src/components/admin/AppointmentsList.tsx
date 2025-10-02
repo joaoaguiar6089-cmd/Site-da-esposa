@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar, Clock, User, Phone, Edit, Trash2, Search, MessageSquare, Filter, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { formatLocationBlock } from "@/utils/location";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatDateToBrazil } from '@/utils/dateUtils';
@@ -19,7 +20,14 @@ interface Appointment {
   appointment_date: string;
   appointment_time: string;
   status: string;
+  city_id?: string | null;
   notes?: string;
+  city_settings?: {
+    city_name?: string | null;
+    clinic_name?: string | null;
+    address?: string | null;
+    map_url?: string | null;
+  } | null;
   clients: {
     id: string;
     nome: string;
@@ -77,7 +85,14 @@ const AppointmentsList = () => {
           appointment_date,
           appointment_time,
           status,
+          city_id,
           notes,
+          city_settings:city_settings (
+            city_name,
+            clinic_name,
+            address,
+            map_url
+          ),
           clients (
             id,
             nome,
@@ -295,13 +310,13 @@ Tefé-AM
   
   const updateAppointmentStatus = async (id: string, newStatus: string) => {
     try {
-      // Primeiro, buscar os dados do agendamento para notificações
       const { data: appointmentData, error: fetchError } = await supabase
         .from('appointments')
         .select(`
           *,
           clients (*),
-          procedures (name, price, duration)
+          procedures (name, price, duration),
+          city_settings (city_name, clinic_name, address, map_url)
         `)
         .eq('id', id)
         .single();
@@ -315,27 +330,93 @@ Tefé-AM
 
       if (error) throw error;
 
-      // Se mudou para "confirmado", enviar notificação WhatsApp para o cliente
+      const formatDateToBrazil = (dateString: string) => {
+        if (!dateString) return '';
+
+        try {
+          if (dateString.includes('-') && dateString.length === 10) {
+            const [year, month, day] = dateString.split('-');
+            if (year && month && day) {
+              return `${day}/${month}/${year}`;
+            }
+          }
+          return dateString;
+        } catch (error) {
+          return dateString;
+        }
+      };
+
+      const buildFallbackMessage = (
+        heading: string,
+        intro: string,
+        outro: string,
+        templateData?: { message?: string | null; variables?: unknown | null },
+      ) => {
+        const detailsLines = [
+          `- Data: ${formatDateToBrazil(appointmentData.appointment_date)}`,
+          `- Horário: ${appointmentData.appointment_time}`,
+          `- Procedimento: ${appointmentData.procedures.name}`,
+        ];
+
+        if (appointmentData.notes) {
+          detailsLines.push(`- Observações: ${appointmentData.notes}`);
+        }
+
+        const locationBlock = formatLocationBlock(
+          (templateData as any)?.variables,
+          appointmentData.city_settings,
+          {
+            defaultCityName: appointmentData.city_settings?.city_name || 'Tefé-AM',
+            defaultClinicName: 'Clínica Dra. Karoline Ferreira',
+          },
+        );
+
+        if (locationBlock) {
+          locationBlock.split('\n').forEach((line) => detailsLines.push(line));
+        }
+
+        const fallback = [
+          heading,
+          '',
+          `Olá ${appointmentData.clients.nome}!`,
+          '',
+          intro,
+          detailsLines.join('\n'),
+          '',
+          outro,
+        ].join('\n');
+
+        return (templateData as any)?.message || fallback;
+      };
+
       if (newStatus === 'confirmado' && appointmentData) {
         try {
           const { data: templateData } = await supabase.functions.invoke('get-whatsapp-template', {
             body: {
               templateType: 'confirmacao_cliente',
+              cityId: appointmentData.city_id,
               variables: {
                 clientName: appointmentData.clients.nome,
                 appointmentDate: formatDateToBrazil(appointmentData.appointment_date),
                 appointmentTime: appointmentData.appointment_time,
                 procedureName: appointmentData.procedures.name,
-                notes: appointmentData.notes ? `\n📝 Observações: ${appointmentData.notes}` : ''
-              }
-            }
+                notes: appointmentData.notes ? `\nObservações: ${appointmentData.notes}` : '',
+              },
+            },
           });
+
+          const message = buildFallbackMessage(
+            '🩺 *Agendamento Confirmado*',
+            'Seu agendamento foi confirmado:',
+            '✨ Aguardamos você!',
+            templateData as any,
+          );
 
           await supabase.functions.invoke('send-whatsapp', {
             body: {
               to: appointmentData.clients.celular,
-              message: templateData?.message || `🩺 *Agendamento Confirmado*\n\nOlá ${appointmentData.clients.nome}!\n\nSeu agendamento foi confirmado:\n\n📅 Data: ${formatDateToBrazil(appointmentData.appointment_date)}\n⏰ Horário: ${appointmentData.appointment_time}\n💉 Procedimento: ${appointmentData.procedures.name}\n\n📍 Clínica Dra. Karoline Ferreira\nTefé-AM\n\n✨ Aguardamos você!`
-            }
+              message,
+            },
           });
 
           console.log('Notificação de confirmação enviada para:', appointmentData.clients.celular);
@@ -344,9 +425,45 @@ Tefé-AM
         }
       }
 
+      if (wasConfirmed && isCanceling && appointmentData) {
+        try {
+          const { data: templateData } = await supabase.functions.invoke('get-whatsapp-template', {
+            body: {
+              templateType: 'cancelamento_cliente',
+              cityId: appointmentData.city_id,
+              variables: {
+                clientName: appointmentData.clients.nome,
+                appointmentDate: formatDateToBrazil(appointmentData.appointment_date),
+                appointmentTime: appointmentData.appointment_time,
+                procedureName: appointmentData.procedures.name,
+                notes: appointmentData.notes ? `\nObservações: ${appointmentData.notes}` : '',
+              },
+            },
+          });
+
+          const message = buildFallbackMessage(
+            '❌ *Agendamento Cancelado*',
+            'Informamos que seu agendamento foi cancelado:',
+            '📞 Para reagendar, entre em contato conosco.',
+            templateData as any,
+          );
+
+          await supabase.functions.invoke('send-whatsapp', {
+            body: {
+              to: appointmentData.clients.celular,
+              message,
+            },
+          });
+
+          console.log('Notificação de cancelamento enviada para:', appointmentData.clients.celular);
+        } catch (notificationError) {
+          console.error('Erro ao enviar notificação de cancelamento:', notificationError);
+        }
+      }
+
       toast({
-        title: "Status atualizado",
-        description: "Status do agendamento atualizado com sucesso.",
+        title: 'Status atualizado',
+        description: 'Status do agendamento atualizado com sucesso.',
       });
 
       loadAppointments();
@@ -354,9 +471,9 @@ Tefé-AM
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
       toast({
-        title: "Erro",
-        description: "Erro ao atualizar status do agendamento.",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'Erro ao atualizar status do agendamento.',
+        variant: 'destructive',
       });
     }
   };

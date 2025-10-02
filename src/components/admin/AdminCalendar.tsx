@@ -19,7 +19,14 @@ interface Appointment {
   appointment_date: string;
   appointment_time: string;
   status: string;
+  city_id?: string | null;
   notes?: string;
+  city_settings?: {
+    city_name?: string | null;
+    clinic_name?: string | null;
+    address?: string | null;
+    map_url?: string | null;
+  } | null;
   clients: {
     id: string;
     nome: string;
@@ -60,7 +67,14 @@ const AdminCalendar = () => {
           appointment_date,
           appointment_time,
           status,
+          city_id,
           notes,
+          city_settings:city_settings (
+            city_name,
+            clinic_name,
+            address,
+            map_url
+          ),
           clients (
             id,
             nome,

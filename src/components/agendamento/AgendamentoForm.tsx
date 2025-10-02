@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -180,7 +180,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
           *,
           procedures!appointments_procedure_id_fkey(name, duration, price, requires_body_selection, body_selection_type),
           appointment_specifications(specification_id, specification_name, specification_price),
-          city_settings(city_name)
+          city_settings(city_name, clinic_name, address, map_url)
         `)
         .eq('id', appointmentId)
         .single();
@@ -667,14 +667,16 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
 
           const ownerNotifyData = {
             type: editingId ? 'alteracao' : 'agendamento',
-            clientName: `${client.nome} ${client.sobrenome}`,
+            clientName: ${client.nome} ,
             clientPhone: client.celular,
             appointmentDate: formData.appointment_date,
             appointmentTime: formData.appointment_time,
             procedureName: selectedProc?.name || '',
             professionalName: null,
             notes: formData.notes,
-            specifications: specificationsText
+            specifications: specificationsText,
+            cityId: formData.city_id || null,
+            cityName: cities.find(city => city.id === formData.city_id)?.city_name || ''
           };
           
           console.log('Dados completos sendo enviados para notify-owner:', ownerNotifyData);
@@ -755,13 +757,18 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         try {
           const cancelNotifyData = {
             type: 'cancelamento',
-            clientName: `${client.nome} ${client.sobrenome}`,
+            clientName: ${client.nome} ,
             clientPhone: client.celular,
             appointmentDate: currentAppointment.appointment_date,
             appointmentTime: currentAppointment.appointment_time,
             procedureName: currentAppointment.procedures?.name || '',
             professionalName: null,
-            notes: currentAppointment.notes || ''
+            notes: currentAppointment.notes || '',
+            specifications: currentAppointment.appointment_specifications?
+              ?.map(spec => spec.specification_name)
+              .join(', ') || '',
+            cityId: currentAppointment.city_id || null,
+            cityName: cities.find(city => city.id === currentAppointment.city_id)?.city_name || ''
           };
 
           await supabase.functions.invoke('notify-owner', {

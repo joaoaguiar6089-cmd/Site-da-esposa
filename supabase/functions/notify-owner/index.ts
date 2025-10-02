@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +15,8 @@ interface NotificationRequest {
   professionalName?: string;
   notes?: string;
   specifications?: string;
+  cityId?: string;
+  cityName?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -28,7 +30,7 @@ const handler = async (req: Request): Promise<Response> => {
     const requestBody = await req.json();
     console.log('Request body received:', requestBody);
     
-    const { type, clientName, clientPhone, appointmentDate, appointmentTime, procedureName, professionalName, notes, specifications }: NotificationRequest = requestBody;
+    const { type, clientName, clientPhone, appointmentDate, appointmentTime, procedureName, professionalName, notes, specifications, cityId, cityName }: NotificationRequest = requestBody;
 
     console.log('=== Owner Notification Function Called ===');
     console.log('Notification type:', type);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,7 +41,14 @@ const NotificationDebug = () => {
     { name: "appointmentDate", description: "Data do agendamento" },
     { name: "appointmentTime", description: "Hora do agendamento" },
     { name: "procedureName", description: "Nome do procedimento" },
-    { name: "notes", description: "Observações do agendamento" }
+    { name: "professionalName", description: "Nome do profissional responsável" },
+    { name: "notes", description: "Observações adicionais" },
+    { name: "specifications", description: "Especificações selecionadas" },
+    { name: "cityName", description: "Cidade escolhida no agendamento" },
+    { name: "clinicName", description: "Nome da clínica correspondente" },
+    { name: "clinicAddress", description: "Endereço completo da clínica" },
+    { name: "clinicMapUrl", description: "Link do Google Maps da clínica" },
+    { name: "clinicLocation", description: "Bloco completo com nome, endereço e link" }
   ];
 
   useEffect(() => {
@@ -357,7 +364,7 @@ const NotificationDebug = () => {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="test" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <TabsTrigger value="test">Teste de Mensagens</TabsTrigger>
           <TabsTrigger value="templates">Editar Templates</TabsTrigger>
           <TabsTrigger value="owner">Notificações Proprietária</TabsTrigger>

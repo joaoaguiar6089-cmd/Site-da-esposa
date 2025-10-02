@@ -48,7 +48,7 @@ const NotificationDebug = () => {
     { name: "clinicName", description: "Nome da clínica correspondente" },
     { name: "clinicAddress", description: "Endereço completo da clínica" },
     { name: "clinicMapUrl", description: "Link do Google Maps da clínica" },
-    { name: "clinicLocation", description: "Bloco completo com nome, endereço e link" }
+    { name: "clinicLocation", description: "Bloco com nome, endereço e link da clínica" }
   ];
 
   useEffect(() => {

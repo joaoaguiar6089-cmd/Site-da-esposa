@@ -323,10 +323,6 @@ Tefé-AM
 
       if (fetchError) throw fetchError;
 
-      // Verificar estados anteriores e novos
-      const wasConfirmed = appointmentData.status === 'confirmado';
-      const isCanceling = newStatus === 'cancelado';
-
       const { error } = await supabase
         .from('appointments')
         .update({ status: newStatus })

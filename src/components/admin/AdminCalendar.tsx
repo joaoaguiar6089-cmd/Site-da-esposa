@@ -71,6 +71,7 @@ const AdminCalendar = () => {
           notes,
           city_settings:city_settings (
             city_name,
+            clinic_name,
             address,
             map_url
           ),

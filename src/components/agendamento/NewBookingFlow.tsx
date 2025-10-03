@@ -606,13 +606,13 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                         <MapPin className="w-5 h-5 text-primary mt-0.5" />
                         <div>
                           <p className="text-sm text-muted-foreground">Unidade</p>
-                          <p className="font-semibold">{clinicName ? `${clinicName} ÔÇö ${cityRec?.city_name || cityName}` : cityRec?.city_name || cityName}</p>
+                          <p className="font-semibold">{clinicName ? `${clinicName} - ${cityRec?.city_name || cityName}` : cityRec?.city_name || cityName}</p>
                           {address && (
                             <p className="text-sm text-foreground mt-1">
                               {address}
                               {mapUrl ? (
                                 <>
-                                  {" ÔÇó "}
+                                  {" • "}
                                   <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="underline">Ver no mapa</a>
                                 </>
                               ) : null}
@@ -718,7 +718,7 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                           <div className="flex flex-col items-start">
                             <span className="font-medium">{procedure.name}</span>
                             <span className="text-xs text-muted-foreground">
-                              {procedure.duration}min {procedure.price && `ÔÇó ${currency(procedure.price)}`}
+                              {procedure.duration}min {procedure.price && `• ${currency(procedure.price)}`}
                             </span>
                           </div>
                         </SelectItem>
@@ -868,10 +868,10 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                   </Popover>
                 </div>
 
-                {/* Hor├írio */}
+                {/* Horário */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground">
-                    Hor├írio <span className="text-destructive">*</span>
+                    Horário <span className="text-destructive">*</span>
                   </label>
                   <Select 
                     value={formData.appointment_time} 
@@ -880,10 +880,10 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                   >
                     <SelectTrigger className="h-14 border-2 hover:border-primary/50 transition-all duration-200 bg-background">
                       <SelectValue placeholder={
-                        loadingTimes ? "Carregando hor├írios..." : 
+                        loadingTimes ? "Carregando horários..." : 
                         !formData.appointment_date ? "Selecione a data primeiro" : 
-                        availableTimes.length === 0 ? "Sem hor├írios dispon├¡veis" :
-                        "Selecione um hor├írio"
+                        availableTimes.length === 0 ? "Sem horários disponíveis" :
+                        "Selecione um horário"
                       } />
                     </SelectTrigger>
                     <SelectContent>
@@ -896,20 +896,20 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                   </Select>
                 </div>
 
-                {/* Observa├º├Áes */}
+                {/* Observações */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground">
-                    Observa├º├Áes (opcional)
+                    Observações (opcional)
                   </label>
                   <Textarea
                     value={formData.notes}
                     onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                    placeholder="Adicione qualquer observa├º├úo relevante sobre o agendamento..."
+                    placeholder="Adicione qualquer observação relevante sobre o agendamento..."
                     className="min-h-[100px] border-2 hover:border-primary/50 transition-all duration-200"
                   />
                 </div>
 
-                {/* Bot├Áes de A├º├úo */}
+                {/* Botões de Ação */}
                 <div className="flex gap-4 pt-4">
                   <Button
                     type="button"

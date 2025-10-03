@@ -63,7 +63,7 @@ const NewBookingFlow = ({
   sendNotification = true,
   selectedDate
 }: NewBookingFlowProps) => {
-  const [currentView, setCurrentView] = useState<ViewMode>(adminMode ? 'form' : 'phone');
+  const [currentView, setCurrentView] = useState<ViewMode>('form');
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [cities, setCities] = useState<{
     id: string,
@@ -98,6 +98,7 @@ const NewBookingFlow = ({
   useEffect(() => {
     loadData();
     loadSiteSettings();
+    // Só definir cliente inicial se estiver em modo admin
     if (adminMode && initialClient) {
       setSelectedClient(initialClient);
     }
@@ -596,6 +597,7 @@ const NewBookingFlow = ({
       // No admin mode, bypass phone validation and go straight to booking
       handleBookingSubmit();
     } else {
+      // Fluxo normal do cliente: ir para verificação de telefone
       setCurrentView('phone');
     }
   };

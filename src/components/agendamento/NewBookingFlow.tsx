@@ -868,10 +868,10 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                   </Popover>
                 </div>
 
-                {/* Hor├írio */}
+                {/* Horário */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground">
-                    Hor├írio <span className="text-destructive">*</span>
+                    Horário <span className="text-destructive">*</span>
                   </label>
                   <Select 
                     value={formData.appointment_time} 
@@ -880,10 +880,10 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                   >
                     <SelectTrigger className="h-14 border-2 hover:border-primary/50 transition-all duration-200 bg-background">
                       <SelectValue placeholder={
-                        loadingTimes ? "Carregando hor├írios..." : 
+                        loadingTimes ? "Carregando horários..." : 
                         !formData.appointment_date ? "Selecione a data primeiro" : 
-                        availableTimes.length === 0 ? "Sem hor├írios dispon├¡veis" :
-                        "Selecione um hor├írio"
+                        availableTimes.length === 0 ? "Sem horários disponíveis" :
+                        "Selecione um horário"
                       } />
                     </SelectTrigger>
                     <SelectContent>
@@ -896,20 +896,20 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                   </Select>
                 </div>
 
-                {/* Observa├º├Áes */}
+                {/* Observações */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground">
-                    Observa├º├Áes (opcional)
+                    Observações (opcional)
                   </label>
                   <Textarea
                     value={formData.notes}
                     onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                    placeholder="Adicione qualquer observa├º├úo relevante sobre o agendamento..."
+                    placeholder="Adicione qualquer observação relevante sobre o agendamento..."
                     className="min-h-[100px] border-2 hover:border-primary/50 transition-all duration-200"
                   />
                 </div>
 
-                {/* Bot├Áes de A├º├úo */}
+                {/* Botões de Ação */}
                 <div className="flex gap-4 pt-4">
                   <Button
                     type="button"

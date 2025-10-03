@@ -122,7 +122,7 @@ const NewAppointmentForm = ({ onBack, onSuccess, selectedDate }: NewAppointmentF
       value = formatCPF(value);
     } else if (field === 'nome' || field === 'sobrenome') {
       // Remove números e caracteres especiais, permite apenas letras e espaços
-      value = value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
+      value = value.replace(/[^\p{L}\s]/gu, '');
     }
     
     setNewClientData(prev => ({
@@ -332,7 +332,7 @@ const NewAppointmentForm = ({ onBack, onSuccess, selectedDate }: NewAppointmentF
           <h1 className="text-2xl font-bold">Novo Agendamento</h1>
         </div>
 
-        <div className="max-w-md mx-auto space-y-4">
+        <div className="max-w-5xl mx-auto space-y-4 w-full">
           {/* Opção para notificar cliente */}
           <div className="flex items-center space-x-2 p-3 bg-muted/50 rounded-lg">
             <Checkbox 

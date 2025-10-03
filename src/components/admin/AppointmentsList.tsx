@@ -583,7 +583,7 @@ Aguardamos você!`;
           <h1 className="text-2xl font-bold">Editar Agendamento</h1>
         </div>
         
-        <div className="max-w-md mx-auto">
+        <div className="max-w-5xl mx-auto w-full">
           <AgendamentoForm
             client={selectedAppointment.clients}
             onAppointmentCreated={handleAppointmentUpdated}

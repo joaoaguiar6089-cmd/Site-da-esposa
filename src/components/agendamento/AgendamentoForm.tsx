@@ -856,26 +856,30 @@ Para reagendar, entre em contato conosco.`;
               </CardTitle>
             </div>
             {/* Botão de dúvidas no WhatsApp */}
-            <div className="absolute right-6 top-6 hidden sm:block">
-              <a
-                href="https://wa.me/5597984387295"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm hover:bg-slate-50"
-              >
-                <MessageCircle className="h-4 w-4" />
-                Tirar dúvida no WhatsApp
-              </a>
-            </div>
-            <a
-              href="https://wa.me/5597984387295"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="sm:hidden fixed right-4 bottom-4 inline-flex items-center gap-2 rounded-full shadow-lg border bg-white px-4 py-3 text-sm z-40"
-            >
-              <MessageCircle className="h-4 w-4" />
-              Dúvidas
-            </a>
+            {!adminMode && (
+              <>
+                <div className="absolute right-6 top-6 hidden sm:block">
+                  <a
+                    href="https://wa.me/5597984387295"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm hover:bg-slate-50"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    Tirar dúvida no WhatsApp
+                  </a>
+                </div>
+                <a
+                  href="https://wa.me/5597984387295"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="sm:hidden fixed right-4 bottom-4 inline-flex items-center gap-2 rounded-full shadow-lg border bg-white px-4 py-3 text-sm z-40"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  Dúvidas
+                </a>
+              </>
+            )}
             <div className="space-y-1">
               <p className="text-lg font-semibold text-foreground">
                 {client.nome} {client.sobrenome}

@@ -3,14 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } fro          <NewBookingFlow
-            onBack={() => setStep('select-client')}
-            onSuccess={onSuccess}
-            adminMode={true}
-            initialClient={selectedClient}
-            sendNotification={sendNotification}
-            selectedDate={selectedDate}
-          />ponents/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Search, Plus, User } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
@@ -355,13 +348,13 @@ const NewAppointmentForm = ({ onBack, onSuccess, selectedDate }: NewAppointmentF
             </label>
           </div>
           
-          <AgendamentoForm
-            client={selectedClient}
-            onAppointmentCreated={handleAppointmentCreated}
+          <NewBookingFlow
             onBack={() => setStep('select-client')}
-            selectedDate={selectedDate}
+            onSuccess={handleAppointmentCreated}
             adminMode={true}
+            initialClient={selectedClient}
             sendNotification={sendNotification}
+            selectedDate={selectedDate}
           />
         </div>
       </div>

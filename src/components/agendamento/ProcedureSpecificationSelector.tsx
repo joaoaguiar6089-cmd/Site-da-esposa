@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useDiscountCalculation } from "@/hooks/useDiscountCalculation";
+import { sanitizeSupabaseData } from "@/utils/textEncoding";
 import { cn } from "@/lib/utils";
 
 type Gender = "female" | "male";
@@ -179,7 +180,8 @@ const ProcedureSpecificationSelector = ({
           .eq("is_active", true)
           .order("display_order", { ascending: true });
         if (error) throw error;
-        const processed: ProcedureSpecification[] = (data ?? []).map((row: any) => ({
+        const sanitizedData = sanitizeSupabaseData(data ?? []) as any[];
+        const processed: ProcedureSpecification[] = sanitizedData.map((row: any) => ({
           id: String(row.id),
           name: String(row.name ?? ""),
           description: row.description ?? null,

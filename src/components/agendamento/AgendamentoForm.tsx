@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+﻿import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatDateToBrazil, getCurrentDateBrazil, getCurrentDateTimeBrazil } from '@/utils/dateUtils';
+import { sanitizeSupabaseData } from "@/utils/textEncoding";
 import type { Client } from "@/types/client";
 import ProcedureSpecificationSelector, { ProcedureSpecification } from "./ProcedureSpecificationSelector";
 import { useDiscountCalculation } from "@/hooks/useDiscountCalculation";
@@ -70,7 +71,7 @@ interface AgendamentoFormProps {
   sendNotification?: boolean;
 }
 
-const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preSelectedProcedureId, selectedDate, adminMode = false, sendNotification = true }: AgendamentoFormProps) => {
+const AgendamentoForm = ({ client: rawClient, onAppointmentCreated, onBack, editingId, preSelectedProcedureId, selectedDate, adminMode = false, sendNotification = true }: AgendamentoFormProps) => {
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
@@ -100,6 +101,7 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
   const [cancelling, setCancelling] = useState(false);
   const [currentAppointment, setCurrentAppointment] = useState<any>(null);
   const { toast } = useToast();
+  const client = useMemo(() => sanitizeSupabaseData(rawClient), [rawClient]);
 
   const loadProcedures = async () => {
     try {
@@ -136,10 +138,10 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
 
       if (citiesError) throw citiesError;
 
-      setProcedures(proceduresData || []);
-      setCategories(categoriesData || []);
-      setSubcategories(subcategoriesData || []);
-      setCities(citiesData || []);
+      setProcedures(sanitizeSupabaseData(proceduresData || []));
+      setCategories(sanitizeSupabaseData(categoriesData || []));
+      setSubcategories(sanitizeSupabaseData(subcategoriesData || []));
+      setCities(sanitizeSupabaseData(citiesData || []));
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast({
@@ -187,18 +189,20 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
 
       if (error) throw error;
 
-      setCurrentAppointment(data);
+      const sanitizedData = sanitizeSupabaseData(data);
+
+      setCurrentAppointment(sanitizedData);
       setFormData({
-        procedure_id: data.procedure_id || "",
-        appointment_date: data.appointment_date,
-        appointment_time: data.appointment_time,
-        notes: data.notes || "",
-        city_id: data.city_id || "",
+        procedure_id: sanitizedData.procedure_id || "",
+        appointment_date: sanitizedData.appointment_date,
+        appointment_time: sanitizedData.appointment_time,
+        notes: sanitizedData.notes || "",
+        city_id: sanitizedData.city_id || "",
       });
 
       // Carregar especificações selecionadas se existirem
-      if (data.appointment_specifications && data.appointment_specifications.length > 0) {
-        const specs: ProcedureSpecification[] = data.appointment_specifications.map((spec: any) => ({
+      if (sanitizedData.appointment_specifications && sanitizedData.appointment_specifications.length > 0) {
+        const specs: ProcedureSpecification[] = sanitizedData.appointment_specifications.map((spec: any) => ({
           id: spec.specification_id,
           name: spec.specification_name,
           price: spec.specification_price,
@@ -212,12 +216,12 @@ const AgendamentoForm = ({ client, onAppointmentCreated, onBack, editingId, preS
         setSelectedSpecifications(specs);
       }
 
-      if (data.selected_gender) {
-        setSelectedGender(data.selected_gender as 'male' | 'female');
+      if (sanitizedData.selected_gender) {
+        setSelectedGender(sanitizedData.selected_gender as 'male' | 'female');
       }
 
       // Carregar horários disponíveis para a data
-      loadAvailableTimes(data.appointment_date);
+      loadAvailableTimes(sanitizedData.appointment_date);
     } catch (error) {
       console.error('Erro ao carregar agendamento:', error);
       toast({
@@ -1389,3 +1393,4 @@ Para reagendar, entre em contato conosco.`;
 };
 
 export default AgendamentoForm;
+

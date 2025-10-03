@@ -1,53 +1,498 @@
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar } from "@/components/ui/calendar";
-import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, MapPin } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { cn } from "@/lib/utils";
+import SmartCityCalendar from "./SmartCityCalendar";import SmartCityCalendar from "./SmartCityCalendar";import { useState, useEffect } from "react";import { useState, useEffect } from "react";
 
-interface City {
-  id: string;
-  city_name: string;
-  is_active: boolean;
-  display_order: number;
-  clinic_name?: string | null;
-  address?: string | null;
-  map_url?: string | null;
-}
 
-interface CityAvailability {
-  id: string;
-  city_id: string;
-  date_start: string;
-  date_end: string | null;
-  city_name?: string;
-}
 
 const CitySettings = () => {
-  const [cities, setCities] = useState<City[]>([]);
-  const [availability, setAvailability] = useState<CityAvailability[]>([]);
-  const [selectedCityId, setSelectedCityId] = useState<string>("");
-  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
-  const [newCityName, setNewCityName] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [selectionMode, setSelectionMode] = useState<"specific" | "range">("specific");
-  const [rangeStart, setRangeStart] = useState<Date | undefined>();
-  const [rangeEnd, setRangeEnd] = useState<Date | undefined>();
-  const { toast } = useToast();
 
-  useEffect(() => {
-    loadCities();
-    loadAvailability();
-  }, []);
+  return <SmartCityCalendar />;
 
-  const loadCities = async () => {
+};const CitySettings = () => {import { Button } from "@/components/ui/button";import { Button } from "@/components/ui/button";
+
+
+
+export default CitySettings;  return <SmartCityCalendar />;
+
+};import { Input } from "@/components/ui/input";import { Input } from "@/components/ui/input";
+
+
+
+export default CitySettings;import { Label } from "@/components/ui/label";import { Label } from "@/components/ui/label";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+import { Trash2, Plus, MapPin } from "lucide-react";import { Trash2, Plus, MapPin } from "lucide-react";
+
+import { useToast } from "@/hooks/use-toast";import { useToast } from "@/hooks/use-toast";
+
+import { supabase } from "@/integrations/supabase/client";import { supabase } from "@/integrations/supabase/client";
+
+import SmartCityCalendar from "./SmartCityCalendar";import SmartCityCalendar from "./SmartCityCalendar";
+
+
+
+interface City {interface City {
+
+  id: string;  id: string;
+
+  city_name: string;  city_name: string;
+
+  is_active: boolean;  is_active: boolean;
+
+  display_order: number;  display_order: number;
+
+  clinic_name?: string | null;  clinic_name?: string | null;
+
+  address?: string | null;  address?: string | null;
+
+  map_url?: string | null;  map_url?: string | null;
+
+}}
+
+
+
+const CitySettings = () => {const CitySettings = () => {
+
+  const [cities, setCities] = useState<City[]>([]);  const [cities, setCities] = useState<City[]>([]);
+
+  const [newCityData, setNewCityData] = useState({  const [newCityData, setNewCityData] = useState({
+
+    city_name: "",    city_name: "",
+
+    clinic_name: "",    clinic_name: "",
+
+    address: "",    address: "",
+
+    map_url: ""    map_url: ""
+
+  });  });
+
+  const [loading, setLoading] = useState(true);  const [loading, setLoading] = useState(true);
+
+  const [saving, setSaving] = useState(false);  const [saving, setSaving] = useState(false);
+
+  const { toast } = useToast();  const { toast } = useToast();
+
+
+
+  useEffect(() => {  useEffect(() => {
+
+    loadCities();    loadCities();
+
+  }, []);  }, []);
+
+
+
+  const loadCities = async () => {  const loadCities = async () => {
+
+    try {    try {
+
+      setLoading(true);      setLoading(true);
+
+      const { data, error } = await supabase      const { data, error } = await supabase
+
+        .from('city_settings')        .from('city_settings')
+
+        .select('*')        .select('*')
+
+        .order('display_order');        .order('display_order');
+
+
+
+      if (error) throw error;      if (error) throw error;
+
+      setCities(data || []);      setCities(data || []);
+
+    } catch (error: any) {    } catch (error: any) {
+
+      toast({      toast({
+
+        title: "Erro ao carregar cidades",        title: "Erro ao carregar cidades",
+
+        description: error.message,        description: error.message,
+
+        variant: "destructive",        variant: "destructive",
+
+      });      });
+
+    } finally {    } finally {
+
+      setLoading(false);      setLoading(false);
+
+    }    }
+
+  };  };
+
+
+
+  const handleCreateCity = async () => {  const handleCreateCity = async () => {
+
+    if (!newCityData.city_name.trim()) {    if (!newCityData.city_name.trim()) {
+
+      toast({      toast({
+
+        title: "Nome obrigatório",        title: "Nome obrigatório",
+
+        description: "Digite o nome da cidade.",        description: "Digite o nome da cidade.",
+
+        variant: "destructive",        variant: "destructive",
+
+      });      });
+
+      return;      return;
+
+    }    }
+
+
+
+    try {    try {
+
+      setSaving(true);      setSaving(true);
+
+      const nextOrder = Math.max(...cities.map(c => c.display_order), 0) + 1;      const nextOrder = Math.max(...cities.map(c => c.display_order), 0) + 1;
+
+
+
+      const { error } = await supabase      const { error } = await supabase
+
+        .from('city_settings')        .from('city_settings')
+
+        .insert({        .insert({
+
+          city_name: newCityData.city_name.trim(),          city_name: newCityData.city_name.trim(),
+
+          clinic_name: newCityData.clinic_name.trim() || null,          clinic_name: newCityData.clinic_name.trim() || null,
+
+          address: newCityData.address.trim() || null,          address: newCityData.address.trim() || null,
+
+          map_url: newCityData.map_url.trim() || null,          map_url: newCityData.map_url.trim() || null,
+
+          is_active: true,          is_active: true,
+
+          display_order: nextOrder          display_order: nextOrder
+
+        });        });
+
+
+
+      if (error) throw error;      if (error) throw error;
+
+
+
+      toast({      toast({
+
+        title: "Cidade adicionada",        title: "Cidade adicionada",
+
+        description: "A cidade foi criada com sucesso.",        description: "A cidade foi criada com sucesso.",
+
+      });      });
+
+
+
+      setNewCityData({      setNewCityData({
+
+        city_name: "",        city_name: "",
+
+        clinic_name: "",        clinic_name: "",
+
+        address: "",        address: "",
+
+        map_url: ""        map_url: ""
+
+      });      });
+
+            
+
+      loadCities();      loadCities();
+
+    } catch (error: any) {    } catch (error: any) {
+
+      toast({      toast({
+
+        title: "Erro ao criar cidade",        title: "Erro ao criar cidade",
+
+        description: error.message,        description: error.message,
+
+        variant: "destructive",        variant: "destructive",
+
+      });      });
+
+    } finally {    } finally {
+
+      setSaving(false);      setSaving(false);
+
+    }    }
+
+  };  };
+
+
+
+  const handleDeleteCity = async (cityId: string) => {  const handleDeleteCity = async (cityId: string) => {
+
+    if (!confirm('Tem certeza que deseja excluir esta cidade? Todos os agendamentos e configurações relacionadas serão perdidos.')) {    if (!confirm('Tem certeza que deseja excluir esta cidade? Todos os agendamentos e configurações relacionadas serão perdidos.')) {
+
+      return;      return;
+
+    }    }
+
+
+
+    try {    try {
+
+      const { error } = await supabase      const { error } = await supabase
+
+        .from('city_settings')        .from('city_settings')
+
+        .delete()        .delete()
+
+        .eq('id', cityId);        .eq('id', cityId);
+
+
+
+      if (error) throw error;      if (error) throw error;
+
+
+
+      toast({      toast({
+
+        title: "Cidade removida",        title: "Cidade removida",
+
+        description: "A cidade foi excluída com sucesso.",        description: "A cidade foi excluída com sucesso.",
+
+      });      });
+
+
+
+      loadCities();      loadCities();
+
+    } catch (error: any) {    } catch (error: any) {
+
+      toast({      toast({
+
+        title: "Erro ao excluir cidade",        title: "Erro ao excluir cidade",
+
+        description: error.message,        description: error.message,
+
+        variant: "destructive",        variant: "destructive",
+
+      });      });
+
+    }    }
+
+  };  };
+
+
+
+  return (  return (
+
+    <div className="space-y-6">    <div className="space-y-6">
+
+      {/* Gerenciar Cidades */}      {/* Gerenciar Cidades */}
+
+      <Card>      <Card>
+
+        <CardHeader>        <CardHeader>
+
+          <CardTitle className="flex items-center gap-2">          <CardTitle className="flex items-center gap-2">
+
+            <MapPin className="w-5 h-5" />            <MapPin className="w-5 h-5" />
+
+            Gerenciar Cidades            Gerenciar Cidades
+
+          </CardTitle>          </CardTitle>
+
+        </CardHeader>        </CardHeader>
+
+        <CardContent className="space-y-6">        <CardContent className="space-y-6">
+
+          {/* Lista de Cidades Existentes */}          {/* Lista de Cidades Existentes */}
+
+          <div className="space-y-3">          <div className="space-y-3">
+
+            <Label className="text-base font-semibold">Cidades Cadastradas</Label>            <Label className="text-base font-semibold">Cidades Cadastradas</Label>
+
+            {loading ? (            {loading ? (
+
+              <p>Carregando cidades...</p>              <p>Carregando cidades...</p>
+
+            ) : cities.length === 0 ? (            ) : cities.length === 0 ? (
+
+              <p className="text-muted-foreground">Nenhuma cidade cadastrada ainda.</p>              <p className="text-muted-foreground">Nenhuma cidade cadastrada ainda.</p>
+
+            ) : (            ) : (
+
+              <div className="space-y-2">              <div className="space-y-2">
+
+                {cities.map((city) => (                {cities.map((city) => (
+
+                  <div key={city.id} className="flex items-center justify-between p-3 border rounded-lg">                  <div key={city.id} className="flex items-center justify-between p-3 border rounded-lg">
+
+                    <div>                    <div>
+
+                      <p className="font-medium">{city.city_name}</p>                      <p className="font-medium">{city.city_name}</p>
+
+                      {city.clinic_name && (                      {city.clinic_name && (
+
+                        <p className="text-sm text-muted-foreground">Clínica: {city.clinic_name}</p>                        <p className="text-sm text-muted-foreground">Clínica: {city.clinic_name}</p>
+
+                      )}                      )}
+
+                      {city.address && (                      {city.address && (
+
+                        <p className="text-sm text-muted-foreground">Endereço: {city.address}</p>                        <p className="text-sm text-muted-foreground">Endereço: {city.address}</p>
+
+                      )}                      )}
+
+                    </div>                    </div>
+
+                    <Button                    <Button
+
+                      variant="ghost"                      variant="ghost"
+
+                      size="sm"                      size="sm"
+
+                      onClick={() => handleDeleteCity(city.id)}                      onClick={() => handleDeleteCity(city.id)}
+
+                      className="text-destructive hover:text-destructive"                      className="text-destructive hover:text-destructive"
+
+                    >                    >
+
+                      <Trash2 className="w-4 h-4" />                      <Trash2 className="w-4 h-4" />
+
+                    </Button>                    </Button>
+
+                  </div>                  </div>
+
+                ))}                ))}
+
+              </div>              </div>
+
+            )}            )}
+
+          </div>          </div>
+
+
+
+          {/* Formulário para Nova Cidade */}          {/* Formulário para Nova Cidade */}
+
+          <div className="space-y-4 pt-4 border-t">          <div className="space-y-4 pt-4 border-t">
+
+            <Label className="text-base font-semibold">Adicionar Nova Cidade</Label>            <Label className="text-base font-semibold">Adicionar Nova Cidade</Label>
+
+                        
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              <div>              <div>
+
+                <Label htmlFor="city_name">Nome da Cidade *</Label>                <Label htmlFor="city_name">Nome da Cidade *</Label>
+
+                <Input                <Input
+
+                  id="city_name"                  id="city_name"
+
+                  value={newCityData.city_name}                  value={newCityData.city_name}
+
+                  onChange={(e) => setNewCityData(prev => ({ ...prev, city_name: e.target.value }))}                  onChange={(e) => setNewCityData(prev => ({ ...prev, city_name: e.target.value }))}
+
+                  placeholder="Ex: Manaus"                  placeholder="Ex: Manaus"
+
+                />                />
+
+              </div>              </div>
+
+
+
+              <div>              <div>
+
+                <Label htmlFor="clinic_name">Nome da Clínica</Label>                <Label htmlFor="clinic_name">Nome da Clínica</Label>
+
+                <Input                <Input
+
+                  id="clinic_name"                  id="clinic_name"
+
+                  value={newCityData.clinic_name}                  value={newCityData.clinic_name}
+
+                  onChange={(e) => setNewCityData(prev => ({ ...prev, clinic_name: e.target.value }))}                  onChange={(e) => setNewCityData(prev => ({ ...prev, clinic_name: e.target.value }))}
+
+                  placeholder="Ex: Clínica Dra Karoline - Manaus"                  placeholder="Ex: Clínica Dra Karoline - Manaus"
+
+                />                />
+
+              </div>              </div>
+
+
+
+              <div className="md:col-span-2">              <div className="md:col-span-2">
+
+                <Label htmlFor="address">Endereço</Label>                <Label htmlFor="address">Endereço</Label>
+
+                <Input                <Input
+
+                  id="address"                  id="address"
+
+                  value={newCityData.address}                  value={newCityData.address}
+
+                  onChange={(e) => setNewCityData(prev => ({ ...prev, address: e.target.value }))}                  onChange={(e) => setNewCityData(prev => ({ ...prev, address: e.target.value }))}
+
+                  placeholder="Ex: Rua das Flores, 123 - Centro"                  placeholder="Ex: Rua das Flores, 123 - Centro"
+
+                />                />
+
+              </div>              </div>
+
+
+
+              <div className="md:col-span-2">              <div className="md:col-span-2">
+
+                <Label htmlFor="map_url">Link do Google Maps</Label>                <Label htmlFor="map_url">Link do Google Maps</Label>
+
+                <Input                <Input
+
+                  id="map_url"                  id="map_url"
+
+                  value={newCityData.map_url}                  value={newCityData.map_url}
+
+                  onChange={(e) => setNewCityData(prev => ({ ...prev, map_url: e.target.value }))}                  onChange={(e) => setNewCityData(prev => ({ ...prev, map_url: e.target.value }))}
+
+                  placeholder="https://maps.google.com/..."                  placeholder="https://maps.google.com/..."
+
+                />                />
+
+              </div>              </div>
+
+            </div>            </div>
+
+
+
+            <Button onClick={handleCreateCity} disabled={saving} className="w-full">            <Button onClick={handleCreateCity} disabled={saving} className="w-full">
+
+              <Plus className="w-4 h-4 mr-2" />              <Plus className="w-4 h-4 mr-2" />
+
+              {saving ? "Adicionando..." : "Adicionar Cidade"}              {saving ? "Adicionando..." : "Adicionar Cidade"}
+
+            </Button>            </Button>
+
+          </div>          </div>
+
+        </CardContent>        </CardContent>
+
+      </Card>      </Card>
+
+
+
+      {/* Calendário Inteligente */}      {/* Calendário Inteligente */}
+
+      <SmartCityCalendar />      <SmartCityCalendar />
+
+    </div>    </div>
+
+  );  );
+
+};};
+
+
+
+export default CitySettings;export default CitySettings;
     try {
       const { data, error } = await supabase
         .from('city_settings')

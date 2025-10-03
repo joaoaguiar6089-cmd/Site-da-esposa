@@ -162,7 +162,9 @@ const NewBookingFlow = ({
         .select('*')
         .eq('city_id', formData.city_id);
 
-      if (availabilityData) {
+      console.log('Availability data for city', formData.city_id, ':', availabilityData);
+
+      if (availabilityData && availabilityData.length > 0) {
         const available = new Set<string>();
         const unavailable = new Set<string>();
         const today = new Date();
@@ -178,6 +180,8 @@ const NewBookingFlow = ({
           const start = new Date(period.date_start);
           const end = period.date_end ? new Date(period.date_end) : sixMonthsLater;
           
+          console.log('Processing period:', period.date_start, 'to', period.date_end);
+          
           for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             const dateStr = format(d, 'yyyy-MM-dd');
             available.add(dateStr);
@@ -185,8 +189,16 @@ const NewBookingFlow = ({
           }
         });
 
+        console.log('Available dates:', Array.from(available));
+        console.log('Unavailable dates:', Array.from(unavailable));
+
         setAvailableDates(available);
         setUnavailableDates(unavailable);
+      } else {
+        console.log('No availability data found for city', formData.city_id);
+        // Se não há dados de disponibilidade, limpar as restrições
+        setAvailableDates(new Set());
+        setUnavailableDates(new Set());
       }
     } catch (error) {
       console.error('Erro ao carregar disponibilidade da cidade:', error);
@@ -934,7 +946,18 @@ const NewBookingFlow = ({
                           const dateStr = format(date, 'yyyy-MM-dd');
                           const today = new Date();
                           today.setHours(0, 0, 0, 0);
-                          return date < today;
+                          
+                          // Desabilitar datas passadas
+                          if (date < today) return true;
+                          
+                          // Se há configurações de disponibilidade para a cidade
+                          if (availableDates.size > 0 || unavailableDates.size > 0) {
+                            // Desabilitar se não está na lista de datas disponíveis
+                            return !availableDates.has(dateStr);
+                          }
+                          
+                          // Se não há configurações, permitir qualquer data futura
+                          return false;
                         }}
                         modifiers={{
                           available: (date) => {

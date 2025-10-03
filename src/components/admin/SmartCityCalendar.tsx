@@ -314,35 +314,102 @@ const SmartCityCalendar = () => {
             </div>
           )}
 
-          {/* Calendário */}
-          <div className="flex justify-center">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={handleDateSelect}
-              className={cn("border rounded-md")}
-              locale={ptBR}
-              modifiers={{
-                selected: (date) => {
-                  if (selectedDate && isSameDay(date, selectedDate)) return true;
-                  if (rangeStart && isSameDay(date, rangeStart)) return true;
-                  if (rangeEnd && isSameDay(date, rangeEnd)) return true;
-                  if (rangeStart && rangeEnd && isWithinInterval(date, { start: rangeStart, end: rangeEnd })) return true;
-                  return false;
-                },
-                configured: (date) => availabilityPeriods.some(p => isDateInPeriod(date, p))
-              }}
-              modifiersClassNames={{
-                selected: "bg-primary text-primary-foreground font-bold",
-                configured: "font-bold text-white"
-              }}
-              modifiersStyles={{
-                configured: {
-                  fontWeight: 'bold',
-                  color: 'white'
-                }
-              }}
-            />
+          {/* Layout lado a lado: Calendário e Legenda */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Calendário */}
+            <div className="lg:col-span-2">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={handleDateSelect}
+                className={cn("border rounded-md w-full")}
+                locale={ptBR}
+                modifiers={{
+                  selected: (date) => {
+                    if (selectedDate && isSameDay(date, selectedDate)) return true;
+                    if (rangeStart && isSameDay(date, rangeStart)) return true;
+                    if (rangeEnd && isSameDay(date, rangeEnd)) return true;
+                    if (rangeStart && rangeEnd && isWithinInterval(date, { start: rangeStart, end: rangeEnd })) return true;
+                    return false;
+                  },
+                  ...availabilityPeriods.reduce((acc, period, index) => {
+                    acc[`city_${period.city_id}`] = (date: Date) => isDateInPeriod(date, period);
+                    return acc;
+                  }, {} as Record<string, (date: Date) => boolean>)
+                }}
+                modifiersClassNames={{
+                  selected: "bg-primary text-primary-foreground font-bold",
+                  ...availabilityPeriods.reduce((acc, period, index) => {
+                    const colorClass = period.color || CITY_COLORS[index % CITY_COLORS.length];
+                    acc[`city_${period.city_id}`] = `${colorClass} text-white font-bold hover:opacity-80`;
+                    return acc;
+                  }, {} as Record<string, string>)
+                }}
+              />
+            </div>
+
+            {/* Legenda e Lista de Configurações */}
+            <div className="space-y-4">
+              <Card className="border-2">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Legenda</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {availabilityPeriods.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nenhuma configuração ainda</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {/* Agrupar por cidade para evitar repetições na legenda */}
+                      {[...new Map(availabilityPeriods.map(period => [period.city_id, period])).values()].map((period, index) => {
+                        const colorClass = period.color || CITY_COLORS[index % CITY_COLORS.length];
+                        return (
+                          <div key={period.city_id} className="flex items-center gap-2">
+                            <div className={cn("w-4 h-4 rounded-full", colorClass)} />
+                            <span className="text-sm font-medium">{period.city_name}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Lista de configurações ativas */}
+              <Card className="border-2">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Configurações Ativas</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 max-h-96 overflow-y-auto">
+                  {availabilityPeriods.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nenhuma configuração criada</p>
+                  ) : (
+                    availabilityPeriods.map((period) => (
+                      <div key={period.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className={cn("w-4 h-4 rounded-full", period.color)} />
+                          <div>
+                            <p className="font-medium">
+                              {period.city_name} - {format(parseISO(period.date_start), 'dd/MM/yyyy')}
+                              {period.date_start !== period.date_end && period.date_end && ` até ${format(parseISO(period.date_end), 'dd/MM/yyyy')}`}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {period.start_time} às {period.end_time}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeletePeriod(period.id!)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
           {/* Formulário de configuração */}
@@ -404,66 +471,6 @@ const SmartCityCalendar = () => {
           )}
         </CardContent>
       </Card>
-
-      {/* Lista de períodos configurados */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Períodos Configurados</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {availabilityPeriods.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4">
-                Nenhum período configurado ainda.
-              </p>
-            ) : (
-              availabilityPeriods.map((period) => (
-                <div key={period.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className={cn("w-4 h-4 rounded-full", period.color)} />
-                    <div>
-                      <p className="font-medium">
-                        {period.city_name} - {format(parseISO(period.date_start), 'dd/MM/yyyy')}
-                        {period.date_start !== period.date_end && period.date_end && ` até ${format(parseISO(period.date_end), 'dd/MM/yyyy')}`}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {period.start_time} às {period.end_time}
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => period.id && handleDeletePeriod(period.id)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Legenda de cores */}
-      {cities.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Legenda de Cores</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-3">
-              {cities.map((city, index) => (
-                <div key={city.id} className="flex items-center gap-2">
-                  <div className={cn("w-4 h-4 rounded-full", CITY_COLORS[index % CITY_COLORS.length])} />
-                  <span className="text-sm font-medium">{city.city_name}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 };

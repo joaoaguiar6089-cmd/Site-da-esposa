@@ -240,7 +240,7 @@ const SmartCityCalendar = () => {
 
   const isDateInPeriod = (date: Date, period: AvailabilityPeriod) => {
     const start = parseISO(period.date_start);
-    const end = parseISO(period.date_end);
+    const end = period.date_end ? parseISO(period.date_end) : start;
     return isWithinInterval(date, { start, end }) || isSameDay(date, start) || isSameDay(date, end);
   };
 
@@ -424,7 +424,7 @@ const SmartCityCalendar = () => {
                     <div>
                       <p className="font-medium">
                         {period.city_name} - {format(parseISO(period.date_start), 'dd/MM/yyyy')}
-                        {period.date_start !== period.date_end && ` até ${format(parseISO(period.date_end), 'dd/MM/yyyy')}`}
+                        {period.date_start !== period.date_end && period.date_end && ` até ${format(parseISO(period.date_end), 'dd/MM/yyyy')}`}
                       </p>
                       <p className="text-sm text-muted-foreground">
                         {period.start_time} às {period.end_time}

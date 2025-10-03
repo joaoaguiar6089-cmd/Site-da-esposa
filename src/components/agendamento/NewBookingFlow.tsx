@@ -100,7 +100,7 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
     }
   }, [formData.appointment_date, formData.city_id]);
 
-  // Mostrar especifica├º├Áes automaticamente quando procedimento ├® selecionado
+  // Mostrar especificações automaticamente quando procedimento é selecionado
   useEffect(() => {
     const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
     if (selectedProcedure?.requires_specifications) {
@@ -133,7 +133,7 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
         setWhatsappNumber(whatsappData.setting_value);
       }
     } catch (error) {
-      console.error('Erro ao carregar configura├º├Áes:', error);
+      console.error('Erro ao carregar configurações:', error);
     }
   };
 
@@ -152,12 +152,12 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
         const today = new Date();
         const sixMonthsLater = addDays(today, 180);
 
-        // Marcar todos os dias como indispon├¡veis por padr├úo
+        // Marcar todos os dias como indisponíveis por padrão
         for (let d = new Date(today); d <= sixMonthsLater; d.setDate(d.getDate() + 1)) {
           unavailable.add(format(d, 'yyyy-MM-dd'));
         }
 
-        // Marcar per├¡odos dispon├¡veis
+        // Marcar períodos disponíveis
         availabilityData.forEach(period => {
           const start = new Date(period.date_start);
           const end = period.date_end ? new Date(period.date_end) : sixMonthsLater;
@@ -329,7 +329,7 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
 
       setAvailableTimes(available);
     } catch (error) {
-      console.error('Erro ao carregar hor├írios:', error);
+      console.error('Erro ao carregar horários:', error);
       setAvailableTimes([]);
     } finally {
       setLoadingTimes(false);
@@ -396,18 +396,18 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
 
       setAppointmentDetails(appointment);
       
-      // Enviar notifica├º├Áes
+      // Enviar notificações
       try {
         await sendWhatsAppNotification(client, appointment, procedure, city);
         await sendOwnerNotification(client, appointment, procedure, city);
         await sendAdminNotification(client, appointment, procedure, city);
       } catch (notificationError) {
-        console.error('Erro ao enviar notifica├º├Áes:', notificationError);
+        console.error('Erro ao enviar notificações:', notificationError);
       }
 
       toast({
         title: "Agendamento realizado!",
-        description: "Seu agendamento foi criado com sucesso. Uma confirma├º├úo ser├í enviada via WhatsApp.",
+        description: "Seu agendamento foi criado com sucesso. Uma confirmação será enviada via WhatsApp.",
       });
 
       setCurrentView('confirmation');
@@ -468,7 +468,7 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
         }
       });
     } catch (error) {
-      console.error('Erro ao notificar propriet├íria:', error);
+      console.error('Erro ao notificar proprietária:', error);
     }
   };
 
@@ -496,8 +496,8 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
     
     if (!formData.procedure_id || !formData.appointment_date || !formData.appointment_time || !formData.city_id) {
       toast({
-        title: "Campos obrigat├│rios",
-        description: "Por favor, preencha todos os campos obrigat├│rios (procedimento, cidade, data e hor├írio).",
+        title: "Campos obrigatórios",
+        description: "Por favor, preencha todos os campos obrigatórios (procedimento, cidade, data e horário).",
         variant: "destructive",
       });
       return;
@@ -506,8 +506,8 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
     const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
     if (selectedProcedure?.requires_specifications && selectedSpecifications.length === 0) {
       toast({
-        title: "Especifica├º├úo obrigat├│ria",
-        description: "Por favor, selecione pelo menos uma especifica├º├úo para este procedimento.",
+        title: "Especificação obrigatória",
+        description: "Por favor, selecione pelo menos uma especificação para este procedimento.",
         variant: "destructive",
       });
       return;
@@ -574,9 +574,9 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                   <div className="flex items-start gap-3">
                     <CalendarIcon className="w-5 h-5 text-primary mt-0.5" />
                     <div>
-                      <p className="text-sm text-muted-foreground">Data e Hor├írio</p>
+                      <p className="text-sm text-muted-foreground">Data e Horário</p>
                       <p className="font-semibold text-lg">
-                        {format(parseISO(appointmentDetails.appointment_date), "dd/MM/yyyy", { locale: ptBR })} ├ás {appointmentDetails.appointment_time}
+                        {format(parseISO(appointmentDetails.appointment_date), "dd/MM/yyyy", { locale: ptBR })} às {appointmentDetails.appointment_time}
                       </p>
                     </div>
                   </div>
@@ -594,7 +594,7 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                       </div>
                     );
                   })()}
-                  {/* Endere├ºo da cl├¡nica conforme cidade do agendamento */}
+                  {/* Endereço da clínica conforme cidade do agendamento */}
                   {(() => {
                     const cityRec = cities.find(c => c.id === appointmentDetails?.city_id);
                     const clinicName = cityRec?.clinic_name;
@@ -691,7 +691,7 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                     className="inline-flex items-center gap-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105"
                   >
                     <MessageCircle className="w-5 h-5" />
-                    Tire suas d├║vidas no WhatsApp
+                    Tire suas dúvidas no WhatsApp
                   </a>
                 </div>
               )}
@@ -727,30 +727,30 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                   </Select>
                 </div>
 
-                {/* Box de Descri├º├úo do Procedimento Selecionado */}
+                {/* Box de Descrição do Procedimento Selecionado */}
                 {selectedProcedure && (
                   <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent shadow-lg">
                     <CardContent className="p-6">
-                      <div className="flex items-start gap-4">
+                      <div className="flex items-start gap-4 min-w-0">
                         <div className="p-3 bg-gradient-to-br from-primary to-primary/80 rounded-full shadow-md flex-shrink-0">
                           <Sparkles className="h-6 w-6 text-primary-foreground" />
                         </div>
-                        <div className="flex-1 space-y-3">
+                        <div className="flex-1 min-w-0 space-y-3">
                           <h3 className="text-xl font-bold text-foreground">{selectedProcedure.name}</h3>
                           {selectedProcedure.description && (
                             <p className="text-sm text-muted-foreground leading-relaxed overflow-hidden break-words [overflow-wrap:anywhere] line-clamp-4">
                               {selectedProcedure.description}
                             </p>
                           )}
-                          <div className="flex items-center gap-6 pt-2">
+                          <div className="flex items-center flex-wrap gap-4 pt-2">
                             <div className="flex items-center gap-2">
-                              <div className="h-1.5 w-1.5 rounded-full bg-primary"></div>
-                              <span className="text-sm font-medium">Dura├º├úo:</span>
+                              <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></div>
+                              <span className="text-sm font-medium whitespace-nowrap">Duração:</span>
                               <span className="text-sm text-muted-foreground">{selectedProcedure.duration}min</span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <div className="h-1.5 w-1.5 rounded-full bg-primary"></div>
-                              <span className="text-sm font-medium">Valor:</span>
+                              <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></div>
+                              <span className="text-sm font-medium whitespace-nowrap">Valor:</span>
                               <span className="text-sm text-primary font-bold">{currency(selectedProcedure.price || 0)}</span>
                             </div>
                           </div>
@@ -760,7 +760,7 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                   </Card>
                 )}
 
-                {/* Especifica├º├Áes */}
+                {/* Especificações */}
                 {showSpecifications && (
                   <div className="space-y-3">
                     <ProcedureSpecificationSelector
@@ -799,7 +799,7 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                   </Select>
                 </div>
 
-                {/* Data com Calend├írio */}
+                {/* Data com Calendário */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <CalendarIcon className="w-4 h-4 text-primary" />

@@ -91,12 +91,18 @@ const SmartCityCalendar = () => {
 
       if (error) throw error;
       
-      const periodsWithColors = (data || []).map((period, index) => ({
-        ...period,
-        city_name: period.city_settings?.city_name,
-        color: CITY_COLORS[cities.findIndex(c => c.id === period.city_id) % CITY_COLORS.length]
-      }));
+      const periodsWithColors = (data || []).map((period, index) => {
+        const cityIndex = cities.findIndex(c => c.id === period.city_id);
+        const color = CITY_COLORS[cityIndex >= 0 ? cityIndex % CITY_COLORS.length : index % CITY_COLORS.length];
+        
+        return {
+          ...period,
+          city_name: period.city_settings?.city_name,
+          color: color
+        };
+      });
       
+      console.log('📅 Períodos carregados:', periodsWithColors); // Debug
       setAvailabilityPeriods(periodsWithColors);
     } catch (error) {
       console.error('Erro ao carregar períodos:', error);
@@ -239,9 +245,12 @@ const SmartCityCalendar = () => {
   };
 
   const isDateInPeriod = (date: Date, period: AvailabilityPeriod) => {
-    const start = parseISO(period.date_start);
-    const end = period.date_end ? parseISO(period.date_end) : start;
-    return isWithinInterval(date, { start, end }) || isSameDay(date, start) || isSameDay(date, end);
+    // Usar format para converter a data para string e então comparar
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const startStr = period.date_start;
+    const endStr = period.date_end || period.date_start;
+    
+    return dateStr >= startStr && dateStr <= endStr;
   };
 
   const getDateColor = (date: Date) => {
@@ -332,18 +341,20 @@ const SmartCityCalendar = () => {
                     if (rangeStart && rangeEnd && isWithinInterval(date, { start: rangeStart, end: rangeEnd })) return true;
                     return false;
                   },
-                  ...availabilityPeriods.reduce((acc, period, index) => {
-                    acc[`city_${period.city_id}`] = (date: Date) => isDateInPeriod(date, period);
-                    return acc;
-                  }, {} as Record<string, (date: Date) => boolean>)
+                  // Modifiers para cada cidade
+                  manaus: (date: Date) => {
+                    const manausPeriods = availabilityPeriods.filter(p => p.city_name === 'Manaus');
+                    return manausPeriods.some(period => isDateInPeriod(date, period));
+                  },
+                  tefe: (date: Date) => {
+                    const tefePeriods = availabilityPeriods.filter(p => p.city_name === 'Tefé');
+                    return tefePeriods.some(period => isDateInPeriod(date, period));
+                  }
                 }}
                 modifiersClassNames={{
                   selected: "bg-primary text-primary-foreground font-bold",
-                  ...availabilityPeriods.reduce((acc, period, index) => {
-                    const colorClass = period.color || CITY_COLORS[index % CITY_COLORS.length];
-                    acc[`city_${period.city_id}`] = `${colorClass} text-white font-bold hover:opacity-80`;
-                    return acc;
-                  }, {} as Record<string, string>)
+                  manaus: "bg-blue-500 text-white font-bold hover:opacity-80",
+                  tefe: "bg-green-500 text-white font-bold hover:opacity-80"
                 }}
               />
             </div>

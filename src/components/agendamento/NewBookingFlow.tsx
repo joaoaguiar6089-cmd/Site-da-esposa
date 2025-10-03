@@ -178,9 +178,16 @@ const NewBookingFlow = ({
         // Marcar períodos disponíveis
         availabilityData.forEach(period => {
           const start = new Date(period.date_start);
-          const end = period.date_end ? new Date(period.date_end) : sixMonthsLater;
+          let end;
           
-          console.log('Processing period:', period.date_start, 'to', period.date_end);
+          if (period.date_end) {
+            end = new Date(period.date_end);
+          } else {
+            // Se não há data de fim, considerar apenas o dia específico (date_start)
+            end = new Date(period.date_start);
+          }
+          
+          console.log('Processing period:', period.date_start, 'to', period.date_end || 'same day');
           
           for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             const dateStr = format(d, 'yyyy-MM-dd');

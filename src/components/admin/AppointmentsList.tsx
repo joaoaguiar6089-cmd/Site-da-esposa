@@ -88,10 +88,7 @@ const AppointmentsList = () => {
           city_id,
           notes,
           city_settings:city_settings (
-            city_name,
-            clinic_name,
-            address,
-            map_url
+            city_name
           ),
           clients (
             id,
@@ -316,12 +313,15 @@ Tefé-AM
           *,
           clients (*),
           procedures (name, price, duration),
-          city_settings (city_name, clinic_name, address, map_url)
+          city_settings (city_name)
         `)
         .eq('id', id)
         .single();
 
       if (fetchError) throw fetchError;
+
+      const wasConfirmed = appointmentData?.status === 'confirmado';
+      const isCanceling = newStatus === 'cancelado';
 
       const { error } = await supabase
         .from('appointments')

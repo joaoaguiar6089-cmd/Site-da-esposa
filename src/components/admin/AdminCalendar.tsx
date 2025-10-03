@@ -70,10 +70,7 @@ const AdminCalendar = () => {
           city_id,
           notes,
           city_settings:city_settings (
-            city_name,
-            clinic_name,
-            address,
-            map_url
+            city_name
           ),
           clients (
             id,
@@ -174,7 +171,7 @@ const AdminCalendar = () => {
           *,
           clients (*),
           procedures (name, price, duration),
-          city_settings (city_name, clinic_name, address, map_url)
+          city_settings (city_name)
         `)
         .eq('id', id)
         .single();

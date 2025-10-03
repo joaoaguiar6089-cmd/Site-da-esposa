@@ -606,13 +606,13 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                         <MapPin className="w-5 h-5 text-primary mt-0.5" />
                         <div>
                           <p className="text-sm text-muted-foreground">Unidade</p>
-                          <p className="font-semibold">{clinicName ? `${clinicName} ÔÇö ${cityRec?.city_name || cityName}` : cityRec?.city_name || cityName}</p>
+                          <p className="font-semibold">{clinicName ? `${clinicName} - ${cityRec?.city_name || cityName}` : cityRec?.city_name || cityName}</p>
                           {address && (
                             <p className="text-sm text-foreground mt-1">
                               {address}
                               {mapUrl ? (
                                 <>
-                                  {" ÔÇó "}
+                                  {" • "}
                                   <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="underline">Ver no mapa</a>
                                 </>
                               ) : null}
@@ -718,7 +718,7 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                           <div className="flex flex-col items-start">
                             <span className="font-medium">{procedure.name}</span>
                             <span className="text-xs text-muted-foreground">
-                              {procedure.duration}min {procedure.price && `ÔÇó ${currency(procedure.price)}`}
+                              {procedure.duration}min {procedure.price && `• ${currency(procedure.price)}`}
                             </span>
                           </div>
                         </SelectItem>

@@ -43,6 +43,10 @@ interface NewBookingFlowProps {
   onBack: () => void;
   onSuccess: () => void;
   preSelectedProcedureId?: string;
+  adminMode?: boolean;
+  initialClient?: Client | null;
+  sendNotification?: boolean;
+  selectedDate?: Date;
 }
 
 type ViewMode = 'form' | 'phone' | 'cadastro' | 'confirmation';
@@ -50,8 +54,16 @@ type ViewMode = 'form' | 'phone' | 'cadastro' | 'confirmation';
 const currency = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0);
 
-const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookingFlowProps) => {
-  const [currentView, setCurrentView] = useState<ViewMode>('form');
+const NewBookingFlow = ({ 
+  onBack, 
+  onSuccess, 
+  preSelectedProcedureId,
+  adminMode = false,
+  initialClient = null,
+  sendNotification = true,
+  selectedDate
+}: NewBookingFlowProps) => {
+  const [currentView, setCurrentView] = useState<ViewMode>(adminMode ? 'form' : 'phone');
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [cities, setCities] = useState<{
     id: string,
@@ -62,7 +74,7 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
   }[]>([]);
   const [formData, setFormData] = useState({
     procedure_id: preSelectedProcedureId || "",
-    appointment_date: "",
+    appointment_date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : "",
     appointment_time: "",
     notes: "",
     city_id: "",
@@ -86,7 +98,10 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
   useEffect(() => {
     loadData();
     loadSiteSettings();
-  }, []);
+    if (adminMode && initialClient) {
+      setSelectedClient(initialClient);
+    }
+  }, [adminMode, initialClient]);
 
   useEffect(() => {
     if (formData.city_id) {
@@ -491,6 +506,70 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
     }
   };
 
+  const handleBookingSubmit = async () => {
+    if (!selectedClient) return;
+
+    try {
+      setLoading(true);
+
+      const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
+      const selectedCity = cities.find(c => c.id === formData.city_id);
+
+      // Criar agendamento
+      const { data: appointment, error: appointmentError } = await supabase
+        .from('appointments')
+        .insert({
+          client_id: selectedClient.id,
+          procedure_id: formData.procedure_id,
+          professional_id: null,
+          appointment_date: formData.appointment_date,
+          appointment_time: formData.appointment_time,
+          notes: formData.notes.trim() || null,
+          status: 'agendado',
+          city_id: formData.city_id || null,
+        })
+        .select()
+        .single();
+
+      if (appointmentError) throw appointmentError;
+
+      // Salvar especificações se houver
+      if (selectedSpecifications.length > 0) {
+        const { error: specificationsError } = await supabase
+          .from('appointment_specifications')
+          .insert(
+            selectedSpecifications.map(spec => ({
+              appointment_id: appointment.id,
+              specification_id: spec.id,
+              specification_name: spec.name,
+              specification_price: spec.price || 0
+            }))
+          );
+
+        if (specificationsError) throw specificationsError;
+      }
+
+      // Notificar se necessário
+      if (sendNotification) {
+        await sendWhatsAppNotification(selectedClient, appointment, selectedProcedure, selectedCity);
+        await sendOwnerNotification(selectedClient, appointment, selectedProcedure, selectedCity);
+        await sendAdminNotification(selectedClient, appointment, selectedProcedure, selectedCity);
+      }
+
+      setAppointmentDetails(appointment);
+      setCurrentView('confirmation');
+      onSuccess();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao criar agendamento",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -513,7 +592,12 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
       return;
     }
 
-    setCurrentView('phone');
+    if (adminMode && selectedClient) {
+      // No admin mode, bypass phone validation and go straight to booking
+      handleBookingSubmit();
+    } else {
+      setCurrentView('phone');
+    }
   };
 
   const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
@@ -631,19 +715,30 @@ const NewBookingFlow = ({ onBack, onSuccess, preSelectedProcedureId }: NewBookin
                 </div>
               )}
               <div className="space-y-3">
-                <Button
-                  onClick={() => window.location.href = '/area-cliente'}
-                  variant="outline"
-                  className="w-full h-12 text-base font-medium"
-                >
-                  Ver Meus Agendamentos
-                </Button>
-                <Button
-                  onClick={onSuccess}
-                  className="w-full h-12 text-base font-medium bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
-                >
-                  Concluir
-                </Button>
+                {adminMode ? (
+                  <Button
+                    onClick={onSuccess}
+                    className="w-full h-12 text-base font-medium bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                  >
+                    Voltar para o Calendário
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      onClick={() => window.location.href = '/area-cliente'}
+                      variant="outline"
+                      className="w-full h-12 text-base font-medium"
+                    >
+                      Ver Meus Agendamentos
+                    </Button>
+                    <Button
+                      onClick={onSuccess}
+                      className="w-full h-12 text-base font-medium bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                    >
+                      Concluir
+                    </Button>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>

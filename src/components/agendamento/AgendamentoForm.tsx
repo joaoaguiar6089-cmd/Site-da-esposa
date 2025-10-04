@@ -632,21 +632,52 @@ const AgendamentoForm = ({ client: rawClient, onAppointmentCreated, onBack, edit
         // Enviar notificação WhatsApp para cliente
         if (!editingId && (!adminMode || sendNotification)) { // Cliente sempre recebe, admin só se marcar opção
           try {
-            // Buscar template de confirmação
+            console.log('=== ENVIO WHATSAPP - AgendamentoForm ===');
+            
+            // Buscar template de agendamento (mesmo usado no NewBookingFlow)
             const { data: template } = await supabase
               .from('whatsapp_templates')
               .select('template_content')
-              .eq('template_type', 'appointment_confirmation')
+              .eq('template_type', 'agendamento_cliente')
               .single();
 
+            console.log('Template encontrado:', template);
+
             if (template) {
-              const formattedDate = formatDateToBrazil(formData.appointment_date);
-              const message = template.template_content
-                .replace('{cliente_nome}', `${client.nome} ${client.sobrenome}`)
-                .replace('{data}', formattedDate)
-                .replace('{horario}', formData.appointment_time)
-                .replace('{procedimento}', selectedProc?.name || '')
-                .replace('{profissional}', 'Dra. Karoline');
+              // Buscar dados da cidade
+              const { data: cityData } = await supabase
+                .from('city_settings')
+                .select('city_name')
+                .eq('id', selectedCity?.id)
+                .single();
+
+              const notes = formData.notes ? `\n📝 Observações: ${formData.notes}` : '';
+              const cityName = cityData?.city_name || selectedCity?.city_name || '';
+              const clinicLocation = `📍 Clínica Dra. Karoline Ferreira — ${cityName}`;
+
+              // Preparar variáveis para substituição
+              const variables = {
+                clientName: client.nome,
+                appointmentDate: formatDateToBrazil(formData.appointment_date),
+                appointmentTime: formData.appointment_time,
+                procedureName: selectedProc?.name || '',
+                notes: notes,
+                clinicLocation: clinicLocation,
+                cityName: cityName,
+                clinicName: 'Clínica Dra. Karoline Ferreira',
+                specifications: selectedSpecifications.map(spec => spec.name).join(', ') || ''
+              };
+
+              console.log('Variáveis preparadas:', variables);
+
+              // Substituir todas as variáveis no template
+              let message = template.template_content;
+              Object.entries(variables).forEach(([key, value]) => {
+                const regex = new RegExp(`\\{${key}\\}`, 'g');
+                message = message.replace(regex, value || '');
+              });
+
+              console.log('Mensagem final:', message);
 
               await supabase.functions.invoke('send-whatsapp', {
                 body: {

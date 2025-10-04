@@ -391,26 +391,67 @@ Tefé-AM
 
       if (newStatus === 'confirmado' && appointmentData) {
         try {
-          const { data: templateData } = await supabase.functions.invoke('get-whatsapp-template', {
-            body: {
-              templateType: 'confirmacao_cliente',
-              cityId: appointmentData.city_id,
-              variables: {
-                clientName: appointmentData.clients.nome,
-                appointmentDate: formatDateToBrazil(appointmentData.appointment_date),
-                appointmentTime: appointmentData.appointment_time,
-                procedureName: appointmentData.procedures.name,
-                notes: appointmentData.notes ? `\nObservações: ${appointmentData.notes}` : '',
-              },
-            },
-          });
+          console.log('=== CONFIRMAÇÃO DE STATUS ===');
+          
+          // Buscar template do banco (mesmo usado nos outros formulários)
+          const { data: templateData, error: templateError } = await supabase
+            .from('whatsapp_templates')
+            .select('template_content')
+            .eq('template_type', 'agendamento_cliente')
+            .single();
 
-          const message = buildFallbackMessage(
-            '🩺 *Agendamento Confirmado*',
-            'Seu agendamento foi confirmado:',
-            '✨ Aguardamos você!',
-            templateData as any,
-          );
+          console.log('Template encontrado:', templateData);
+          console.log('Template error:', templateError);
+
+          let message = '';
+          
+          if (templateData?.template_content) {
+            // Usar o template do banco com substituição de variáveis
+            const notes = appointmentData.notes ? `\n📝 Observações: ${appointmentData.notes}` : '';
+            const cityName = appointmentData.city_settings?.city_name || '';
+            const clinicLocation = `📍 Clínica Dra. Karoline Ferreira — ${cityName}`;
+
+            // Preparar variáveis para substituição
+            const variables = {
+              clientName: appointmentData.clients.nome,
+              appointmentDate: formatDateToBrazil(appointmentData.appointment_date),
+              appointmentTime: appointmentData.appointment_time,
+              procedureName: appointmentData.procedures.name,
+              notes: notes,
+              clinicLocation: clinicLocation,
+              cityName: cityName,
+              clinicName: 'Clínica Dra. Karoline Ferreira',
+              specifications: ''
+            };
+
+            console.log('Variáveis preparadas:', variables);
+
+            // Substituir todas as variáveis no template
+            message = templateData.template_content;
+            Object.entries(variables).forEach(([key, value]) => {
+              const regex = new RegExp(`\\{${key}\\}`, 'g');
+              message = message.replace(regex, value || '');
+            });
+          } else {
+            // Fallback caso não encontre o template
+            const notes = appointmentData.notes ? `\n📝 Observações: ${appointmentData.notes}` : '';
+            const cityName = appointmentData.city_settings?.city_name || '';
+            const clinicLocation = `📍 Clínica Dra. Karoline Ferreira — ${cityName}`;
+            
+            message = `🩺 *Agendamento Confirmado*
+
+Olá ${appointmentData.clients.nome}!
+
+📅 Data: ${formatDateToBrazil(appointmentData.appointment_date)}
+⏰ Horário: ${appointmentData.appointment_time}
+💉 Procedimento: ${appointmentData.procedures.name}${notes}
+
+${clinicLocation}
+
+✨ Aguardamos você!`;
+          }
+
+          console.log('Mensagem final:', message);
 
           await supabase.functions.invoke('send-whatsapp', {
             body: {

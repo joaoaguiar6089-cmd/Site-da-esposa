@@ -452,40 +452,34 @@ const NewBookingFlow = ({
 
   const sendWhatsAppNotification = async (client: Client, appointment: any, procedure: any, city: any) => {
     try {
-      const notes = appointment.notes ? `\n📝 Observações: ${appointment.notes}` : '';
+      console.log('=== INÍCIO WHATSAPP NOTIFICATION ===');
+      console.log('Client:', client);
+      console.log('Appointment:', appointment);
+      console.log('Procedure:', procedure);
+      console.log('City:', city);
 
-      // Buscar dados da cidade para montar o endereço
-      const { data: cityData } = await supabase
+      const notes = appointment.notes ? `\n📝 Observações: ${appointment.notes}` : '';
+      console.log('Notes formatadas:', notes);
+
+      // Buscar dados da cidade
+      console.log('Buscando dados da cidade com ID:', appointment.city_id);
+      const { data: cityData, error: cityError } = await supabase
         .from('city_settings')
-        .select('city_name, clinic_name, address, map_url')
+        .select('city_name')
         .eq('id', appointment.city_id)
         .single();
 
-      const formatClinicLocation = (cityData: any) => {
-        if (!cityData) return '';
-        
-        const clinicName = cityData.clinic_name || 'Clínica Dra. Karoline Ferreira';
-        const cityName = cityData.city_name || '';
-        const address = cityData.address || '';
-        const mapUrl = cityData.map_url || '';
+      console.log('City data:', cityData);
+      console.log('City error:', cityError);
 
-        let location = `📍 **${clinicName}`;
-        if (cityName) location += ` — ${cityName}`;
-        location += '**';
-        
-        if (address) {
-          location += `\n${address}`;
-          if (mapUrl) {
-            location += `\nVer no mapa → ${mapUrl}`;
-          }
-        }
-        
-        return location;
-      };
-
-      const clinicLocation = formatClinicLocation(cityData);
+      // Formatação simples do local da clínica usando dados disponíveis
+      const cityName = cityData?.city_name || city?.city_name || '';
+      const clinicLocation = `📍 Clínica Dra. Karoline Ferreira — ${cityName}`;
+      
+      console.log('Clinic location formatada:', clinicLocation);
 
       // Buscar template do banco de dados
+      console.log('Buscando template do banco...');
       const { data: templateData, error: templateError } = await supabase
         .from('whatsapp_templates')
         .select('template_content')
@@ -493,6 +487,7 @@ const NewBookingFlow = ({
         .single();
 
       console.log('Template encontrado:', templateData);
+      console.log('Template error:', templateError);
 
       // Preparar variáveis para substituição
       const variables = {
@@ -502,11 +497,12 @@ const NewBookingFlow = ({
         procedureName: procedure?.name || '',
         notes: notes,
         clinicLocation: clinicLocation,
-        cityName: cityData?.city_name || '',
-        clinicName: cityData?.clinic_name || 'Clínica Dra. Karoline Ferreira',
-        clinicAddress: cityData?.address || '',
+        cityName: cityName,
+        clinicName: 'Clínica Dra. Karoline Ferreira',
         specifications: appointment.specifications || ''
       };
+
+      console.log('Variáveis preparadas:', variables);
 
       // Processar template ou usar fallback
       let message = templateData?.template_content || `🩺 *Agendamento Confirmado*
@@ -521,15 +517,22 @@ Olá {clientName}!
 
 ✨ Aguardamos você!`;
 
+      console.log('Template inicial:', message);
+
       // Substituir todas as variáveis
       Object.entries(variables).forEach(([key, value]) => {
         const regex = new RegExp(`\\{${key}\\}`, 'g');
+        const oldMessage = message;
         message = message.replace(regex, value || '');
+        if (oldMessage !== message) {
+          console.log(`Substituiu {${key}} por:`, value);
+        }
       });
 
-      console.log('Mensagem processada:', message);
+      console.log('Mensagem final processada:', message);
 
       // Enviar WhatsApp
+      console.log('Enviando WhatsApp para:', client.celular);
       const { error: sendError } = await supabase.functions.invoke('send-whatsapp', {
         body: {
           to: client.celular,
@@ -542,6 +545,8 @@ Olá {clientName}!
       } else {
         console.log('WhatsApp enviado com sucesso');
       }
+
+      console.log('=== FIM WHATSAPP NOTIFICATION ===');
 
     } catch (err) {
       console.error('Erro ao enviar WhatsApp:', err);

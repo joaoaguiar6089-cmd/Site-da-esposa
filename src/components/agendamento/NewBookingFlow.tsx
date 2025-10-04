@@ -91,6 +91,7 @@ const NewBookingFlow = ({
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [availableDates, setAvailableDates] = useState<Set<string>>(new Set());
   const [unavailableDates, setUnavailableDates] = useState<Set<string>>(new Set());
+  const [availabilityWarning, setAvailabilityWarning] = useState<string>('');
   const [logoUrl, setLogoUrl] = useState<string>('');
   const [whatsappNumber, setWhatsappNumber] = useState<string>('');
   const { toast } = useToast();
@@ -157,50 +158,77 @@ const NewBookingFlow = ({
     if (!formData.city_id) return;
 
     try {
-      const { data: availabilityData } = await supabase
-        .from('city_availability')
-        .select('*')
-        .eq('city_id', formData.city_id);
-
-      if (availabilityData && availabilityData.length > 0) {
-        const available = new Set<string>();
-        const unavailable = new Set<string>();
-        const today = new Date();
-        const sixMonthsLater = addDays(today, 180);
-
-        // Marcar todos os dias como indisponíveis por padrão
-        for (let d = new Date(today); d <= sixMonthsLater; d.setDate(d.getDate() + 1)) {
-          unavailable.add(format(d, 'yyyy-MM-dd'));
-        }
-
-        // Marcar períodos disponíveis
-        availabilityData.forEach(period => {
-          const start = new Date(period.date_start);
-          let end;
-          
-          if (period.date_end) {
-            end = new Date(period.date_end);
-          } else {
-            // Se não há data de fim, considerar apenas o dia específico (date_start)
-            end = new Date(period.date_start);
-          }
-          
-          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            const dateStr = format(d, 'yyyy-MM-dd');
-            available.add(dateStr);
-            unavailable.delete(dateStr);
-          }
-        });
-
-        setAvailableDates(available);
-        setUnavailableDates(unavailable);
-      } else {
-        // Se não há dados de disponibilidade, limpar as restrições
-        setAvailableDates(new Set());
-        setUnavailableDates(new Set());
-      }
+      // Novo sistema flexível: não bloqueamos mais datas
+      // Apenas limpamos as restrições e permitimos todos os dias
+      setAvailableDates(new Set());
+      setUnavailableDates(new Set());
+      
+      // Nota: O sistema de avisos será implementado na função de seleção de data
+      // quando o usuário selecionar uma data onde a Dra. está em outra cidade
     } catch (error) {
       console.error('Erro ao carregar disponibilidade da cidade:', error);
+    }
+  };
+
+  const checkDateAvailability = async (date: string, cityId: string) => {
+    try {
+      // Verificar se a doutora estará disponível na cidade selecionada
+      const { data: cityAvailability, error: availabilityError } = await supabase
+        .from('city_availability')
+        .select('*')
+        .eq('city_id', cityId)
+        .or(`and(date_start.lte.${date},date_end.gte.${date}),and(date_start.eq.${date},date_end.is.null)`);
+
+      if (availabilityError) {
+        console.error('Erro ao verificar disponibilidade:', availabilityError);
+        setAvailabilityWarning('');
+        return;
+      }
+
+      if (!cityAvailability || cityAvailability.length === 0) {
+        // Verificar se ela estará em outra cidade
+        const { data: otherCityAvailability, error: otherError } = await supabase
+          .from('city_availability')
+          .select(`
+            *,
+            city_settings (
+              city_name
+            )
+          `)
+          .or(`and(date_start.lte.${date},date_end.gte.${date}),and(date_start.eq.${date},date_end.is.null)`)
+          .neq('city_id', cityId);
+
+        if (otherError) {
+          console.error('Erro ao verificar outras cidades:', otherError);
+          setAvailabilityWarning('A Dra. Karoline não estará disponível nesta data.');
+          return;
+        }
+
+        if (otherCityAvailability && otherCityAvailability.length > 0) {
+          const otherCity = otherCityAvailability[0];
+          const cityName = (otherCity.city_settings as any)?.city_name || 'outra cidade';
+          
+          // Buscar mensagem configurável
+          const { data: messageSetting } = await supabase
+            .from('site_settings')
+            .select('setting_value')
+            .eq('setting_key', 'availability_message')
+            .single();
+
+          const defaultMessage = 'A Dra. Karoline estará em {cidade} nesta data.';
+          const messageTemplate = messageSetting?.setting_value || defaultMessage;
+          const finalMessage = messageTemplate.replace('{cidade}', cityName);
+          
+          setAvailabilityWarning(finalMessage);
+        } else {
+          setAvailabilityWarning('A Dra. Karoline não estará disponível nesta data.');
+        }
+      } else {
+        setAvailabilityWarning('');
+      }
+    } catch (error) {
+      console.error('Erro ao verificar disponibilidade da data:', error);
+      setAvailabilityWarning('');
     }
   };
 
@@ -1010,54 +1038,38 @@ Olá {clientName}!
                         selected={formData.appointment_date ? parseISO(formData.appointment_date) : undefined}
                         onSelect={(date) => {
                           if (date) {
-                            setFormData(prev => ({ ...prev, appointment_date: format(date, 'yyyy-MM-dd') }));
+                            const selectedDate = format(date, 'yyyy-MM-dd');
+                            setFormData(prev => ({ ...prev, appointment_date: selectedDate }));
+                            
+                            // Verificar disponibilidade para mostrar aviso
+                            if (formData.city_id) {
+                              checkDateAvailability(selectedDate, formData.city_id);
+                            }
+                            
                             setCalendarOpen(false);
                           }
                         }}
                         disabled={(date) => {
-                          const dateStr = format(date, 'yyyy-MM-dd');
                           const today = new Date();
                           today.setHours(0, 0, 0, 0);
                           
-                          // Desabilitar datas passadas
-                          if (date < today) return true;
-                          
-                          // Se há configurações de disponibilidade para a cidade
-                          if (availableDates.size > 0 || unavailableDates.size > 0) {
-                            // Desabilitar se não está na lista de datas disponíveis
-                            return !availableDates.has(dateStr);
-                          }
-                          
-                          // Se não há configurações, permitir qualquer data futura
-                          return false;
-                        }}
-                        modifiers={{
-                          available: (date) => {
-                            const dateStr = format(date, 'yyyy-MM-dd');
-                            return availableDates.has(dateStr);
-                          },
-                          unavailable: (date) => {
-                            const dateStr = format(date, 'yyyy-MM-dd');
-                            return unavailableDates.has(dateStr);
-                          },
-                        }}
-                        modifiersStyles={{
-                          available: {
-                            backgroundColor: 'hsl(var(--success) / 0.2)',
-                            color: 'hsl(var(--success))',
-                            fontWeight: 'bold',
-                          },
-                          unavailable: {
-                            backgroundColor: 'hsl(var(--destructive) / 0.1)',
-                            color: 'hsl(var(--destructive) / 0.5)',
-                            textDecoration: 'line-through',
-                          },
+                          // Apenas desabilitar datas passadas
+                          return date < today;
                         }}
                         locale={ptBR}
                         className="rounded-md border"
                       />
                     </PopoverContent>
                   </Popover>
+                  
+                  {/* Aviso de disponibilidade */}
+                  {availabilityWarning && (
+                    <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-sm text-yellow-800">
+                        ⚠️ {availabilityWarning}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Horário */}

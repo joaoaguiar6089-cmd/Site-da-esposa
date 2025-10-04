@@ -327,6 +327,18 @@ const SmartCityCalendar = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Calendário */}
             <div className="lg:col-span-2">
+              <style>
+                {`
+                  .overlapping-manaus-tefe {
+                    background: linear-gradient(45deg, #3b82f6 50%, #10b981 50%) !important;
+                    color: white !important;
+                    font-weight: bold !important;
+                  }
+                  .overlapping-manaus-tefe:hover {
+                    opacity: 0.8 !important;
+                  }
+                `}
+              </style>
               <Calendar
                 mode="single"
                 selected={selectedDate}
@@ -341,20 +353,32 @@ const SmartCityCalendar = () => {
                     if (rangeStart && rangeEnd && isWithinInterval(date, { start: rangeStart, end: rangeEnd })) return true;
                     return false;
                   },
-                  // Modifiers para cada cidade
-                  manaus: (date: Date) => {
-                    const manausPeriods = availabilityPeriods.filter(p => p.city_name === 'Manaus');
-                    return manausPeriods.some(period => isDateInPeriod(date, period));
+                  // Modifier para sobreposição Manaus + Tefé
+                  overlappingManausTefe: (date: Date) => {
+                    const matchingPeriods = availabilityPeriods.filter(period => isDateInPeriod(date, period));
+                    const hasManaus = matchingPeriods.some(p => p.city_name === 'Manaus');
+                    const hasTefe = matchingPeriods.some(p => p.city_name === 'Tefé');
+                    return hasManaus && hasTefe;
                   },
-                  tefe: (date: Date) => {
-                    const tefePeriods = availabilityPeriods.filter(p => p.city_name === 'Tefé');
-                    return tefePeriods.some(period => isDateInPeriod(date, period));
+                  // Modifiers para cada cidade (apenas quando não há sobreposição)
+                  manausOnly: (date: Date) => {
+                    const matchingPeriods = availabilityPeriods.filter(period => isDateInPeriod(date, period));
+                    const hasManaus = matchingPeriods.some(p => p.city_name === 'Manaus');
+                    const hasTefe = matchingPeriods.some(p => p.city_name === 'Tefé');
+                    return hasManaus && !hasTefe;
+                  },
+                  tefeOnly: (date: Date) => {
+                    const matchingPeriods = availabilityPeriods.filter(period => isDateInPeriod(date, period));
+                    const hasManaus = matchingPeriods.some(p => p.city_name === 'Manaus');
+                    const hasTefe = matchingPeriods.some(p => p.city_name === 'Tefé');
+                    return hasTefe && !hasManaus;
                   }
                 }}
                 modifiersClassNames={{
                   selected: "bg-primary text-primary-foreground font-bold",
-                  manaus: "bg-blue-500 text-white font-bold hover:opacity-80",
-                  tefe: "bg-green-500 text-white font-bold hover:opacity-80"
+                  overlappingManausTefe: "overlapping-manaus-tefe",
+                  manausOnly: "bg-blue-500 text-white font-bold hover:opacity-80",
+                  tefeOnly: "bg-green-500 text-white font-bold hover:opacity-80"
                 }}
               />
             </div>

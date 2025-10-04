@@ -236,32 +236,11 @@ const AgendamentoForm = ({ client: rawClient, onAppointmentCreated, onBack, edit
   const [loadingTimes, setLoadingTimes] = useState(false);
   const [procedureSearchOpen, setProcedureSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [availabilityWarning, setAvailabilityWarning] = useState<string>('');
 
   const generateTimeOptions = async () => {
     try {
-      // Primeiro verificar se uma cidade está selecionada
-      if (!formData.city_id || !formData.appointment_date) {
-        return [];
-      }
-
-      // Verificar se o dia está disponível na cidade selecionada
-      const { data: cityAvailability, error: availabilityError } = await supabase
-        .from('city_availability')
-        .select('*')
-        .eq('city_id', formData.city_id)
-        .or(`and(date_start.lte.${formData.appointment_date},date_end.gte.${formData.appointment_date}),and(date_start.eq.${formData.appointment_date},date_end.is.null)`);
-
-      if (availabilityError) {
-        console.error('Erro ao verificar disponibilidade da cidade:', availabilityError);
-        return [];
-      }
-
-      // Se não há disponibilidade na cidade para esta data, retorna vazio
-      if (!cityAvailability || cityAvailability.length === 0) {
-        return [];
-      }
-
-      // Verificar se a data tem exceções configuradas
+      // Verificar se a data tem exceções configuradas (horários especiais)
       if (formData.appointment_date) {
         const { data: exceptions, error: exceptionsError } = await supabase
           .from('schedule_exceptions')
@@ -275,11 +254,16 @@ const AgendamentoForm = ({ client: rawClient, onAppointmentCreated, onBack, edit
 
         // Se há exceção para essa data
         if (exceptions && exceptions.length > 0) {
-          const exception = exceptions[0]; // Pega a primeira exceção válida
+          const exception = exceptions[0];
           
-          // Se a clínica está fechada nesta data
+          // Se está fechado, ainda retorna horários básicos (permitindo agendamento)
           if (exception.is_closed) {
-            return [];
+            const basicTimes: string[] = [];
+            for (let hour = 8; hour <= 17; hour++) {
+              const timeString = `${hour.toString().padStart(2, '0')}:00`;
+              basicTimes.push(timeString);
+            }
+            return basicTimes;
           }
           
           // Se há horários customizados, usar eles
@@ -323,19 +307,22 @@ const AgendamentoForm = ({ client: rawClient, onAppointmentCreated, onBack, edit
         return times;
       }
 
-      // Verificar se o dia selecionado está disponível (considerando fuso brasileiro)
-      if (formData.appointment_date) {
-        // Criar data no fuso brasileiro para evitar problemas de timezone
-        const [year, month, day] = formData.appointment_date.split('-').map(Number);
-        const selectedDate = new Date(year, month - 1, day);
-        const dayOfWeek = selectedDate.getDay();
-        
-        if (!settings.available_days.includes(dayOfWeek)) {
-          return [];
+      // Verificar se hoje é um dia disponível
+      const today = new Date(formData.appointment_date).getDay();
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const todayName = dayNames[today];
+      
+      if (!settings.available_days || !settings.available_days[todayName]) {
+        // Dia não está disponível, mas retornamos horários básicos (permitindo agendamento)
+        const basicTimes: string[] = [];
+        for (let hour = 8; hour <= 17; hour++) {
+          const timeString = `${hour.toString().padStart(2, '0')}:00`;
+          basicTimes.push(timeString);
         }
+        return basicTimes;
       }
 
-      // Gerar horários baseados nas configurações padrão
+      // Gerar horários baseados nas configurações
       const times = [];
       const [startHour, startMinute] = settings.start_time.split(':').map(Number);
       const [endHour, endMinute] = settings.end_time.split(':').map(Number);
@@ -352,16 +339,14 @@ const AgendamentoForm = ({ client: rawClient, onAppointmentCreated, onBack, edit
       
       return times;
     } catch (error) {
-      console.error('Erro ao gerar horários:', error);
-      // Fallback para horários padrão
-      const times = [];
-      for (let hour = 8; hour <= 18; hour++) {
-        for (let minute = 0; minute < 60; minute += 30) {
-          const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-          times.push(timeString);
-        }
+      console.error('Erro ao gerar opções de horário:', error);
+      // Fallback para horários básicos
+      const fallbackTimes: string[] = [];
+      for (let hour = 8; hour <= 17; hour++) {
+        const timeString = `${hour.toString().padStart(2, '0')}:00`;
+        fallbackTimes.push(timeString);
       }
-      return times;
+      return fallbackTimes;
     }
   };
 
@@ -470,6 +455,68 @@ const AgendamentoForm = ({ client: rawClient, onAppointmentCreated, onBack, edit
     } catch (error) {
       console.error('Erro ao verificar data:', error);
       return false;
+    }
+  };
+
+  const checkDateAvailability = async (date: string, cityId: string) => {
+    try {
+      // Verificar se a doutora estará disponível na cidade selecionada
+      const { data: cityAvailability, error: availabilityError } = await supabase
+        .from('city_availability')
+        .select('*')
+        .eq('city_id', cityId)
+        .or(`and(date_start.lte.${date},date_end.gte.${date}),and(date_start.eq.${date},date_end.is.null)`);
+
+      if (availabilityError) {
+        console.error('Erro ao verificar disponibilidade:', availabilityError);
+        setAvailabilityWarning('');
+        return;
+      }
+
+      if (!cityAvailability || cityAvailability.length === 0) {
+        // Verificar se ela estará em outra cidade
+        const { data: otherCityAvailability, error: otherError } = await supabase
+          .from('city_availability')
+          .select(`
+            *,
+            city_settings (
+              city_name
+            )
+          `)
+          .or(`and(date_start.lte.${date},date_end.gte.${date}),and(date_start.eq.${date},date_end.is.null)`)
+          .neq('city_id', cityId);
+
+        if (otherError) {
+          console.error('Erro ao verificar outras cidades:', otherError);
+          setAvailabilityWarning('A Dra. Karoline não estará disponível nesta data.');
+          return;
+        }
+
+        if (otherCityAvailability && otherCityAvailability.length > 0) {
+          const otherCity = otherCityAvailability[0];
+          const cityName = (otherCity.city_settings as any)?.city_name || 'outra cidade';
+          
+          // Buscar mensagem configurável
+          const { data: messageSetting } = await supabase
+            .from('site_settings')
+            .select('setting_value')
+            .eq('setting_key', 'availability_message')
+            .single();
+
+          const defaultMessage = 'A Dra. Karoline estará em {cidade} nesta data.';
+          const messageTemplate = messageSetting?.setting_value || defaultMessage;
+          const finalMessage = messageTemplate.replace('{cidade}', cityName);
+          
+          setAvailabilityWarning(finalMessage);
+        } else {
+          setAvailabilityWarning('A Dra. Karoline não estará disponível nesta data.');
+        }
+      } else {
+        setAvailabilityWarning('');
+      }
+    } catch (error) {
+      console.error('Erro ao verificar disponibilidade:', error);
+      setAvailabilityWarning('');
     }
   };
 
@@ -662,11 +709,11 @@ const AgendamentoForm = ({ client: rawClient, onAppointmentCreated, onBack, edit
               const { data: cityData } = await supabase
                 .from('city_settings')
                 .select('city_name')
-                .eq('id', selectedCity?.id)
+                .eq('id', formData.city_id)
                 .single();
 
               const notes = formData.notes ? `\n📝 Observações: ${formData.notes}` : '';
-              const cityName = cityData?.city_name || selectedCity?.city_name || '';
+              const cityName = cityData?.city_name || '';
               const clinicLocation = `📍 Clínica Dra. Karoline Ferreira — ${cityName}`;
 
               // Preparar variáveis para substituição
@@ -1152,9 +1199,18 @@ Para reagendar, entre em contato conosco.`;
             </label>
             <Select
               value={formData.city_id}
-              onValueChange={(value) => {
+              onValueChange={async (value) => {
+                const currentDate = formData.appointment_date;
                 setFormData({...formData, city_id: value, appointment_date: "", appointment_time: ""});
                 setAvailableTimes([]);
+                setAvailabilityWarning('');
+                
+                // Se havia uma data selecionada, verificar disponibilidade na nova cidade
+                if (currentDate) {
+                  setFormData({...formData, city_id: value, appointment_date: currentDate, appointment_time: ""});
+                  await checkDateAvailability(currentDate, value);
+                  loadAvailableTimes(currentDate);
+                }
               }}
             >
               <SelectTrigger>
@@ -1181,58 +1237,42 @@ Para reagendar, entre em contato conosco.`;
               value={formData.appointment_date}
               disabled={!formData.city_id}
               onChange={async (e) => {
-                    const newDate = e.target.value;
-                    
-                    // Verificar se a data está bloqueada
-                    const isDisabled = await isDateDisabled(newDate);
-                    if (!isDisabled) {
-                      // Verificar se a data está disponível na cidade selecionada
-                      if (formData.city_id) {
-                        const { data: cityAvailability, error: availabilityError } = await supabase
-                          .from('city_availability')
-                          .select('*')
-                          .eq('city_id', formData.city_id)
-                          .or(`and(date_start.lte.${newDate},date_end.gte.${newDate}),and(date_start.eq.${newDate},date_end.is.null)`);
-
-                        if (availabilityError) {
-                          console.error('Erro ao verificar disponibilidade:', availabilityError);
-                          toast({
-                            title: "Erro",
-                            description: "Erro ao verificar disponibilidade da cidade.",
-                            variant: "destructive",
-                          });
-                          return;
-                        }
-
-                        if (!cityAvailability || cityAvailability.length === 0) {
-                          toast({
-                            title: "Data indisponível",
-                            description: "Esta data não está disponível na cidade selecionada.",
-                            variant: "destructive",
-                          });
-                          return;
-                        }
-                      }
-                      
-                      setFormData({...formData, appointment_date: newDate, appointment_time: ""});
-                      loadAvailableTimes(newDate);
-                    } else {
-                      toast({
-                        title: "Data indisponível",
-                        description: "A clínica está fechada nesta data.",
-                        variant: "destructive",
-                      });
-                    }
-                  }}
-                  className="border-2 hover:border-primary/50 focus:border-primary transition-all duration-200"
-                  required
-                  />
-                  {!formData.city_id && (
-                    <p className="text-sm text-muted-foreground">
-                      Primeiro selecione uma cidade para habilitar a seleção de data
-                    </p>
-                  )}
+                const newDate = e.target.value;
+                
+                // Atualizar data sempre (não bloqueamos mais)
+                setFormData({...formData, appointment_date: newDate, appointment_time: ""});
+                
+                // Verificar disponibilidade para mostrar aviso
+                if (formData.city_id) {
+                  await checkDateAvailability(newDate, formData.city_id);
+                }
+                
+                // Carregar horários disponíveis
+                loadAvailableTimes(newDate);
+              }}
+              className="border-2 hover:border-primary/50 focus:border-primary transition-all duration-200"
+              required
+            />
+            {!formData.city_id && (
+              <p className="text-sm text-muted-foreground">
+                Primeiro selecione uma cidade para habilitar a seleção de data
+              </p>
+            )}
+            
+            {/* Aviso de disponibilidade */}
+            {availabilityWarning && (
+              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="text-amber-600 mt-0.5">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
                 </div>
+                <div className="text-sm text-amber-800">
+                  {availabilityWarning}
+                </div>
+              </div>
+            )}
+          </div>
 
               <div className="space-y-2">
                 <label htmlFor="time" className="text-sm font-semibold text-foreground">

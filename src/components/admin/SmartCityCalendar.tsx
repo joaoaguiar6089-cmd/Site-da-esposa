@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -58,11 +59,14 @@ const SmartCityCalendar = () => {
     end_time: '18:00'
   });
   const [loading, setLoading] = useState(false);
+  const [availabilityMessage, setAvailabilityMessage] = useState('A Dra. Karoline estará em {cidade} nesta data.');
+  const [savingMessage, setSavingMessage] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     loadCities();
     loadAvailabilityPeriods();
+    loadAvailabilityMessage();
   }, []);
 
   const loadCities = async () => {
@@ -106,6 +110,54 @@ const SmartCityCalendar = () => {
       setAvailabilityPeriods(periodsWithColors);
     } catch (error) {
       console.error('Erro ao carregar períodos:', error);
+    }
+  };
+
+  const loadAvailabilityMessage = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('site_settings')
+        .select('setting_value')
+        .eq('setting_key', 'availability_message')
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      
+      if (data) {
+        setAvailabilityMessage(data.setting_value);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar mensagem de disponibilidade:', error);
+    }
+  };
+
+  const saveAvailabilityMessage = async () => {
+    try {
+      setSavingMessage(true);
+      
+      const { error } = await supabase
+        .from('site_settings')
+        .upsert({
+          setting_key: 'availability_message',
+          setting_value: availabilityMessage
+        }, {
+          onConflict: 'setting_key'
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Mensagem salva",
+        description: "Mensagem de disponibilidade atualizada com sucesso.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao salvar",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSavingMessage(false);
     }
   };
 
@@ -264,6 +316,46 @@ const SmartCityCalendar = () => {
 
   return (
     <div className="space-y-6">
+      {/* Seção de Configurações */}
+      <Card>
+        <CardHeader>
+          <CardTitle>⚙️ Configuração de Mensagens</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="availability-message" className="text-sm font-medium">
+              Mensagem de disponibilidade
+            </Label>
+            <p className="text-sm text-gray-600 mb-2">
+              Esta mensagem será exibida quando o cliente selecionar uma data onde a Dra. está em outra cidade.
+              Use {"{cidade}"} para inserir o nome da cidade automaticamente.
+            </p>
+            <Textarea
+              id="availability-message"
+              value={availabilityMessage}
+              onChange={(e) => setAvailabilityMessage(e.target.value)}
+              placeholder="A Dra. Karoline estará em {cidade} nesta data."
+              rows={3}
+              className="w-full"
+            />
+          </div>
+          {availabilityMessage && (
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+              <p className="text-sm text-yellow-800">
+                <strong>Prévia:</strong> {availabilityMessage.replace('{cidade}', 'São Paulo')}
+              </p>
+            </div>
+          )}
+          <Button 
+            onClick={saveAvailabilityMessage}
+            disabled={savingMessage}
+            className="w-full"
+          >
+            {savingMessage ? 'Salvando...' : 'Salvar Mensagem'}
+          </Button>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Calendário Inteligente de Disponibilidade</CardTitle>

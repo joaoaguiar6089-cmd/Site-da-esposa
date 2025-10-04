@@ -265,6 +265,32 @@ const NotificationDebug = () => {
     }
   };
 
+  const fixTemplateFormatting = async (templateType: string, originalContent: string) => {
+    try {
+      const cleanedContent = cleanTemplateContent(originalContent);
+      
+      const { error } = await supabase
+        .from('whatsapp_templates')
+        .update({ template_content: cleanedContent })
+        .eq('template_type', templateType);
+
+      if (error) throw error;
+
+      toast({
+        title: "✅ Formatação corrigida!",
+        description: "Template atualizado com formatação limpa",
+      });
+
+      loadTemplates();
+    } catch (error: any) {
+      toast({
+        title: "❌ Erro ao corrigir",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const startEditing = (template: any) => {
     setEditingTemplate(template.template_type);
     setEditContent(template.template_content);
@@ -314,14 +340,92 @@ const NotificationDebug = () => {
   };
 
   const getTemplateDisplayName = (type: string) => {
-    const names: Record<string, string> = {
-      'agendamento_cliente': 'Confirmação para Cliente',
-      'agendamento_atualizado_cliente': 'Atualização para Cliente',
-      'agendamento_proprietaria': 'Novo Agendamento (Proprietária)',
-      'alteracao_proprietaria': 'Alteração (Proprietária)',
-      'cancelamento_proprietaria': 'Cancelamento (Proprietária)'
+    const templateInfo: Record<string, { name: string; channel: string; recipient: string; description: string }> = {
+      // Templates WhatsApp para Cliente
+      'agendamento_cliente': {
+        name: 'Confirmação de Agendamento',
+        channel: 'WhatsApp',
+        recipient: 'Cliente',
+        description: 'Enviado quando o agendamento é confirmado'
+      },
+      'agendamento_atualizado_cliente': {
+        name: 'Atualização de Agendamento',
+        channel: 'WhatsApp', 
+        recipient: 'Cliente',
+        description: 'Enviado quando data/hora são alteradas'
+      },
+      'cancelamento_cliente': {
+        name: 'Cancelamento de Agendamento',
+        channel: 'WhatsApp',
+        recipient: 'Cliente', 
+        description: 'Enviado quando agendamento é cancelado'
+      },
+      // Templates WhatsApp para Proprietária
+      'agendamento_proprietaria': {
+        name: 'Novo Agendamento',
+        channel: 'WhatsApp',
+        recipient: 'Proprietária',
+        description: 'Notifica sobre novos agendamentos'
+      },
+      'alteracao_proprietaria': {
+        name: 'Alteração de Agendamento', 
+        channel: 'WhatsApp',
+        recipient: 'Proprietária',
+        description: 'Notifica sobre alterações'
+      },
+      'cancelamento_proprietaria': {
+        name: 'Cancelamento de Agendamento',
+        channel: 'WhatsApp', 
+        recipient: 'Proprietária',
+        description: 'Notifica sobre cancelamentos'
+      },
+      // Templates E-mail (se existirem)
+      'appointment_confirmation': {
+        name: 'Confirmação de Agendamento',
+        channel: 'E-mail',
+        recipient: 'Cliente',
+        description: 'Template de confirmação por e-mail'
+      }
     };
-    return names[type] || type;
+
+    return templateInfo[type] || {
+      name: type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      channel: 'Desconhecido',
+      recipient: 'Desconhecido', 
+      description: 'Template não categorizado'
+    };
+  };
+
+  const getChannelBadge = (channel: string) => {
+    const styles = {
+      'WhatsApp': 'bg-green-100 text-green-800 border-green-200',
+      'E-mail': 'bg-blue-100 text-blue-800 border-blue-200',
+      'Desconhecido': 'bg-gray-100 text-gray-800 border-gray-200'
+    };
+    return styles[channel] || styles['Desconhecido'];
+  };
+
+  const getRecipientBadge = (recipient: string) => {
+    const styles = {
+      'Cliente': 'bg-purple-100 text-purple-800 border-purple-200',
+      'Proprietária': 'bg-orange-100 text-orange-800 border-orange-200',
+      'Desconhecido': 'bg-gray-100 text-gray-800 border-gray-200'
+    };
+    return styles[recipient] || styles['Desconhecido'];
+  };
+
+  const cleanTemplateContent = (content: string) => {
+    // Limpar formatação estranha como \n, \\ etc
+    return content
+      .replace(/\\n/g, '\n')  // Converter \n em quebra de linha real
+      .replace(/\\t/g, '\t')  // Converter \t em tab real
+      .replace(/\\\\/g, '\\') // Converter \\ em \ simples
+      .trim();
+  };
+
+  const hasFormattingIssues = (content: string) => {
+    // Detectar se tem formatação estranha
+    return content.includes('\\n') || content.includes('\\t') || content.includes('\\\\');
   };
 
   const saveOwnerSettings = async () => {
@@ -423,27 +527,112 @@ const NotificationDebug = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5" />
-                Templates de Mensagens WhatsApp
+                Gerenciar Templates de Notificações
               </CardTitle>
               <CardDescription>
-                Personalize as mensagens enviadas automaticamente
+                Configure mensagens automáticas enviadas por WhatsApp e E-mail para clientes e proprietária. 
+                Cada template é identificado por canal (WhatsApp/E-mail) e destinatário (Cliente/Proprietária).
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {templates.map((template) => (
-                <div key={template.id} className="border rounded-lg p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">{getTemplateDisplayName(template.template_type)}</h4>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => startEditing(template)}
-                      className="flex items-center gap-2"
-                    >
-                      <Edit className="h-4 w-4" />
-                      Editar
-                    </Button>
+            <CardContent className="space-y-6">
+              {/* Estatísticas dos Templates */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <MessageSquare className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-800">WhatsApp</span>
                   </div>
+                  <div className="text-2xl font-bold text-green-700">
+                    {templates.filter(t => getTemplateDisplayName(t.template_type).channel === 'WhatsApp').length}
+                  </div>
+                  <div className="text-xs text-green-600">templates</div>
+                </div>
+                
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <MessageSquare className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-800">E-mail</span>
+                  </div>
+                  <div className="text-2xl font-bold text-blue-700">
+                    {templates.filter(t => getTemplateDisplayName(t.template_type).channel === 'E-mail').length}
+                  </div>
+                  <div className="text-xs text-blue-600">templates</div>
+                </div>
+                
+                <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <MessageSquare className="h-4 w-4 text-purple-600" />
+                    <span className="text-sm font-medium text-purple-800">Cliente</span>
+                  </div>
+                  <div className="text-2xl font-bold text-purple-700">
+                    {templates.filter(t => getTemplateDisplayName(t.template_type).recipient === 'Cliente').length}
+                  </div>
+                  <div className="text-xs text-purple-600">templates</div>
+                </div>
+                
+                <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <AlertCircle className="h-4 w-4 text-orange-600" />
+                    <span className="text-sm font-medium text-orange-800">Com Problemas</span>
+                  </div>
+                  <div className="text-2xl font-bold text-orange-700">
+                    {templates.filter(t => hasFormattingIssues(t.template_content)).length}
+                  </div>
+                  <div className="text-xs text-orange-600">formatação</div>
+                </div>
+              </div>
+
+              {/* Lista de Templates */}
+              {templates.map((template) => {
+                const templateInfo = getTemplateDisplayName(template.template_type);
+                return (
+                  <div key={template.id} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium text-lg">{templateInfo.name}</h4>
+                          <Badge className={getChannelBadge(templateInfo.channel)}>
+                            {templateInfo.channel}
+                          </Badge>
+                          <Badge className={getRecipientBadge(templateInfo.recipient)}>
+                            {templateInfo.recipient}
+                          </Badge>
+                          {hasFormattingIssues(template.template_content) && (
+                            <Badge className="bg-red-100 text-red-800 border-red-200">
+                              ⚠️ Formatação
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">{templateInfo.description}</p>
+                        <div className="text-xs text-gray-500">
+                          ID do template: <code>{template.template_type}</code>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {hasFormattingIssues(template.template_content) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              fixTemplateFormatting(template.template_type, template.template_content);
+                            }}
+                            className="flex items-center gap-2 text-orange-600 border-orange-200 hover:bg-orange-50"
+                          >
+                            <AlertCircle className="h-4 w-4" />
+                            Corrigir Formatação
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => startEditing(template)}
+                          className="flex items-center gap-2"
+                        >
+                          <Edit className="h-4 w-4" />
+                          Editar
+                        </Button>
+                      </div>
+                    </div>
                   
                   {editingTemplate === template.template_type ? (
                     <div className="space-y-4">
@@ -545,12 +734,29 @@ const NotificationDebug = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-muted p-3 rounded text-sm font-mono whitespace-pre-wrap">
-                      {template.template_content}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h5 className="text-sm font-medium text-gray-700">Visualização do Template:</h5>
+                        {hasFormattingIssues(template.template_content) && (
+                          <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
+                            ⚠️ Contém caracteres de formatação como \n
+                          </span>
+                        )}
+                      </div>
+                      <div className="bg-muted p-3 rounded text-sm font-mono whitespace-pre-wrap border">
+                        {cleanTemplateContent(template.template_content)}
+                      </div>
+                      {hasFormattingIssues(template.template_content) && (
+                        <div className="text-xs text-gray-600 bg-blue-50 p-2 rounded border-l-4 border-blue-200">
+                          <strong>💡 Dica:</strong> Este template contém formatação estranha. 
+                          Use o botão "Corrigir Formatação" para limpar automaticamente.
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </CardContent>
           </Card>
         </TabsContent>

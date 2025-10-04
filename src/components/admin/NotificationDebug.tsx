@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Send, Phone, CheckCircle, XCircle, MessageSquare, Edit, Copy, Info, Settings, Clock, AlertCircle } from "lucide-react";
@@ -22,6 +23,10 @@ const NotificationDebug = () => {
   const [cursorPosition, setCursorPosition] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
+  
+  // Template filters
+  const [channelFilter, setChannelFilter] = useState<string>('all');
+  const [recipientFilter, setRecipientFilter] = useState<string>('all');
   
   // Owner notification settings
   const [ownerPhone, setOwnerPhone] = useState("97984387295");
@@ -340,51 +345,67 @@ const NotificationDebug = () => {
   };
 
   const getTemplateDisplayName = (type: string) => {
-    const templateInfo: Record<string, { name: string; channel: string; recipient: string; description: string }> = {
+    const templateInfo: Record<string, { name: string; channel: string; recipient: string; description: string; order: number }> = {
       // Templates WhatsApp para Cliente
       'agendamento_cliente': {
-        name: 'Confirmação de Agendamento',
+        name: 'Novo Agendamento (Cliente)',
         channel: 'WhatsApp',
         recipient: 'Cliente',
-        description: 'Enviado quando o agendamento é confirmado'
+        description: 'Enviado quando um novo agendamento é criado ou status muda para confirmado',
+        order: 1
       },
       'agendamento_atualizado_cliente': {
-        name: 'Atualização de Agendamento',
+        name: 'Agendamento Alterado (Cliente)',
         channel: 'WhatsApp', 
         recipient: 'Cliente',
-        description: 'Enviado quando data/hora são alteradas'
+        description: 'Enviado quando data/hora são alteradas em agendamento existente',
+        order: 2
       },
       'cancelamento_cliente': {
-        name: 'Cancelamento de Agendamento',
+        name: 'Agendamento Cancelado (Cliente)',
         channel: 'WhatsApp',
         recipient: 'Cliente', 
-        description: 'Enviado quando agendamento é cancelado'
+        description: 'Enviado quando agendamento é cancelado',
+        order: 3
       },
+      
       // Templates WhatsApp para Proprietária
       'agendamento_proprietaria': {
-        name: 'Novo Agendamento',
+        name: 'Novo Agendamento (Proprietária)',
         channel: 'WhatsApp',
         recipient: 'Proprietária',
-        description: 'Notifica sobre novos agendamentos'
+        description: 'Notifica proprietária sobre novos agendamentos criados',
+        order: 4
       },
       'alteracao_proprietaria': {
-        name: 'Alteração de Agendamento', 
+        name: 'Agendamento Alterado (Proprietária)', 
         channel: 'WhatsApp',
         recipient: 'Proprietária',
-        description: 'Notifica sobre alterações'
+        description: 'Notifica proprietária sobre alterações em agendamentos',
+        order: 5
       },
       'cancelamento_proprietaria': {
-        name: 'Cancelamento de Agendamento',
+        name: 'Agendamento Cancelado (Proprietária)',
         channel: 'WhatsApp', 
         recipient: 'Proprietária',
-        description: 'Notifica sobre cancelamentos'
+        description: 'Notifica proprietária sobre cancelamentos',
+        order: 6
       },
-      // Templates E-mail (se existirem)
+
+      // Templates E-mail (legados)
       'appointment_confirmation': {
-        name: 'Confirmação de Agendamento',
+        name: 'Confirmação por E-mail (Legado)',
         channel: 'E-mail',
         recipient: 'Cliente',
-        description: 'Template de confirmação por e-mail'
+        description: 'Template de confirmação por e-mail (não utilizado)',
+        order: 7
+      },
+      'confirmacao_cliente': {
+        name: 'Confirmação (Legado)',
+        channel: 'WhatsApp',
+        recipient: 'Cliente',
+        description: 'Template legado - usar "Novo Agendamento (Cliente)" em vez deste',
+        order: 8
       }
     };
 
@@ -392,8 +413,30 @@ const NotificationDebug = () => {
       name: type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
       channel: 'Desconhecido',
       recipient: 'Desconhecido', 
-      description: 'Template não categorizado'
+      description: 'Template não categorizado',
+      order: 999
     };
+  };
+
+  const getFilteredTemplates = () => {
+    let filtered = templates;
+
+    // Filtrar por canal
+    if (channelFilter !== 'all') {
+      filtered = filtered.filter(t => getTemplateDisplayName(t.template_type).channel === channelFilter);
+    }
+
+    // Filtrar por destinatário
+    if (recipientFilter !== 'all') {
+      filtered = filtered.filter(t => getTemplateDisplayName(t.template_type).recipient === recipientFilter);
+    }
+
+    // Ordenar por ordem definida
+    return filtered.sort((a, b) => {
+      const orderA = getTemplateDisplayName(a.template_type).order;
+      const orderB = getTemplateDisplayName(b.template_type).order;
+      return orderA - orderB;
+    });
   };
 
   const getChannelBadge = (channel: string) => {
@@ -582,8 +625,45 @@ const NotificationDebug = () => {
                 </div>
               </div>
 
+              {/* Filtros */}
+              <div className="flex flex-col sm:flex-row gap-4 p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="channel-filter" className="text-sm font-medium">Canal:</Label>
+                  <Select value={channelFilter} onValueChange={setChannelFilter}>
+                    <SelectTrigger id="channel-filter" className="w-[140px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                      <SelectItem value="E-mail">E-mail</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="recipient-filter" className="text-sm font-medium">Destinatário:</Label>
+                  <Select value={recipientFilter} onValueChange={setRecipientFilter}>
+                    <SelectTrigger id="recipient-filter" className="w-[140px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="Cliente">Cliente</SelectItem>
+                      <SelectItem value="Proprietária">Proprietária</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <span>
+                    {getFilteredTemplates().length} de {templates.length} templates
+                  </span>
+                </div>
+              </div>
+
               {/* Lista de Templates */}
-              {templates.map((template) => {
+              {getFilteredTemplates().map((template) => {
                 const templateInfo = getTemplateDisplayName(template.template_type);
                 return (
                   <div key={template.id} className="border rounded-lg p-4 space-y-3">

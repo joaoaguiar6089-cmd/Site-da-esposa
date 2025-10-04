@@ -379,7 +379,8 @@ const AgendamentoForm = ({ client: rawClient, onAppointmentCreated, onBack, edit
         return;
       }
 
-      const { data: appointments, error } = await supabase
+      // Buscar agendamentos do dia, excluindo o agendamento atual se estiver editando
+      let query = supabase
         .from('appointments')
         .select(`
           appointment_time,
@@ -389,6 +390,13 @@ const AgendamentoForm = ({ client: rawClient, onAppointmentCreated, onBack, edit
         `)
         .eq('appointment_date', date)
         .neq('status', 'cancelado');
+
+      // Se estiver editando, excluir o agendamento atual da verificação de conflitos
+      if (editingId) {
+        query = query.neq('id', editingId);
+      }
+
+      const { data: appointments, error } = await query;
 
       if (error) throw error;
 
@@ -424,6 +432,12 @@ const AgendamentoForm = ({ client: rawClient, onAppointmentCreated, onBack, edit
 
         return !hasConflict;
       });
+
+      // Se estiver editando, garantir que o horário atual esteja sempre disponível
+      if (editingId && formData.appointment_time && !available.includes(formData.appointment_time)) {
+        available.push(formData.appointment_time);
+        available.sort();
+      }
       
       setAvailableTimes(available);
     } catch (error) {

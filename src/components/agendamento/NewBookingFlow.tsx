@@ -452,31 +452,99 @@ const NewBookingFlow = ({
 
   const sendWhatsAppNotification = async (client: Client, appointment: any, procedure: any, city: any) => {
     try {
-      // Buscar template formatado
-      const { data: templateData, error: templateError } = await supabase.functions.invoke('get-whatsapp-template', {
-        body: {
-          templateType: 'agendamento_cliente',
-          variables: {
-            clientName: client.nome,
-            appointmentDate: format(parseISO(appointment.appointment_date), "dd/MM/yyyy", { locale: ptBR }),
-            appointmentTime: appointment.appointment_time,
-            procedureName: procedure?.name || '',
-            cityName: city?.city_name || ''
+      const notes = appointment.notes ? `\n📝 Observações: ${appointment.notes}` : '';
+
+      // Buscar dados da cidade para montar o endereço
+      const { data: cityData } = await supabase
+        .from('city_settings')
+        .select('city_name, clinic_name, address, map_url')
+        .eq('id', appointment.city_id)
+        .single();
+
+      const formatClinicLocation = (cityData: any) => {
+        if (!cityData) return '';
+        
+        const clinicName = cityData.clinic_name || 'Clínica Dra. Karoline Ferreira';
+        const cityName = cityData.city_name || '';
+        const address = cityData.address || '';
+        const mapUrl = cityData.map_url || '';
+
+        let location = `📍 **${clinicName}`;
+        if (cityName) location += ` — ${cityName}`;
+        location += '**';
+        
+        if (address) {
+          location += `\n${address}`;
+          if (mapUrl) {
+            location += `\nVer no mapa → ${mapUrl}`;
           }
         }
+        
+        return location;
+      };
+
+      const clinicLocation = formatClinicLocation(cityData);
+
+      // Buscar template do banco de dados
+      const { data: templateData, error: templateError } = await supabase
+        .from('whatsapp_templates')
+        .select('template_content')
+        .eq('template_type', 'agendamento_cliente')
+        .single();
+
+      console.log('Template encontrado:', templateData);
+
+      // Preparar variáveis para substituição
+      const variables = {
+        clientName: client.nome,
+        appointmentDate: format(parseISO(appointment.appointment_date), "dd/MM/yyyy", { locale: ptBR }),
+        appointmentTime: appointment.appointment_time,
+        procedureName: procedure?.name || '',
+        notes: notes,
+        clinicLocation: clinicLocation,
+        cityName: cityData?.city_name || '',
+        clinicName: cityData?.clinic_name || 'Clínica Dra. Karoline Ferreira',
+        clinicAddress: cityData?.address || '',
+        specifications: appointment.specifications || ''
+      };
+
+      // Processar template ou usar fallback
+      let message = templateData?.template_content || `🩺 *Agendamento Confirmado*
+
+Olá {clientName}!
+
+📅 Data: {appointmentDate}
+⏰ Horário: {appointmentTime}
+💉 Procedimento: {procedureName}{notes}
+
+{clinicLocation}
+
+✨ Aguardamos você!`;
+
+      // Substituir todas as variáveis
+      Object.entries(variables).forEach(([key, value]) => {
+        const regex = new RegExp(`\\{${key}\\}`, 'g');
+        message = message.replace(regex, value || '');
       });
 
-      if (templateError) throw templateError;
+      console.log('Mensagem processada:', message);
 
-      // Enviar mensagem via WhatsApp
-      await supabase.functions.invoke('send-whatsapp', {
+      // Enviar WhatsApp
+      const { error: sendError } = await supabase.functions.invoke('send-whatsapp', {
         body: {
           to: client.celular,
-          message: templateData.message
+          message
         }
       });
-    } catch (error) {
-      console.error('Erro ao notificar cliente:', error);
+
+      if (sendError) {
+        console.error('Erro ao enviar WhatsApp:', sendError);
+      } else {
+        console.log('WhatsApp enviado com sucesso');
+      }
+
+    } catch (err) {
+      console.error('Erro ao enviar WhatsApp:', err);
     }
   };
 

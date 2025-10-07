@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.cleanup-appointments]
 verify_jwt = false
+
+[functions.send-meta-event]
+verify_jwt = false

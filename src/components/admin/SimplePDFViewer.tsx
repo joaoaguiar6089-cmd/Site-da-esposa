@@ -334,7 +334,9 @@ const SimplePDFViewer = ({ document, clientId, onSave, onCancel }: SimplePDFView
       
       // Salvar PDF modificado
       const pdfBytes = await pdfDoc.save();
-      const modifiedFile = new File([pdfBytes], document.file_name, { type: 'application/pdf' });
+      const arrayBuffer: ArrayBuffer = pdfBytes.buffer.slice(pdfBytes.byteOffset, pdfBytes.byteOffset + pdfBytes.byteLength) as ArrayBuffer;
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const modifiedFile = new File([blob], document.file_name, { type: 'application/pdf' });
       
       // Upload do arquivo modificado
       const { error: uploadError } = await supabase.storage

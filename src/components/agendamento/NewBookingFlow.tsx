@@ -451,6 +451,29 @@ const NewBookingFlow = ({
 
       setAppointmentDetails(appointment);
       
+      // Enviar evento para Meta Pixel
+      try {
+        await supabase.functions.invoke('send-meta-event', {
+          body: {
+            event_name: 'Lead',
+            event_data: {
+              content_name: procedure?.name || 'Procedimento',
+              content_category: 'Agendamento',
+              value: procedure?.price || 0,
+              currency: 'BRL',
+              source_url: window.location.href,
+            },
+            user_data: {
+              ph: client.celular, // phone
+              fn: client.nome, // first name
+              ct: city?.city_name || '', // city
+            }
+          }
+        });
+      } catch (metaError) {
+        console.error('Erro ao enviar evento Meta:', metaError);
+      }
+      
       // Enviar notificações
       try {
         await sendWhatsAppNotification(client, appointment, procedure, city);

@@ -16,8 +16,8 @@ export const InventoryTransactions = () => {
   const [filters, setFilters] = useState({
     startDate: "",
     endDate: "",
-    materialId: "",
-    transactionType: "",
+    materialId: "all",
+    transactionType: "all",
   });
 
   const { data: transactions, isLoading, refetch } = useQuery({
@@ -47,10 +47,10 @@ export const InventoryTransactions = () => {
       if (filters.endDate) {
         query = query.lte("transaction_date", filters.endDate);
       }
-      if (filters.materialId) {
+      if (filters.materialId && filters.materialId !== "all") {
         query = query.eq("item_id", filters.materialId);
       }
-      if (filters.transactionType) {
+      if (filters.transactionType && filters.transactionType !== "all") {
         query = query.eq("transaction_type", filters.transactionType);
       }
 

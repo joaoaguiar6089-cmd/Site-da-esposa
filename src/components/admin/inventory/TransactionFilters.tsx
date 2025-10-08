@@ -74,7 +74,7 @@ export const TransactionFilters = ({
             <SelectValue placeholder="Todos os materiais" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todos os materiais</SelectItem>
+            <SelectItem value="all">Todos os materiais</SelectItem>
             {materials?.map((material) => (
               <SelectItem key={material.id} value={material.id}>
                 {material.material_name}
@@ -96,7 +96,7 @@ export const TransactionFilters = ({
             <SelectValue placeholder="Todos os tipos" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todos os tipos</SelectItem>
+            <SelectItem value="all">Todos os tipos</SelectItem>
             <SelectItem value="entrada">Entrada</SelectItem>
             <SelectItem value="saida">Saída</SelectItem>
           </SelectContent>

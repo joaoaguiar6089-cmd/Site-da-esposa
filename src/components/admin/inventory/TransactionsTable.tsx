@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
@@ -57,24 +57,50 @@ export const TransactionsTable = ({
 }: TransactionsTableProps) => {
   const { toast } = useToast();
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [runningBalance, setRunningBalance] = useState<Record<string, number>>({});
 
-  // Calculate running balance for each item
-  const transactionsWithBalance = transactions.map((transaction, index) => {
-    const itemId = transaction.inventory_items?.id || "";
-    const prevBalance = index > 0 ? runningBalance[itemId] || 0 : 0;
-    const change =
-      transaction.transaction_type === "entrada"
-        ? transaction.quantity
+  // Calculate running balance for each item (working backwards since transactions are in descending order)
+  const transactionsWithBalance = useMemo(() => {
+    if (!transactions.length) return [];
+
+    // Group transactions by item and calculate balances
+    const itemBalances: Record<string, number> = {};
+    
+    // First, calculate current balance for each item by going through all transactions
+    transactions.forEach((transaction) => {
+      const itemId = transaction.inventory_items?.id || "";
+      if (!itemBalances[itemId]) itemBalances[itemId] = 0;
+      
+      const change = transaction.transaction_type === "entrada" 
+        ? transaction.quantity 
         : -transaction.quantity;
-    const newBalance = prevBalance + change;
-    runningBalance[itemId] = newBalance;
+      itemBalances[itemId] += change;
+    });
 
-    return {
-      ...transaction,
-      balance: newBalance,
-    };
-  });
+    // Now, work backwards from current balance to calculate historical balances
+    const result = [];
+    const currentItemBalances = { ...itemBalances };
+    
+    for (let i = 0; i < transactions.length; i++) {
+      const transaction = transactions[i];
+      const itemId = transaction.inventory_items?.id || "";
+      
+      // The balance for this transaction is the current balance at this point
+      const balanceAtThisPoint = currentItemBalances[itemId];
+      
+      result.push({
+        ...transaction,
+        balance: balanceAtThisPoint,
+      });
+      
+      // Subtract this transaction's effect to get the balance before it
+      const change = transaction.transaction_type === "entrada" 
+        ? transaction.quantity 
+        : -transaction.quantity;
+      currentItemBalances[itemId] -= change;
+    }
+    
+    return result;
+  }, [transactions]);
 
   const handleDelete = async () => {
     if (!deleteId) return;

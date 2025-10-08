@@ -39,6 +39,7 @@ type PricingRow = {
   specificationId?: string;
   displayName: string;
   price: number | null;
+  materialCost: number | null;
   categoryId: string | null;
   subcategoryId: string | null;
   categoryName?: string | null;
@@ -48,8 +49,17 @@ type PricingRow = {
 type GoalDetail = GoalWithRelations & {
   displayName: string;
   unitPrice: number;
+  unitCost: number;
   categoryName?: string | null;
   subcategoryName?: string | null;
+};
+
+type ProcedureWithCost = ProcedureWithRelations & {
+  material_cost?: number | null;
+};
+
+type SpecificationWithProcedureCost = SpecificationWithProcedure & {
+  material_cost?: number | null;
 };
 
 const ALL_CATEGORIES = "all";
@@ -109,6 +119,7 @@ const ProcedurePricingTable = () => {
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>(ALL_SUBCATEGORIES);
   const [searchTerm, setSearchTerm] = useState("");
   const [editingValues, setEditingValues] = useState<Record<string, string>>({});
+  const [editingCostValues, setEditingCostValues] = useState<Record<string, string>>({});
   const [savingRowKey, setSavingRowKey] = useState<string | null>(null);
 
   const [goals, setGoals] = useState<GoalWithRelations[]>([]);
@@ -174,6 +185,7 @@ const ProcedurePricingTable = () => {
             id,
             name,
             price,
+            material_cost,
             category_id,
             subcategory_id,
             categories ( name ),
@@ -191,12 +203,14 @@ const ProcedurePricingTable = () => {
             id,
             name,
             price,
+            material_cost,
             is_active,
             procedure_id,
             procedures (
               id,
               name,
               price,
+              material_cost,
               category_id,
               subcategory_id,
               categories ( name ),
@@ -210,12 +224,13 @@ const ProcedurePricingTable = () => {
       if (specificationsError) throw specificationsError;
 
       const procedureRows: PricingRow[] =
-        (proceduresData as ProcedureWithRelations[] | null)?.map((procedure) => ({
+        (proceduresData as ProcedureWithCost[] | null)?.map((procedure) => ({
           rowKey: `procedure-${procedure.id}`,
           type: "procedure",
           procedureId: procedure.id,
           displayName: procedure.name,
           price: procedure.price,
+          materialCost: procedure.material_cost ?? null,
           categoryId: procedure.category_id,
           subcategoryId: procedure.subcategory_id,
           categoryName: procedure.categories?.name ?? null,
@@ -223,7 +238,7 @@ const ProcedurePricingTable = () => {
         })) ?? [];
 
       const specificationRows: PricingRow[] =
-        (specificationsData as SpecificationWithProcedure[] | null)
+        (specificationsData as SpecificationWithProcedureCost[] | null)
           ?.filter((spec) => spec.procedures)
           .map((spec) => ({
             rowKey: `spec-${spec.id}`,
@@ -232,6 +247,7 @@ const ProcedurePricingTable = () => {
             specificationId: spec.id,
             displayName: `${spec.procedures?.name ?? "Procedimento"} - ${spec.name}`,
             price: spec.price,
+            materialCost: spec.material_cost ?? spec.procedures?.material_cost ?? null,
             categoryId: spec.procedures?.category_id ?? null,
             subcategoryId: spec.procedures?.subcategory_id ?? null,
             categoryName: spec.procedures?.categories?.name ?? null,
@@ -243,6 +259,7 @@ const ProcedurePricingTable = () => {
 
       setRows(combined);
       setEditingValues({});
+      setEditingCostValues({});
     } catch (error: any) {
       console.error("Erro ao carregar precos:", error);
       toast({
@@ -273,6 +290,7 @@ const ProcedurePricingTable = () => {
               id,
               name,
               price,
+              material_cost,
               category_id,
               subcategory_id,
               categories ( name ),
@@ -282,6 +300,7 @@ const ProcedurePricingTable = () => {
               id,
               name,
               price,
+              material_cost,
               procedure_id
             )
           `,
@@ -303,7 +322,7 @@ const ProcedurePricingTable = () => {
       console.error("Erro ao carregar metas:", error);
       toast({
         title: "Erro ao carregar metas",
-        description: "Não foi possível recuperar as metas do mês.",
+        description: "Nao foi possivel recuperar as metas do mes.",
         variant: "destructive",
       });
     } finally {
@@ -356,6 +375,13 @@ const ProcedurePricingTable = () => {
           ? goal.procedure_specifications?.price ?? 0
           : goal.procedures?.price ?? 0);
 
+      const unitCost =
+        matchingRow?.materialCost ??
+        (goal.specification_id
+          ? goal.procedure_specifications?.material_cost ?? 0
+          : goal.procedures?.material_cost ?? 0) ??
+        0;
+
       const categoryName = matchingRow?.categoryName ?? goal.procedures?.categories?.name ?? null;
       const subcategoryName = matchingRow?.subcategoryName ?? goal.procedures?.subcategories?.name ?? null;
 
@@ -363,6 +389,7 @@ const ProcedurePricingTable = () => {
         ...goal,
         displayName,
         unitPrice: unitPrice ?? 0,
+        unitCost,
         categoryName,
         subcategoryName,
       };
@@ -370,7 +397,10 @@ const ProcedurePricingTable = () => {
   }, [goals, rows]);
 
   const totalGoalsValue = useMemo(() => {
-    return goalsWithDetails.reduce((sum, goal) => sum + goal.quantity * (goal.unitPrice ?? 0), 0);
+    return goalsWithDetails.reduce(
+      (sum, goal) => sum + goal.quantity * Math.max(goal.unitPrice - goal.unitCost, 0),
+      0,
+    );
   }, [goalsWithDetails]);
 
   const currentMonthLabel = useMemo(() => {
@@ -379,6 +409,13 @@ const ProcedurePricingTable = () => {
   }, []);
   const handlePriceChange = (rowKey: string, value: string) => {
     setEditingValues((prev) => ({
+      ...prev,
+      [rowKey]: value,
+    }));
+  };
+
+  const handleCostChange = (rowKey: string, value: string) => {
+    setEditingCostValues((prev) => ({
       ...prev,
       [rowKey]: value,
     }));
@@ -449,6 +486,94 @@ const ProcedurePricingTable = () => {
       toast({
         title: "Erro ao salvar",
         description: "Nao foi possivel salvar o novo valor. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingRowKey(null);
+    }
+  };
+
+  const handleCostBlur = async (row: PricingRow, rawValue: string) => {
+    const trimmed = rawValue.trim();
+    const parsedValue = trimmed ? parsePriceInput(rawValue) : null;
+    if (trimmed && parsedValue === null) {
+      toast({
+        title: "Valor invalido",
+        description: "Informe um valor numerico maior ou igual a zero ou deixe em branco.",
+        variant: "destructive",
+      });
+      setEditingCostValues((prev) => ({
+        ...prev,
+        [row.rowKey]: row.materialCost !== null && row.materialCost !== undefined ? row.materialCost.toString() : "",
+      }));
+      return;
+    }
+
+    const normalizedValue = parsedValue ?? null;
+    if (normalizedValue === null && (row.materialCost === null || row.materialCost === undefined)) {
+      setEditingCostValues((prev) => {
+        const next = { ...prev };
+        delete next[row.rowKey];
+        return next;
+      });
+      return;
+    }
+
+    if (
+      normalizedValue !== null &&
+      row.materialCost !== null &&
+      Math.abs(row.materialCost - normalizedValue) < 0.001
+    ) {
+      setEditingCostValues((prev) => {
+        const next = { ...prev };
+        delete next[row.rowKey];
+        return next;
+      });
+      return;
+    }
+
+    setSavingRowKey(row.rowKey);
+    try {
+      if (row.type === "procedure") {
+        const { error } = await supabase
+          .from("procedures")
+          .update({ material_cost: normalizedValue })
+          .eq("id", row.procedureId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("procedure_specifications")
+          .update({ material_cost: normalizedValue })
+          .eq("id", row.specificationId);
+        if (error) throw error;
+      }
+
+      setRows((prev) =>
+        prev.map((item) =>
+          item.rowKey === row.rowKey
+            ? {
+                ...item,
+                materialCost: normalizedValue,
+              }
+            : item,
+        ),
+      );
+
+      setEditingCostValues((prev) => {
+        const next = { ...prev };
+        delete next[row.rowKey];
+        return next;
+      });
+
+      toast({
+        title: "Custo atualizado",
+        description: "O custo de material foi sincronizado com sucesso.",
+      });
+    } catch (error: any) {
+      console.error("Erro ao atualizar custo:", error);
+      toast({
+        title: "Erro ao salvar",
+        description: "Nao foi possivel salvar o custo. Tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -658,14 +783,14 @@ const ProcedurePricingTable = () => {
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary">
                 <TrendingUp className="h-6 w-6" />
               </span>
-              Metas do Mês
+              Metas do Mes
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Acompanhe as metas de vendas para {currentMonthLabel || "o mês atual"}.
+              Acompanhe as metas de vendas para {currentMonthLabel || "o mes atual"}.
             </p>
           </div>
           <div className="flex flex-col items-start gap-2 rounded-2xl border border-primary/15 bg-background/95 px-5 py-4 text-right shadow-sm sm:items-end">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total previsto</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Lucro previsto</span>
             <span className="text-3xl font-bold text-primary">{formatCurrency(totalGoalsValue)}</span>
             <Button variant="secondary" size="sm" onClick={() => setGoalDialogOpen(true)} className="gap-2">
               <Plus className="h-4 w-4" />
@@ -683,14 +808,15 @@ const ProcedurePricingTable = () => {
             <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-primary/30 bg-background p-8 text-center text-muted-foreground">
               <TrendingUp className="h-8 w-8 text-primary/60" />
               <p className="max-w-xs text-sm">
-                Nenhuma meta cadastrada para este mês. Clique em "Criar meta" para adicionar uma nova meta.
+                Nenhuma meta cadastrada para este mes. Clique em "Criar meta" para adicionar uma nova meta.
               </p>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {goalsWithDetails.map((goal) => {
                 const quantityValue = goalQuantityMap[goal.id] ?? goal.quantity.toString();
-                const totalValue = goal.unitPrice * goal.quantity;
+                const netUnit = Math.max(goal.unitPrice - goal.unitCost, 0);
+                const totalValue = netUnit * goal.quantity;
                 const monthLabel = getMonthLabel(goal.target_month);
 
                 return (
@@ -736,7 +862,7 @@ const ProcedurePricingTable = () => {
                     </div>
 
                     <div className="mt-4 flex flex-col gap-3">
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:items-end">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 sm:items-end">
                         <div className="sm:col-span-1">
                           <Label htmlFor={`goal-qty-${goal.id}`} className="text-xs font-medium text-muted-foreground">
                             Quantidade
@@ -755,7 +881,11 @@ const ProcedurePricingTable = () => {
                           <p className="text-sm font-medium text-foreground">{formatCurrency(goal.unitPrice)}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground">Total previsto</p>
+                          <p className="text-xs text-muted-foreground">Custo unitario</p>
+                          <p className="text-sm font-medium text-foreground">{formatCurrency(goal.unitCost ?? 0)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Lucro previsto</p>
                           <p className="text-lg font-semibold text-primary">{formatCurrency(totalValue)}</p>
                         </div>
                       </div>
@@ -836,13 +966,14 @@ const ProcedurePricingTable = () => {
               <TableHeader className="bg-muted/40">
                 <TableRow>
                   <TableHead>Procedimento / Especificacao</TableHead>
-                  <TableHead className="w-[220px] text-right">Valor (R$)</TableHead>
+                  <TableHead className="w-[160px] text-right">Valor (R$)</TableHead>
+                  <TableHead className="w-[160px] text-right">Custo (R$)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loadingRows ? (
                   <TableRow>
-                    <TableCell colSpan={2}>
+                    <TableCell colSpan={3}>
                       <div className="flex items-center gap-2 py-6 text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Carregando tabela de precos...
@@ -851,7 +982,7 @@ const ProcedurePricingTable = () => {
                   </TableRow>
                 ) : filteredRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={2}>
+                    <TableCell colSpan={3}>
                       <div className="py-6 text-center text-muted-foreground">
                         Nenhum procedimento encontrado com os filtros selecionados.
                       </div>
@@ -859,9 +990,14 @@ const ProcedurePricingTable = () => {
                   </TableRow>
                 ) : (
                   filteredRows.map((row) => {
-                    const inputValue =
+                    const priceInputValue =
                       editingValues[row.rowKey] ??
                       (row.price !== null && row.price !== undefined ? row.price.toString() : "");
+                    const costInputValue =
+                      editingCostValues[row.rowKey] ??
+                      (row.materialCost !== null && row.materialCost !== undefined
+                        ? row.materialCost.toString()
+                        : "");
 
                     return (
                       <TableRow key={row.rowKey} className="hover:bg-muted/40">
@@ -893,9 +1029,24 @@ const ProcedurePricingTable = () => {
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
                             <Input
-                              value={inputValue}
+                              value={priceInputValue}
                               onChange={(event) => handlePriceChange(row.rowKey, event.target.value)}
                               onBlur={(event) => handlePriceBlur(row, event.target.value)}
+                              inputMode="decimal"
+                              placeholder="0,00"
+                              className="max-w-[140px] text-right"
+                            />
+                            {savingRowKey === row.rowKey && (
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Input
+                              value={costInputValue}
+                              onChange={(event) => handleCostChange(row.rowKey, event.target.value)}
+                              onBlur={(event) => handleCostBlur(row, event.target.value)}
                               inputMode="decimal"
                               placeholder="0,00"
                               className="max-w-[140px] text-right"
@@ -974,3 +1125,4 @@ const ProcedurePricingTable = () => {
 };
 
 export default ProcedurePricingTable;
+

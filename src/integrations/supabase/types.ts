@@ -767,6 +767,7 @@ export type Database = {
           has_area_selection: boolean | null
           id: string
           is_active: boolean | null
+          material_cost: number | null
           name: string
           price: number
           procedure_id: string
@@ -781,6 +782,7 @@ export type Database = {
           has_area_selection?: boolean | null
           id?: string
           is_active?: boolean | null
+          material_cost?: number | null
           name: string
           price?: number
           procedure_id: string
@@ -795,6 +797,7 @@ export type Database = {
           has_area_selection?: boolean | null
           id?: string
           is_active?: boolean | null
+          material_cost?: number | null
           name?: string
           price?: number
           procedure_id?: string
@@ -824,6 +827,7 @@ export type Database = {
           image_url: string | null
           indication: string | null
           is_featured: boolean | null
+          material_cost: number | null
           name: string
           price: number | null
           requires_area_selection: boolean | null
@@ -847,6 +851,7 @@ export type Database = {
           image_url?: string | null
           indication?: string | null
           is_featured?: boolean | null
+          material_cost?: number | null
           name: string
           price?: number | null
           requires_area_selection?: boolean | null
@@ -870,6 +875,7 @@ export type Database = {
           image_url?: string | null
           indication?: string | null
           is_featured?: boolean | null
+          material_cost?: number | null
           name?: string
           price?: number | null
           requires_area_selection?: boolean | null

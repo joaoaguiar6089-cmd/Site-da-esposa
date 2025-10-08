@@ -107,12 +107,16 @@ const handler = async (req: Request): Promise<Response> => {
         const mapUrl = safeTrim(cityData.map_url);
         const location = buildClinicLocation(cityData);
         
+        console.log('City data:', { clinicName, cityName, address, mapUrl });
+        
         // Variáveis em inglês (nomes que aparecem no box azul)
         mergedVariables.cityName = cityName;
         mergedVariables.clinicName = clinicName;
         mergedVariables.clinicAddress = address;
         mergedVariables.clinicMapUrl = mapUrl;
         mergedVariables.clinicLocation = location;
+        
+        console.log('Merged variables after city:', mergedVariables);
       }
     }
 

@@ -283,7 +283,9 @@ export type Database = {
           created_at: string
           date_end: string | null
           date_start: string
+          end_time: string | null
           id: string
+          start_time: string | null
           updated_at: string
         }
         Insert: {
@@ -291,7 +293,9 @@ export type Database = {
           created_at?: string
           date_end?: string | null
           date_start: string
+          end_time?: string | null
           id?: string
+          start_time?: string | null
           updated_at?: string
         }
         Update: {
@@ -299,7 +303,9 @@ export type Database = {
           created_at?: string
           date_end?: string | null
           date_start?: string
+          end_time?: string | null
           id?: string
+          start_time?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -314,27 +320,39 @@ export type Database = {
       }
       city_settings: {
         Row: {
+          address: string | null
+          city: string | null
           city_name: string
+          clinic_name: string | null
           created_at: string
           display_order: number
           id: string
           is_active: boolean
+          map_url: string | null
           updated_at: string
         }
         Insert: {
+          address?: string | null
+          city?: string | null
           city_name: string
+          clinic_name?: string | null
           created_at?: string
           display_order?: number
           id?: string
           is_active?: boolean
+          map_url?: string | null
           updated_at?: string
         }
         Update: {
+          address?: string | null
+          city?: string | null
           city_name?: string
+          clinic_name?: string | null
           created_at?: string
           display_order?: number
           id?: string
           is_active?: boolean
+          map_url?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -463,6 +481,138 @@ export type Database = {
             columns: ["document_id"]
             isOneToOne: false
             referencedRelation: "client_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_items: {
+        Row: {
+          created_at: string
+          id: string
+          material_name: string
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          material_name: string
+          unit: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          material_name?: string
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      inventory_suggestions: {
+        Row: {
+          appointment_id: string
+          created_at: string
+          id: string
+          status: string
+          suggested_date: string
+          updated_at: string
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string
+          id?: string
+          status?: string
+          suggested_date: string
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string
+          id?: string
+          status?: string
+          suggested_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_suggestions_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: true
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_transactions: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          deleted_by: string | null
+          id: string
+          invoice_url: string | null
+          item_id: string
+          notes: string | null
+          procedure_id: string | null
+          quantity: number
+          total_value: number | null
+          transaction_date: string
+          transaction_type: string
+          unit_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          id?: string
+          invoice_url?: string | null
+          item_id: string
+          notes?: string | null
+          procedure_id?: string | null
+          quantity: number
+          total_value?: number | null
+          transaction_date: string
+          transaction_type: string
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          id?: string
+          invoice_url?: string | null
+          item_id?: string
+          notes?: string | null
+          procedure_id?: string | null
+          quantity?: number
+          total_value?: number | null
+          transaction_date?: string
+          transaction_type?: string
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_transactions_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "admin_users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "inventory_transactions_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_transactions_procedure_id_fkey"
+            columns: ["procedure_id"]
+            isOneToOne: false
+            referencedRelation: "procedures"
             referencedColumns: ["id"]
           },
         ]
@@ -1146,6 +1296,14 @@ export type Database = {
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_inventory_balance: {
+        Args: { p_item_id: string }
+        Returns: number
+      }
+      get_latest_unit_price: {
+        Args: { p_item_id: string }
+        Returns: number
       }
       get_public_site_setting: {
         Args: { setting_key_param: string }

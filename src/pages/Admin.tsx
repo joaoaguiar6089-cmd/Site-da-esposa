@@ -16,6 +16,7 @@ import HeroImageManager from "@/components/admin/HeroImageManager";
 import ScheduleSettings from "@/components/admin/ScheduleSettings";
 import AdminCityAddresses from "@/components/admin/AdminCityAddresses";
 import PromotionsManagement from "@/components/admin/PromotionsManagement";
+import { InventoryManagement } from "@/components/admin/InventoryManagement";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/auth/AuthContext";
@@ -94,6 +95,8 @@ const Admin = () => {
         return <ScheduleSettings />;
       case "city-addresses":
         return <AdminCityAddresses />;
+      case "inventory":
+        return <InventoryManagement />;
       case "notifications":
         return <NotificationDebug />;
       case "admins":

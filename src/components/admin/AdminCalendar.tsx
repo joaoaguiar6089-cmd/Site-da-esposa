@@ -382,7 +382,109 @@ ${clinicLocation}
     if (!confirm('Tem certeza que deseja deletar este agendamento? Esta ação também removerá todos os logs de lembrete associados.')) return;
 
     try {
-      // Primeiro, deletar os logs de lembrete relacionados
+      // Primeiro, buscar dados do agendamento para notificação
+      const { data: appointmentData, error: fetchError } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          clients (*),
+          procedures (name, price, duration),
+          city_settings (city_name)
+        `)
+        .eq('id', id)
+        .single();
+
+      if (fetchError) {
+        console.error('Erro ao buscar dados do agendamento:', fetchError);
+        // Continue com a deleção mesmo se não conseguir buscar os dados
+      }
+
+      // Se conseguiu buscar os dados e o agendamento estava confirmado, enviar notificação de cancelamento
+      if (appointmentData && appointmentData.status === 'confirmado') {
+        try {
+          console.log('=== ENVIANDO NOTIFICAÇÃO DE CANCELAMENTO (DELETE - CALENDAR) ===');
+          
+          const formatDateToBrazil = (dateString: string) => {
+            if (!dateString) return '';
+            try {
+              if (dateString.includes('-') && dateString.length === 10) {
+                const [year, month, day] = dateString.split('-');
+                if (year && month && day) {
+                  return `${day}/${month}/${year}`;
+                }
+              }
+              return dateString;
+            } catch (error) {
+              return dateString;
+            }
+          };
+
+          const { data: templateData } = await supabase.functions.invoke('get-whatsapp-template', {
+            body: {
+              templateType: 'cancelamento_cliente',
+              cityId: appointmentData.city_id,
+              variables: {
+                clientName: appointmentData.clients.nome,
+                appointmentDate: formatDateToBrazil(appointmentData.appointment_date),
+                appointmentTime: appointmentData.appointment_time,
+                procedureName: appointmentData.procedures.name,
+                notes: appointmentData.notes ? `\nObservações: ${appointmentData.notes}` : '',
+              },
+            },
+          });
+
+          const buildFallbackMessage = (
+            heading: string,
+            intro: string,
+            outro: string,
+            templateData?: { message?: string | null; variables?: unknown | null },
+          ) => {
+            const detailsLines = [
+              `- Data: ${formatDateToBrazil(appointmentData.appointment_date)}`,
+              `- Horário: ${appointmentData.appointment_time}`,
+              `- Procedimento: ${appointmentData.procedures.name}`,
+            ];
+
+            if (appointmentData.notes) {
+              detailsLines.push(`- Observações: ${appointmentData.notes}`);
+            }
+
+            const fallback = [
+              heading,
+              '',
+              `Olá ${appointmentData.clients.nome}!`,
+              '',
+              intro,
+              detailsLines.join('\n'),
+              '',
+              outro,
+            ].join('\n');
+
+            return (templateData as any)?.message || fallback;
+          };
+
+          const message = buildFallbackMessage(
+            '❌ *Agendamento Cancelado*',
+            'Informamos que seu agendamento foi cancelado:',
+            '📞 Para reagendar, entre em contato conosco.',
+            templateData as any,
+          );
+
+          await supabase.functions.invoke('send-whatsapp', {
+            body: {
+              to: appointmentData.clients.celular,
+              message,
+            },
+          });
+
+          console.log('Notificação de cancelamento enviada para:', appointmentData.clients.celular);
+        } catch (notificationError) {
+          console.error('Erro ao enviar notificação de cancelamento:', notificationError);
+          // Continue com a deleção mesmo se a notificação falhar
+        }
+      }
+
+      // Deletar os logs de lembrete relacionados
       const { error: reminderError } = await supabase
         .from('reminder_logs')
         .delete()
@@ -403,7 +505,9 @@ ${clinicLocation}
 
       toast({
         title: "Agendamento deletado",
-        description: "Agendamento foi removido com sucesso.",
+        description: appointmentData?.status === 'confirmado' 
+          ? "Agendamento foi removido e cliente foi notificado." 
+          : "Agendamento foi removido com sucesso.",
       });
 
       loadAppointments();

@@ -691,15 +691,18 @@ const AgendamentoForm = ({ client: rawClient, onAppointmentCreated, onBack, edit
         }
         
         // Enviar notificação WhatsApp para cliente
-        if (!editingId && (!adminMode || sendNotification)) { // Cliente sempre recebe, admin só se marcar opção
+        if (!adminMode || sendNotification) { // Cliente sempre recebe, admin só se marcar opção
           try {
-            console.log('=== ENVIO WHATSAPP - AgendamentoForm ===');
+            console.log(`=== ENVIO WHATSAPP - AgendamentoForm ${editingId ? '(EDIÇÃO)' : '(NOVO)'} ===`);
             
-            // Buscar template de agendamento (mesmo usado no NewBookingFlow)
+            // Escolher template baseado na ação
+            const templateType = editingId ? 'agendamento_atualizado_cliente' : 'agendamento_cliente';
+            
+            // Buscar template
             const { data: template } = await supabase
               .from('whatsapp_templates')
               .select('template_content')
-              .eq('template_type', 'agendamento_cliente')
+              .eq('template_type', templateType)
               .single();
 
             console.log('Template encontrado:', template);
@@ -747,7 +750,58 @@ const AgendamentoForm = ({ client: rawClient, onAppointmentCreated, onBack, edit
                 }
               });
               
-              console.log('Notificação de confirmação enviada para cliente');
+              console.log(`Notificação de ${editingId ? 'alteração' : 'confirmação'} enviada para cliente`);
+            } else if (editingId) {
+              // Fallback para alteração se não houver template específico
+              const { data: fallbackTemplate } = await supabase
+                .from('whatsapp_templates')
+                .select('template_content')
+                .eq('template_type', 'agendamento_cliente')
+                .single();
+
+              if (fallbackTemplate) {
+                // Buscar dados da cidade
+                const { data: cityData } = await supabase
+                  .from('city_settings')
+                  .select('city_name')
+                  .eq('id', formData.city_id)
+                  .single();
+
+                const notes = formData.notes ? `\n📝 Observações: ${formData.notes}` : '';
+                const cityName = cityData?.city_name || '';
+                const clinicLocation = `📍 Clínica Dra. Karoline Ferreira — ${cityName}`;
+
+                // Adicionar cabeçalho de alteração ao template padrão
+                let message = `🔄 *Agendamento Alterado*\n\n` + fallbackTemplate.template_content;
+
+                // Preparar variáveis para substituição
+                const variables = {
+                  clientName: client.nome,
+                  appointmentDate: formatDateToBrazil(formData.appointment_date),
+                  appointmentTime: formData.appointment_time,
+                  procedureName: selectedProc?.name || '',
+                  notes: notes,
+                  clinicLocation: clinicLocation,
+                  cityName: cityName,
+                  clinicName: 'Clínica Dra. Karoline Ferreira',
+                  specifications: selectedSpecifications.map(spec => spec.name).join(', ') || ''
+                };
+
+                // Substituir todas as variáveis no template
+                Object.entries(variables).forEach(([key, value]) => {
+                  const regex = new RegExp(`\\{${key}\\}`, 'g');
+                  message = message.replace(regex, value || '');
+                });
+
+                await supabase.functions.invoke('send-whatsapp', {
+                  body: {
+                    to: client.celular,
+                    message: message
+                  }
+                });
+                
+                console.log('Notificação de alteração enviada para cliente (usando template padrão)');
+              }
             }
           } catch (notificationError) {
             console.error('Erro ao enviar notificação para cliente:', notificationError);

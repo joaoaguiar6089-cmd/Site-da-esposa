@@ -83,8 +83,27 @@ const handler = async (req: Request): Promise<Response> => {
 
     const mergedVariables: Record<string, string> = {};
 
+    // Mapear variáveis em inglês para português para compatibilidade
+    const variableMapping: Record<string, string> = {
+      'clientName': 'nomeCliente',
+      'clientPhone': 'telefoneCliente', 
+      'appointmentDate': 'dataAgendamento',
+      'appointmentTime': 'horaAgendamento',
+      'procedureName': 'nomeProcedimento',
+      'professionalName': 'nomeProfissional',
+      'notes': 'observacoes',
+      'specifications': 'especificacoes',
+      'cityName': 'nomeCidade',
+      'clinicName': 'nomeClinica',
+      'clinicAddress': 'enderecoClinica',
+      'clinicMapUrl': 'urlMapaClinica',
+      'clinicLocation': 'localizacaoClinica'
+    };
+
     Object.entries(variables || {}).forEach(([key, value]) => {
-      mergedVariables[key] = safeTrim(value);
+      // Usar nome em português se existir mapeamento, senão usar o nome original
+      const portugueseKey = variableMapping[key] || key;
+      mergedVariables[portugueseKey] = safeTrim(value);
     });
 
     if (cityId) {
@@ -105,13 +124,6 @@ const handler = async (req: Request): Promise<Response> => {
         mergedVariables.enderecoClinica = safeTrim(cityData.address);
         mergedVariables.urlMapaClinica = safeTrim(cityData.map_url);
         mergedVariables.localizacaoClinica = buildClinicLocation(cityData);
-        
-        // Manter compatibilidade com nomes em inglês por enquanto
-        mergedVariables.cityName = safeTrim(cityData.city_name);
-        mergedVariables.clinicName = safeTrim(cityData.clinic_name);
-        mergedVariables.clinicAddress = safeTrim(cityData.address);
-        mergedVariables.clinicMapUrl = safeTrim(cityData.map_url);
-        mergedVariables.clinicLocation = buildClinicLocation(cityData);
       }
     }
 

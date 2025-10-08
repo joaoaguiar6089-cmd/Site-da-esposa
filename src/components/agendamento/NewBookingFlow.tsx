@@ -516,7 +516,7 @@ const NewBookingFlow = ({
       console.log('Buscando dados da cidade com ID:', appointment.city_id);
       const { data: cityData, error: cityError } = await supabase
         .from('city_settings')
-        .select('city_name')
+        .select('city_name, map_url')
         .eq('id', appointment.city_id)
         .single();
 
@@ -550,6 +550,7 @@ const NewBookingFlow = ({
         clinicLocation: clinicLocation,
         cityName: cityName,
         clinicName: 'Clínica Dra. Karoline Ferreira',
+        clinicMapUrl: cityData?.map_url || '',
         specifications: appointment.specifications || ''
       };
 

@@ -83,35 +83,33 @@ const handler = async (req: Request): Promise<Response> => {
 
     const mergedVariables: Record<string, string> = {};
 
-    // Primeiro, adicionar todas as variáveis como vieram (mantendo compatibilidade)
+    // Primeiro, adicionar todas as variáveis como vieram
     Object.entries(variables || {}).forEach(([key, value]) => {
       mergedVariables[key] = safeTrim(value);
     });
 
-    // Mapeamento completo de variáveis em português para todas as variações nos templates
-    const portugueseMapping: Record<string, string[]> = {
-      'nomeCliente': ['clientName', 'cliente_nome'],
-      'telefoneCliente': ['clientPhone'], 
-      'dataAgendamento': ['appointmentDate', 'data'],
-      'horaAgendamento': ['appointmentTime', 'horario'],
-      'nomeProcedimento': ['procedureName', 'procedimento'],
-      'nomeProfissional': ['professionalName'],
-      'observacoes': ['notes'],
-      'especificacoes': ['specifications'],
-      'nomeCidade': ['cityName'],
-      'nomeClinica': ['clinicName'],
-      'enderecoClinica': ['clinicAddress'],
-      'urlMapaClinica': ['clinicMapUrl'],
-      'localizacaoClinica': ['clinicLocation']
+    // Mapeamento de variáveis em português para inglês (para templates originais)
+    const portugueseToEnglish: Record<string, string> = {
+      'nomeCliente': 'clientName',
+      'telefoneCliente': 'clientPhone', 
+      'dataAgendamento': 'appointmentDate',
+      'horaAgendamento': 'appointmentTime',
+      'nomeProcedimento': 'procedureName',
+      'nomeProfissional': 'professionalName',
+      'observacoes': 'notes',
+      'especificacoes': 'specifications',
+      'nomeCidade': 'cityName',
+      'nomeClinica': 'clinicName',
+      'enderecoClinica': 'clinicAddress',
+      'urlMapaClinica': 'clinicMapUrl',
+      'localizacaoClinica': 'clinicLocation'
     };
 
-    // Mapear variáveis em português para todas as variações em inglês/português nos templates
+    // Mapear variáveis em português para inglês
     Object.entries(variables || {}).forEach(([key, value]) => {
-      const mappings = portugueseMapping[key];
-      if (mappings) {
-        mappings.forEach(englishKey => {
-          mergedVariables[englishKey] = safeTrim(value);
-        });
+      const englishKey = portugueseToEnglish[key];
+      if (englishKey) {
+        mergedVariables[englishKey] = safeTrim(value);
       }
     });
 
@@ -128,23 +126,22 @@ const handler = async (req: Request): Promise<Response> => {
       }
 
       if (cityData) {
-        // Mapear para todas as variações de variáveis nos templates
         const clinicName = safeTrim(cityData.clinic_name);
         const cityName = safeTrim(cityData.city_name);
         const address = safeTrim(cityData.address);
         const mapUrl = safeTrim(cityData.map_url);
         const location = buildClinicLocation(cityData);
         
-        // Variáveis em inglês (templates antigos)
+        // Variáveis em inglês (para templates originais)
         mergedVariables.cityName = cityName;
         mergedVariables.clinicName = clinicName;
         mergedVariables.clinicAddress = address;
         mergedVariables.clinicMapUrl = mapUrl;
         mergedVariables.clinicLocation = location;
         
-        // Variáveis em português (interface nova)
-        mergedVariables.nomeClinica = clinicName;
+        // Variáveis em português (para interface nova)
         mergedVariables.nomeCidade = cityName;
+        mergedVariables.nomeClinica = clinicName;
         mergedVariables.enderecoClinica = address;
         mergedVariables.urlMapaClinica = mapUrl;
         mergedVariables.localizacaoClinica = location;

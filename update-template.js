@@ -9,18 +9,20 @@ async function updateTemplate() {
   try {
     console.log('Atualizando template de agendamento...');
     
-    // Novo template que usa as variáveis corretas
-    const newTemplate = `🩺 *Agendamento Confirmado*
+    // Novo template que usa as variáveis corretas em português
+    const newTemplate = `Olá {nomeCliente}! 👋  
 
-Olá {clientName}!
+✅ Seu agendamento foi confirmado!  
 
-📅 Data: {appointmentDate}
-⏰ Horário: {appointmentTime}
-💉 Procedimento: {procedureName}{notes}
+📅 Data: {dataAgendamento}  
+⏰ Horário: {horarioAgendamento}  
+� Procedimento: {nomeProcedimento}
 
-{clinicLocation}
+📍 {localizacaoClinica}
 
-✨ Aguardamos você!`;
+✨ Aguardo você!
+
+* Se precisar cancelar ou alterar, entre em contato conosco ou faça pelo nosso site: drakarolineferreira.com.br - área do cliente.`;
 
     const { data, error } = await supabase
       .from('whatsapp_templates')

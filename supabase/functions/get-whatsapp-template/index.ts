@@ -100,6 +100,13 @@ const handler = async (req: Request): Promise<Response> => {
       }
 
       if (cityData) {
+        mergedVariables.nomeClinica = safeTrim(cityData.clinic_name);
+        mergedVariables.nomeCidade = safeTrim(cityData.city_name);
+        mergedVariables.enderecoClinica = safeTrim(cityData.address);
+        mergedVariables.urlMapaClinica = safeTrim(cityData.map_url);
+        mergedVariables.localizacaoClinica = buildClinicLocation(cityData);
+        
+        // Manter compatibilidade com nomes em inglês por enquanto
         mergedVariables.cityName = safeTrim(cityData.city_name);
         mergedVariables.clinicName = safeTrim(cityData.clinic_name);
         mergedVariables.clinicAddress = safeTrim(cityData.address);

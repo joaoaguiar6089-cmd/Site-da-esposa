@@ -413,6 +413,16 @@ Tefé-AM
 
             // Preparar variáveis para substituição
             const variables = {
+              nomeCliente: appointmentData.clients.nome,
+              dataAgendamento: formatDateToBrazil(appointmentData.appointment_date),
+              horarioAgendamento: appointmentData.appointment_time,
+              nomeProcedimento: appointmentData.procedures.name,
+              observacoes: notes,
+              localizacaoClinica: clinicLocation,
+              nomeCidade: cityName,
+              nomeClinica: 'Clínica Dra. Karoline Ferreira',
+              especificacoes: '',
+              // Manter compatibilidade
               clientName: appointmentData.clients.nome,
               appointmentDate: formatDateToBrazil(appointmentData.appointment_date),
               appointmentTime: appointmentData.appointment_time,
@@ -473,6 +483,12 @@ ${clinicLocation}
               templateType: 'cancelamento_cliente',
               cityId: appointmentData.city_id,
               variables: {
+                nomeCliente: appointmentData.clients.nome,
+                dataAgendamento: formatDateToBrazil(appointmentData.appointment_date),
+                horarioAgendamento: appointmentData.appointment_time,
+                nomeProcedimento: appointmentData.procedures.name,
+                observacoes: appointmentData.notes ? `\nObservações: ${appointmentData.notes}` : '',
+                // Manter compatibilidade
                 clientName: appointmentData.clients.nome,
                 appointmentDate: formatDateToBrazil(appointmentData.appointment_date),
                 appointmentTime: appointmentData.appointment_time,

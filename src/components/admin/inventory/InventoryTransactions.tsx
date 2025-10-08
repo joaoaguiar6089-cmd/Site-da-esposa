@@ -23,6 +23,28 @@ export const InventoryTransactions = () => {
   const { data: transactions, isLoading, refetch } = useQuery({
     queryKey: ["inventory-transactions", filters],
     queryFn: async () => {
+      // First, get ALL transactions for balance calculation
+      const { data: allTransactions, error: allError } = await supabase
+        .from("inventory_transactions")
+        .select(`
+          *,
+          inventory_items (
+            id,
+            material_name,
+            unit
+          ),
+          procedures (
+            id,
+            name
+          )
+        `)
+        .is("deleted_at", null)
+        .order("transaction_date", { ascending: false })
+        .order("created_at", { ascending: false });
+
+      if (allError) throw allError;
+
+      // Then apply filters for display
       let query = supabase
         .from("inventory_transactions")
         .select(`
@@ -54,9 +76,13 @@ export const InventoryTransactions = () => {
         query = query.eq("transaction_type", filters.transactionType);
       }
 
-      const { data, error } = await query;
+      const { data: filteredTransactions, error } = await query;
       if (error) throw error;
-      return data;
+      
+      return {
+        allTransactions,
+        filteredTransactions
+      };
     },
   });
 
@@ -64,11 +90,11 @@ export const InventoryTransactions = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-4 justify-between">
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => setShowEntryDialog(true)} className="gap-2">
+          <Button onClick={() => setShowEntryDialog(true)} className="gap-2 bg-green-600 hover:bg-green-700 text-white">
             <Plus className="h-4 w-4" />
             Nova Entrada
           </Button>
-          <Button onClick={() => setShowExitDialog(true)} variant="outline" className="gap-2">
+          <Button onClick={() => setShowExitDialog(true)} variant="outline" className="gap-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white">
             <Plus className="h-4 w-4" />
             Nova Saída
           </Button>
@@ -80,7 +106,8 @@ export const InventoryTransactions = () => {
       <Card className="p-6">
         <TransactionFilters filters={filters} onFiltersChange={setFilters} />
         <TransactionsTable 
-          transactions={transactions || []} 
+          transactions={transactions?.filteredTransactions || []} 
+          allTransactions={transactions?.allTransactions || []}
           isLoading={isLoading}
           onRefetch={refetch}
         />

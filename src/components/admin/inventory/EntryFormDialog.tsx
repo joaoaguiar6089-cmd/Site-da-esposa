@@ -65,42 +65,54 @@ export const EntryFormDialog = ({ open, onOpenChange, onSuccess }: EntryFormProp
       let invoiceUrl = null;
       if (invoiceFile) {
         const fileExt = invoiceFile.name.split(".").pop();
-        const fileName = `${itemId}-${Date.now()}.${fileExt}`;
+        const fileName = `invoices/${itemId}-${Date.now()}.${fileExt}`;
         
-        // Try to upload to client-documents bucket, create if it doesn't exist
+        // Try multiple bucket strategies
+        const buckets = ["client-documents", "inventory-attachments"];
         let uploadError;
-        let bucket = "client-documents";
+        let publicUrl;
         
-        const { error: uploadError1 } = await supabase.storage
-          .from(bucket)
-          .upload(`invoices/${fileName}`, invoiceFile);
+        for (const bucket of buckets) {
+          const { error: uploadErr } = await supabase.storage
+            .from(bucket)
+            .upload(fileName, invoiceFile);
 
-        if (uploadError1 && uploadError1.message.includes("Bucket not found")) {
-          // Try to create the bucket
-          const { error: createError } = await supabase.storage.createBucket(bucket, {
-            public: true,
-            allowedMimeTypes: ['application/pdf', 'image/*'],
-            fileSizeLimit: 10485760 // 10MB
-          });
-          
-          if (!createError) {
-            // Retry upload after creating bucket
-            const { error: uploadError2 } = await supabase.storage
+          if (!uploadErr) {
+            // Upload successful, get public URL
+            const { data: { publicUrl: url } } = supabase.storage
               .from(bucket)
-              .upload(`invoices/${fileName}`, invoiceFile);
-            uploadError = uploadError2;
-          } else {
-            uploadError = uploadError1;
+              .getPublicUrl(fileName);
+            publicUrl = url;
+            break;
+          } else if (uploadErr.message.includes("Bucket not found")) {
+            // Try to create the bucket and retry
+            const { error: createError } = await supabase.storage.createBucket(bucket, {
+              public: true,
+              allowedMimeTypes: ['application/pdf', 'image/*'],
+              fileSizeLimit: 10485760 // 10MB
+            });
+            
+            if (!createError) {
+              // Retry upload after creating bucket
+              const { error: retryError } = await supabase.storage
+                .from(bucket)
+                .upload(fileName, invoiceFile);
+                
+              if (!retryError) {
+                const { data: { publicUrl: url } } = supabase.storage
+                  .from(bucket)
+                  .getPublicUrl(fileName);
+                publicUrl = url;
+                break;
+              }
+            }
           }
-        } else {
-          uploadError = uploadError1;
+          uploadError = uploadErr;
         }
 
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from(bucket)
-          .getPublicUrl(`invoices/${fileName}`);
+        if (!publicUrl && uploadError) {
+          throw uploadError;
+        }
 
         invoiceUrl = publicUrl;
       }

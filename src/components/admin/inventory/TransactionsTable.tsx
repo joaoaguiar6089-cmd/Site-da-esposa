@@ -46,12 +46,14 @@ interface Transaction {
 
 interface TransactionsTableProps {
   transactions: Transaction[];
+  allTransactions?: Transaction[];
   isLoading: boolean;
   onRefetch: () => void;
 }
 
 export const TransactionsTable = ({
   transactions,
+  allTransactions,
   isLoading,
   onRefetch,
 }: TransactionsTableProps) => {
@@ -62,11 +64,14 @@ export const TransactionsTable = ({
   const transactionsWithBalance = useMemo(() => {
     if (!transactions.length) return [];
 
+    // Use allTransactions for balance calculation if available, otherwise use filtered transactions
+    const transactionsForBalance = allTransactions && allTransactions.length > 0 ? allTransactions : transactions;
+
     // Group transactions by item and calculate balances
     const itemBalances: Record<string, number> = {};
     
     // First, calculate current balance for each item by going through all transactions
-    transactions.forEach((transaction) => {
+    transactionsForBalance.forEach((transaction) => {
       const itemId = transaction.inventory_items?.id || "";
       if (!itemBalances[itemId]) itemBalances[itemId] = 0;
       
@@ -76,31 +81,37 @@ export const TransactionsTable = ({
       itemBalances[itemId] += change;
     });
 
-    // Now, work backwards from current balance to calculate historical balances
+    // Now, calculate historical balances for each filtered transaction
     const result = [];
-    const currentItemBalances = { ...itemBalances };
     
-    for (let i = 0; i < transactions.length; i++) {
-      const transaction = transactions[i];
+    for (const transaction of transactions) {
       const itemId = transaction.inventory_items?.id || "";
       
-      // The balance for this transaction is the current balance at this point
-      const balanceAtThisPoint = currentItemBalances[itemId];
+      // Get all transactions for this item up to and including this transaction's date
+      const transactionsUpToDate = transactionsForBalance.filter(t => {
+        const isSameItem = t.inventory_items?.id === itemId;
+        const isBeforeOrSame = new Date(t.transaction_date) <= new Date(transaction.transaction_date);
+        const isSameTransaction = t.id === transaction.id;
+        
+        // Include if it's the same item AND (before/same date OR same transaction)
+        return isSameItem && (isBeforeOrSame || isSameTransaction);
+      });
+      
+      // Calculate balance up to this transaction
+      let balanceAtThisPoint = 0;
+      transactionsUpToDate.forEach(t => {
+        const change = t.transaction_type === "entrada" ? t.quantity : -t.quantity;
+        balanceAtThisPoint += change;
+      });
       
       result.push({
         ...transaction,
         balance: balanceAtThisPoint,
       });
-      
-      // Subtract this transaction's effect to get the balance before it
-      const change = transaction.transaction_type === "entrada" 
-        ? transaction.quantity 
-        : -transaction.quantity;
-      currentItemBalances[itemId] -= change;
     }
     
     return result;
-  }, [transactions]);
+  }, [transactions, allTransactions]);
 
   const handleDelete = async () => {
     if (!deleteId) return;

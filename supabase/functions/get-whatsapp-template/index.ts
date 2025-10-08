@@ -139,11 +139,11 @@ const handler = async (req: Request): Promise<Response> => {
         mergedVariables.clinicMapUrl = mapUrl;
         mergedVariables.clinicLocation = location;
         
-        // Variáveis em português (para interface nova)
+        // Variáveis em português (para interface nova) - IMPORTANTE: mapear para inglês também
         mergedVariables.nomeCidade = cityName;
         mergedVariables.nomeClinica = clinicName;
         mergedVariables.enderecoClinica = address;
-        mergedVariables.urlMapaClinica = mapUrl;
+        mergedVariables.urlMapaClinica = mapUrl;  // Esta linha é crucial!
         mergedVariables.localizacaoClinica = location;
       }
     }

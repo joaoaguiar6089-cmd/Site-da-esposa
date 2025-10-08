@@ -677,6 +677,51 @@ export type Database = {
         }
         Relationships: []
       }
+      procedure_monthly_goals: {
+        Row: {
+          created_at: string
+          id: string
+          procedure_id: string
+          quantity: number
+          specification_id: string | null
+          target_month: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          procedure_id: string
+          quantity?: number
+          specification_id?: string | null
+          target_month?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          procedure_id?: string
+          quantity?: number
+          specification_id?: string | null
+          target_month?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procedure_monthly_goals_procedure_id_fkey"
+            columns: ["procedure_id"]
+            isOneToOne: false
+            referencedRelation: "procedures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "procedure_monthly_goals_specification_id_fkey"
+            columns: ["specification_id"]
+            isOneToOne: false
+            referencedRelation: "procedure_specifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       procedure_results: {
         Row: {
           appointment_id: string

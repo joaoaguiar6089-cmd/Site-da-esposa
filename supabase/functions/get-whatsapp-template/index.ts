@@ -83,34 +83,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     const mergedVariables: Record<string, string> = {};
 
-    // Primeiro, adicionar todas as variáveis como vieram
+    // Adicionar todas as variáveis como vieram (sem mapeamento)
     Object.entries(variables || {}).forEach(([key, value]) => {
       mergedVariables[key] = safeTrim(value);
-    });
-
-    // Mapeamento de variáveis em português para inglês (para templates originais)
-    const portugueseToEnglish: Record<string, string> = {
-      'nomeCliente': 'clientName',
-      'telefoneCliente': 'clientPhone', 
-      'dataAgendamento': 'appointmentDate',
-      'horaAgendamento': 'appointmentTime',
-      'nomeProcedimento': 'procedureName',
-      'nomeProfissional': 'professionalName',
-      'observacoes': 'notes',
-      'especificacoes': 'specifications',
-      'nomeCidade': 'cityName',
-      'nomeClinica': 'clinicName',
-      'enderecoClinica': 'clinicAddress',
-      'urlMapaClinica': 'clinicMapUrl',
-      'localizacaoClinica': 'clinicLocation'
-    };
-
-    // Mapear variáveis em português para inglês
-    Object.entries(variables || {}).forEach(([key, value]) => {
-      const englishKey = portugueseToEnglish[key];
-      if (englishKey) {
-        mergedVariables[englishKey] = safeTrim(value);
-      }
     });
 
     if (cityId) {
@@ -132,19 +107,12 @@ const handler = async (req: Request): Promise<Response> => {
         const mapUrl = safeTrim(cityData.map_url);
         const location = buildClinicLocation(cityData);
         
-        // Variáveis em inglês (para templates originais)
+        // Variáveis em inglês (nomes que aparecem no box azul)
         mergedVariables.cityName = cityName;
         mergedVariables.clinicName = clinicName;
         mergedVariables.clinicAddress = address;
         mergedVariables.clinicMapUrl = mapUrl;
         mergedVariables.clinicLocation = location;
-        
-        // Variáveis em português (para interface nova) - IMPORTANTE: mapear para inglês também
-        mergedVariables.nomeCidade = cityName;
-        mergedVariables.nomeClinica = clinicName;
-        mergedVariables.enderecoClinica = address;
-        mergedVariables.urlMapaClinica = mapUrl;  // Esta linha é crucial!
-        mergedVariables.localizacaoClinica = location;
       }
     }
 

@@ -41,19 +41,19 @@ const NotificationDebug = () => {
 
   // Variáveis disponíveis para os templates
   const availableVariables = [
-    { name: "nomeCliente", description: "Nome do cliente" },
-    { name: "telefoneCliente", description: "Telefone do cliente" },
-    { name: "dataAgendamento", description: "Data do agendamento" },
-    { name: "horaAgendamento", description: "Hora do agendamento" },
-    { name: "nomeProcedimento", description: "Nome do procedimento" },
-    { name: "nomeProfissional", description: "Nome do profissional responsável" },
-    { name: "observacoes", description: "Observações adicionais" },
-    { name: "especificacoes", description: "Especificações selecionadas" },
-    { name: "nomeCidade", description: "Cidade escolhida no agendamento" },
-    { name: "nomeClinica", description: "Nome da clínica correspondente" },
-    { name: "enderecoClinica", description: "Endereço completo da clínica" },
-    { name: "urlMapaClinica", description: "Link do Google Maps da clínica" },
-    { name: "localizacaoClinica", description: "Bloco com nome, endereço e link da clínica" }
+    { name: "clientName", description: "Nome do cliente" },
+    { name: "clientPhone", description: "Telefone do cliente" },
+    { name: "appointmentDate", description: "Data do agendamento" },
+    { name: "appointmentTime", description: "Hora do agendamento" },
+    { name: "procedureName", description: "Nome do procedimento" },
+    { name: "professionalName", description: "Nome do profissional responsável" },
+    { name: "notes", description: "Observações adicionais" },
+    { name: "specifications", description: "Especificações selecionadas" },
+    { name: "cityName", description: "Cidade escolhida no agendamento" },
+    { name: "clinicName", description: "Nome da clínica correspondente" },
+    { name: "clinicAddress", description: "Endereço completo da clínica" },
+    { name: "clinicMapUrl", description: "Link do Google Maps da clínica" },
+    { name: "clinicLocation", description: "Bloco com nome, endereço e link da clínica" }
   ];
 
   useEffect(() => {

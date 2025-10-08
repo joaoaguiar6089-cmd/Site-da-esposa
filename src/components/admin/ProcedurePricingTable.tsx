@@ -52,6 +52,9 @@ type GoalDetail = GoalWithRelations & {
   subcategoryName?: string | null;
 };
 
+const ALL_CATEGORIES = "all";
+const ALL_SUBCATEGORIES = "all";
+
 const currencyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
@@ -111,8 +114,8 @@ const ProcedurePricingTable = () => {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [rows, setRows] = useState<PricingRow[]>([]);
   const [loadingRows, setLoadingRows] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string>("");
+  const [selectedCategory, setSelectedCategory] = useState<string>(ALL_CATEGORIES);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string>(ALL_SUBCATEGORIES);
   const [searchTerm, setSearchTerm] = useState("");
   const [editingValues, setEditingValues] = useState<Record<string, string>>({});
   const [savingRowKey, setSavingRowKey] = useState<string | null>(null);
@@ -134,14 +137,16 @@ const ProcedurePricingTable = () => {
   }, []);
 
   useEffect(() => {
-    if (!selectedSubcategory) return;
+    if (selectedSubcategory === ALL_SUBCATEGORIES) return;
 
     const belongsToCategory = subcategories.some(
-      (sub) => sub.id === selectedSubcategory && (!selectedCategory || sub.category_id === selectedCategory),
+      (sub) =>
+        sub.id === selectedSubcategory &&
+        (selectedCategory === ALL_CATEGORIES || sub.category_id === selectedCategory),
     );
 
     if (!belongsToCategory) {
-      setSelectedSubcategory("");
+      setSelectedSubcategory(ALL_SUBCATEGORIES);
     }
   }, [selectedCategory, selectedSubcategory, subcategories]);
 
@@ -315,7 +320,7 @@ const ProcedurePricingTable = () => {
   };
 
   const filteredSubcategories = useMemo(() => {
-    if (!selectedCategory) return subcategories;
+    if (selectedCategory === ALL_CATEGORIES) return subcategories;
     return subcategories.filter((sub) => sub.category_id === selectedCategory);
   }, [selectedCategory, subcategories]);
 
@@ -323,10 +328,10 @@ const ProcedurePricingTable = () => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
     return rows.filter((row) => {
-      if (selectedCategory && row.categoryId !== selectedCategory) {
+      if (selectedCategory !== ALL_CATEGORIES && row.categoryId !== selectedCategory) {
         return false;
       }
-      if (selectedSubcategory && row.subcategoryId !== selectedSubcategory) {
+      if (selectedSubcategory !== ALL_SUBCATEGORIES && row.subcategoryId !== selectedSubcategory) {
         return false;
       }
       if (normalizedSearch && !row.displayName.toLowerCase().includes(normalizedSearch)) {
@@ -796,10 +801,10 @@ const ProcedurePricingTable = () => {
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger className="w-full sm:w-[220px]">
                   <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
-                  <SelectValue placeholder="Todas as categorias" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas as categorias</SelectItem>
+                  <SelectItem value={ALL_CATEGORIES}>Todas as categorias</SelectItem>
                   {categories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
@@ -808,13 +813,17 @@ const ProcedurePricingTable = () => {
                 </SelectContent>
               </Select>
 
-              <Select value={selectedSubcategory} onValueChange={setSelectedSubcategory} disabled={!filteredSubcategories.length}>
+              <Select
+                value={selectedSubcategory}
+                onValueChange={setSelectedSubcategory}
+                disabled={!filteredSubcategories.length}
+              >
                 <SelectTrigger className="w-full sm:w-[220px]">
                   <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
-                  <SelectValue placeholder="Todas as subcategorias" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas as subcategorias</SelectItem>
+                  <SelectItem value={ALL_SUBCATEGORIES}>Todas as subcategorias</SelectItem>
                   {filteredSubcategories.map((subcategory) => (
                     <SelectItem key={subcategory.id} value={subcategory.id}>
                       {subcategory.name}

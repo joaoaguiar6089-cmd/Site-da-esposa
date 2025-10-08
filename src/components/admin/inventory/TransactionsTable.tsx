@@ -24,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { AttachmentPreview } from "./AttachmentPreview";
 
 interface Transaction {
   id: string;
@@ -59,6 +60,7 @@ export const TransactionsTable = ({
 }: TransactionsTableProps) => {
   const { toast } = useToast();
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   // Calculate running balance for each item (working backwards since transactions are in descending order)
   const transactionsWithBalance = useMemo(() => {
@@ -244,13 +246,14 @@ export const TransactionsTable = ({
                       ? `R$ ${transaction.total_value.toFixed(2)}`
                       : "-"}
                   </TableCell>
-                  <TableCell className="text-right">
+                                    <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       {transaction.invoice_url && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => window.open(transaction.invoice_url!, "_blank")}
+                          onClick={() => setPreviewUrl(transaction.invoice_url)}
+                          title="Visualizar anexo"
                         >
                           <FileText className="h-4 w-4" />
                         </Button>
@@ -259,6 +262,7 @@ export const TransactionsTable = ({
                         variant="ghost"
                         size="sm"
                         onClick={() => setDeleteId(transaction.id)}
+                        title="Excluir transação"
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -271,7 +275,7 @@ export const TransactionsTable = ({
         </Table>
       </div>
 
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+            <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
@@ -286,6 +290,15 @@ export const TransactionsTable = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {previewUrl && (
+        <AttachmentPreview
+          open={!!previewUrl}
+          onOpenChange={() => setPreviewUrl(null)}
+          fileUrl={previewUrl}
+          fileName="Nota Fiscal"
+        />
+      )}
     </>
   );
 };

@@ -9,6 +9,7 @@ import { TransactionFilters } from "./TransactionFilters";
 import { EntryFormDialog } from "./EntryFormDialog";
 import { ExitFormDialog } from "./ExitFormDialog";
 import { SuggestionsPanel } from "./SuggestionsPanel";
+import { StorageHealthCheck } from "./StorageHealthCheck";
 
 export const InventoryTransactions = () => {
   const [showEntryDialog, setShowEntryDialog] = useState(false);
@@ -86,8 +87,12 @@ export const InventoryTransactions = () => {
     },
   });
 
-  return (
+    return (
     <div className="space-y-6">
+      <Card className="p-6">
+        <StorageHealthCheck />
+      </Card>
+      
       <div className="flex flex-col sm:flex-row gap-4 justify-between">
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => setShowEntryDialog(true)} className="gap-2 bg-green-600 hover:bg-green-700 text-white">

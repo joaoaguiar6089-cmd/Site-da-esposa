@@ -61,59 +61,31 @@ export const EntryFormDialog = ({ open, onOpenChange, onSuccess }: EntryFormProp
         itemId = newItem.id;
       }
 
-      // Upload invoice if provided
+            // Upload invoice if provided
       let invoiceUrl = null;
       if (invoiceFile) {
         const fileExt = invoiceFile.name.split(".").pop();
         const fileName = `invoices/${itemId}-${Date.now()}.${fileExt}`;
         
-        // Try multiple bucket strategies
-        const buckets = ["client-documents", "inventory-attachments"];
-        let uploadError;
-        let publicUrl;
-        
-        for (const bucket of buckets) {
-          const { error: uploadErr } = await supabase.storage
-            .from(bucket)
-            .upload(fileName, invoiceFile);
+        // Use client-documents bucket (should already exist)
+        const { error: uploadError, data: uploadData } = await supabase.storage
+          .from("client-documents")
+          .upload(fileName, invoiceFile, {
+            cacheControl: '3600',
+            upsert: false
+          });
 
-          if (!uploadErr) {
-            // Upload successful, get public URL
-            const { data: { publicUrl: url } } = supabase.storage
-              .from(bucket)
-              .getPublicUrl(fileName);
-            publicUrl = url;
-            break;
-          } else if (uploadErr.message.includes("Bucket not found")) {
-            // Try to create the bucket and retry
-            const { error: createError } = await supabase.storage.createBucket(bucket, {
-              public: true,
-              allowedMimeTypes: ['application/pdf', 'image/*'],
-              fileSizeLimit: 10485760 // 10MB
-            });
-            
-            if (!createError) {
-              // Retry upload after creating bucket
-              const { error: retryError } = await supabase.storage
-                .from(bucket)
-                .upload(fileName, invoiceFile);
-                
-              if (!retryError) {
-                const { data: { publicUrl: url } } = supabase.storage
-                  .from(bucket)
-                  .getPublicUrl(fileName);
-                publicUrl = url;
-                break;
-              }
-            }
-          }
-          uploadError = uploadErr;
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+          // Show more specific error message
+          throw new Error(`Erro no upload: ${uploadError.message}`);
         }
 
-        if (!publicUrl && uploadError) {
-          throw uploadError;
-        }
-
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from("client-documents")
+          .getPublicUrl(fileName);
+          
         invoiceUrl = publicUrl;
       }
 

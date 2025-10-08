@@ -66,14 +66,40 @@ export const EntryFormDialog = ({ open, onOpenChange, onSuccess }: EntryFormProp
       if (invoiceFile) {
         const fileExt = invoiceFile.name.split(".").pop();
         const fileName = `${itemId}-${Date.now()}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage
-          .from("client-documents")
+        
+        // Try to upload to client-documents bucket, create if it doesn't exist
+        let uploadError;
+        let bucket = "client-documents";
+        
+        const { error: uploadError1 } = await supabase.storage
+          .from(bucket)
           .upload(`invoices/${fileName}`, invoiceFile);
+
+        if (uploadError1 && uploadError1.message.includes("Bucket not found")) {
+          // Try to create the bucket
+          const { error: createError } = await supabase.storage.createBucket(bucket, {
+            public: true,
+            allowedMimeTypes: ['application/pdf', 'image/*'],
+            fileSizeLimit: 10485760 // 10MB
+          });
+          
+          if (!createError) {
+            // Retry upload after creating bucket
+            const { error: uploadError2 } = await supabase.storage
+              .from(bucket)
+              .upload(`invoices/${fileName}`, invoiceFile);
+            uploadError = uploadError2;
+          } else {
+            uploadError = uploadError1;
+          }
+        } else {
+          uploadError = uploadError1;
+        }
 
         if (uploadError) throw uploadError;
 
         const { data: { publicUrl } } = supabase.storage
-          .from("client-documents")
+          .from(bucket)
           .getPublicUrl(`invoices/${fileName}`);
 
         invoiceUrl = publicUrl;

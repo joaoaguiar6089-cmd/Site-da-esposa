@@ -777,25 +777,51 @@ const ProcedurePricingTable = () => {
   return (
     <div className="space-y-6">
       <Card className="overflow-hidden border-none bg-gradient-to-br from-primary/10 via-background to-rose-50 shadow-md">
-        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-2">
-            <CardTitle className="flex items-center gap-3 text-2xl font-semibold text-foreground">
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary">
-                <TrendingUp className="h-6 w-6" />
-              </span>
-              Metas do Mes
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Acompanhe as metas de vendas para {currentMonthLabel || "o mes atual"}.
-            </p>
+        <CardHeader className="space-y-4">
+          {/* Mobile: Stack vertically */}
+          <div className="space-y-4 sm:hidden">
+            <div className="space-y-2">
+              <CardTitle className="flex items-center gap-3 text-xl font-semibold text-foreground">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary">
+                  <TrendingUp className="h-5 w-5" />
+                </span>
+                Metas do Mês
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Acompanhe as metas de vendas para {currentMonthLabel || "o mês atual"}.
+              </p>
+            </div>
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-primary/15 bg-background/95 px-4 py-3 shadow-sm">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total previsto</span>
+              <span className="text-2xl font-bold text-primary">{formatCurrency(totalGoalsValue)}</span>
+              <Button variant="secondary" size="sm" onClick={() => setGoalDialogOpen(true)} className="gap-2 w-full">
+                <Plus className="h-4 w-4" />
+                Criar meta
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-col items-start gap-2 rounded-2xl border border-primary/15 bg-background/95 px-5 py-4 text-right shadow-sm sm:items-end">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Lucro previsto</span>
-            <span className="text-3xl font-bold text-primary">{formatCurrency(totalGoalsValue)}</span>
-            <Button variant="secondary" size="sm" onClick={() => setGoalDialogOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Criar meta
-            </Button>
+
+          {/* Desktop: Side by side */}
+          <div className="hidden sm:flex sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <div className="space-y-2">
+              <CardTitle className="flex items-center gap-3 text-2xl font-semibold text-foreground">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary">
+                  <TrendingUp className="h-6 w-6" />
+                </span>
+                Metas do Mês
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Acompanhe as metas de vendas para {currentMonthLabel || "o mês atual"}.
+              </p>
+            </div>
+            <div className="flex flex-col items-start gap-2 rounded-2xl border border-primary/15 bg-background/95 px-5 py-4 text-right shadow-sm sm:items-end">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total previsto</span>
+              <span className="text-3xl font-bold text-primary">{formatCurrency(totalGoalsValue)}</span>
+              <Button variant="secondary" size="sm" onClick={() => setGoalDialogOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Criar meta
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="bg-background/70">
@@ -812,7 +838,7 @@ const ProcedurePricingTable = () => {
               </p>
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {goalsWithDetails.map((goal) => {
                 const quantityValue = goalQuantityMap[goal.id] ?? goal.quantity.toString();
                 const netUnit = Math.max(goal.unitPrice - goal.unitCost, 0);
@@ -822,79 +848,83 @@ const ProcedurePricingTable = () => {
                 return (
                   <div
                     key={goal.id}
-                    className="flex flex-col justify-between rounded-2xl border border-border/80 bg-background p-5 shadow-sm transition hover:shadow-md"
+                    className="flex flex-col justify-between rounded-2xl border border-border/80 bg-background p-4 shadow-sm transition hover:shadow-md"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          {goal.specification_id ? (
-                            <Badge variant="secondary" className="text-xs">
-                              Especificacao
-                            </Badge>
+                    <div className="space-y-3">
+                      {/* Header with badges and delete button */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                            {goal.specification_id ? (
+                              <Badge variant="secondary" className="text-xs">
+                                Especificação
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs">
+                                Procedimento
+                              </Badge>
+                            )}
+                            {goal.categoryName && (
+                              <span className="text-xs text-muted-foreground truncate">{goal.categoryName}</span>
+                            )}
+                          </div>
+                          <h3 className="text-sm font-semibold text-foreground leading-tight break-words">{goal.displayName}</h3>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {goal.subcategoryName && <span>{goal.subcategoryName} • </span>}
+                            {monthLabel || currentMonthLabel}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveGoal(goal)}
+                          disabled={removingGoalId === goal.id || updatingGoalId === goal.id}
+                          className="text-muted-foreground hover:text-destructive flex-shrink-0 h-8 w-8"
+                        >
+                          {removingGoalId === goal.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
                           ) : (
-                            <Badge variant="outline" className="text-xs">
-                              Procedimento
-                            </Badge>
+                            <Trash2 className="h-3 w-3" />
                           )}
-                          {goal.categoryName && (
-                            <span className="text-xs text-muted-foreground">{goal.categoryName}</span>
-                          )}
-                        </div>
-                        <h3 className="mt-1 text-base font-semibold text-foreground">{goal.displayName}</h3>
-                        <p className="text-xs text-muted-foreground">
-                          {goal.subcategoryName && <span>{goal.subcategoryName} \u2022 </span>}
-                          {monthLabel || currentMonthLabel}
-                        </p>
+                        </Button>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveGoal(goal)}
-                        disabled={removingGoalId === goal.id || updatingGoalId === goal.id}
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        {removingGoalId === goal.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
 
-                    <div className="mt-4 flex flex-col gap-3">
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 sm:items-end">
-                        <div className="sm:col-span-1">
-                          <Label htmlFor={`goal-qty-${goal.id}`} className="text-xs font-medium text-muted-foreground">
-                            Quantidade
-                          </Label>
-                          <Input
-                            id={`goal-qty-${goal.id}`}
-                            value={quantityValue}
-                            onChange={(event) => handleGoalQuantityChange(goal.id, event.target.value)}
-                            onBlur={(event) => handleGoalQuantityBlur(goal, event.target.value)}
-                            inputMode="numeric"
-                            className="mt-1"
-                          />
+                      {/* Content section with values */}
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 sm:items-end">
+                          <div className="sm:col-span-1">
+                            <Label htmlFor={`goal-qty-${goal.id}`} className="text-xs font-medium text-muted-foreground">
+                              Quantidade
+                            </Label>
+                            <Input
+                              id={`goal-qty-${goal.id}`}
+                              value={quantityValue}
+                              onChange={(event) => handleGoalQuantityChange(goal.id, event.target.value)}
+                              onBlur={(event) => handleGoalQuantityBlur(goal, event.target.value)}
+                              inputMode="numeric"
+                              className="mt-1 h-9"
+                            />
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Valor unitário</p>
+                            <p className="text-sm font-medium text-foreground">{formatCurrency(goal.unitPrice)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Custo unitário</p>
+                            <p className="text-sm font-medium text-foreground">{formatCurrency(goal.unitCost ?? 0)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Lucro previsto</p>
+                            <p className="text-lg font-semibold text-primary">{formatCurrency(totalValue)}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Valor unitario</p>
-                          <p className="text-sm font-medium text-foreground">{formatCurrency(goal.unitPrice)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Custo unitario</p>
-                          <p className="text-sm font-medium text-foreground">{formatCurrency(goal.unitCost ?? 0)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Lucro previsto</p>
-                          <p className="text-lg font-semibold text-primary">{formatCurrency(totalValue)}</p>
-                        </div>
+                        {updatingGoalId === goal.id && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Salvando alterações...
+                          </div>
+                        )}
                       </div>
-                      {updatingGoalId === goal.id && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Salvando alteracoes...
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
@@ -912,21 +942,22 @@ const ProcedurePricingTable = () => {
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex w-full flex-col gap-3 sm:flex-row">
-              <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar procedimento ou especificacao"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  className="pl-9"
-                />
-              </div>
+          <div className="space-y-4">
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar procedimento ou especificação"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                className="pl-9"
+              />
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
+            
+            {/* Filters */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-full sm:w-[220px]">
+                <SelectTrigger>
                   <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
                   <SelectValue placeholder="Todas as categorias" />
                 </SelectTrigger>
@@ -945,7 +976,7 @@ const ProcedurePricingTable = () => {
                 onValueChange={setSelectedSubcategory}
                 disabled={!filteredSubcategories.length}
               >
-                <SelectTrigger className="w-full sm:w-[220px]">
+                <SelectTrigger>
                   <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
                   <SelectValue placeholder="Todas as subcategorias" />
                 </SelectTrigger>
@@ -962,34 +993,124 @@ const ProcedurePricingTable = () => {
           </div>
 
           <div className="overflow-hidden rounded-xl border">
-            <Table>
-              <TableHeader className="bg-muted/40">
-                <TableRow>
-                  <TableHead>Procedimento / Especificacao</TableHead>
-                  <TableHead className="w-[160px] text-right">Valor (R$)</TableHead>
-                  <TableHead className="w-[160px] text-right">Custo (R$)</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loadingRows ? (
+            {/* Desktop Table View */}
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader className="bg-muted/40">
                   <TableRow>
-                    <TableCell colSpan={3}>
-                      <div className="flex items-center gap-2 py-6 text-muted-foreground">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Carregando tabela de precos...
-                      </div>
-                    </TableCell>
+                    <TableHead>Procedimento / Especificação</TableHead>
+                    <TableHead className="w-[140px] text-right">Valor (R$)</TableHead>
+                    <TableHead className="w-[140px] text-right">Custo (R$)</TableHead>
                   </TableRow>
-                ) : filteredRows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={3}>
-                      <div className="py-6 text-center text-muted-foreground">
-                        Nenhum procedimento encontrado com os filtros selecionados.
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredRows.map((row) => {
+                </TableHeader>
+                <TableBody>
+                  {loadingRows ? (
+                    <TableRow>
+                      <TableCell colSpan={3}>
+                        <div className="flex items-center gap-2 py-6 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Carregando tabela de preços...
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3}>
+                        <div className="py-6 text-center text-muted-foreground">
+                          Nenhum procedimento encontrado com os filtros selecionados.
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredRows.map((row) => {
+                      const priceInputValue =
+                        editingValues[row.rowKey] ??
+                        (row.price !== null && row.price !== undefined ? row.price.toString() : "");
+                      const costInputValue =
+                        editingCostValues[row.rowKey] ??
+                        (row.materialCost !== null && row.materialCost !== undefined
+                          ? row.materialCost.toString()
+                          : "");
+
+                      return (
+                        <TableRow key={row.rowKey} className="hover:bg-muted/40">
+                          <TableCell>
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                {row.type === "specification" ? (
+                                  <Badge variant="secondary" className="text-xs">
+                                    Especificação
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs">
+                                    Procedimento
+                                  </Badge>
+                                )}
+                                <span className="font-medium text-foreground">{row.displayName}</span>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {row.categoryName && <span>{row.categoryName}</span>}
+                                {row.subcategoryName && (
+                                  <span>
+                                    {row.categoryName ? " • " : ""}
+                                    {row.subcategoryName}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Input
+                                value={priceInputValue}
+                                onChange={(event) => handlePriceChange(row.rowKey, event.target.value)}
+                                onBlur={(event) => handlePriceBlur(row, event.target.value)}
+                                inputMode="decimal"
+                                placeholder="0,00"
+                                className="w-[120px] text-right text-sm"
+                              />
+                              {savingRowKey === row.rowKey && (
+                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Input
+                                value={costInputValue}
+                                onChange={(event) => handleCostChange(row.rowKey, event.target.value)}
+                                onBlur={(event) => handleCostBlur(row, event.target.value)}
+                                inputMode="decimal"
+                                placeholder="0,00"
+                                className="w-[120px] text-right text-sm"
+                              />
+                              {savingRowKey === row.rowKey && (
+                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="block md:hidden">
+              {loadingRows ? (
+                <div className="flex items-center gap-2 p-6 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Carregando tabela de preços...
+                </div>
+              ) : filteredRows.length === 0 ? (
+                <div className="p-6 text-center text-muted-foreground">
+                  Nenhum procedimento encontrado com os filtros selecionados.
+                </div>
+              ) : (
+                <div className="space-y-3 p-3">
+                  {filteredRows.map((row) => {
                     const priceInputValue =
                       editingValues[row.rowKey] ??
                       (row.price !== null && row.price !== undefined ? row.price.toString() : "");
@@ -1000,68 +1121,84 @@ const ProcedurePricingTable = () => {
                         : "");
 
                     return (
-                      <TableRow key={row.rowKey} className="hover:bg-muted/40">
-                        <TableCell>
-                          <div className="space-y-1">
+                      <Card key={row.rowKey} className="p-4 bg-background border border-border/50">
+                        <div className="space-y-3">
+                          {/* Header with name and type */}
+                          <div className="space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
                               {row.type === "specification" ? (
                                 <Badge variant="secondary" className="text-xs">
-                                  Especificacao
+                                  Especificação
                                 </Badge>
                               ) : (
                                 <Badge variant="outline" className="text-xs">
                                   Procedimento
                                 </Badge>
                               )}
-                              <span className="font-medium text-foreground">{row.displayName}</span>
+                              <span className="font-medium text-foreground text-sm leading-tight">
+                                {row.displayName}
+                              </span>
                             </div>
-                            <div className="text-xs text-muted-foreground">
-                              {row.categoryName && <span>{row.categoryName}</span>}
-                              {row.subcategoryName && (
-                                <span>
-                                  {row.categoryName ? " \u2022 " : ""}
-                                  {row.subcategoryName}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Input
-                              value={priceInputValue}
-                              onChange={(event) => handlePriceChange(row.rowKey, event.target.value)}
-                              onBlur={(event) => handlePriceBlur(row, event.target.value)}
-                              inputMode="decimal"
-                              placeholder="0,00"
-                              className="max-w-[140px] text-right"
-                            />
-                            {savingRowKey === row.rowKey && (
-                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            {(row.categoryName || row.subcategoryName) && (
+                              <div className="text-xs text-muted-foreground">
+                                {row.categoryName && <span>{row.categoryName}</span>}
+                                {row.subcategoryName && (
+                                  <span>
+                                    {row.categoryName ? " • " : ""}
+                                    {row.subcategoryName}
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Input
-                              value={costInputValue}
-                              onChange={(event) => handleCostChange(row.rowKey, event.target.value)}
-                              onBlur={(event) => handleCostBlur(row, event.target.value)}
-                              inputMode="decimal"
-                              placeholder="0,00"
-                              className="max-w-[140px] text-right"
-                            />
-                            {savingRowKey === row.rowKey && (
-                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                            )}
+
+                          {/* Values input section */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label className="text-xs font-medium text-muted-foreground">
+                                Valor (R$)
+                              </Label>
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  value={priceInputValue}
+                                  onChange={(event) => handlePriceChange(row.rowKey, event.target.value)}
+                                  onBlur={(event) => handlePriceBlur(row, event.target.value)}
+                                  inputMode="decimal"
+                                  placeholder="0,00"
+                                  className="flex-1 text-right text-sm h-9"
+                                />
+                                {savingRowKey === row.rowKey && (
+                                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground flex-shrink-0" />
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label className="text-xs font-medium text-muted-foreground">
+                                Custo (R$)
+                              </Label>
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  value={costInputValue}
+                                  onChange={(event) => handleCostChange(row.rowKey, event.target.value)}
+                                  onBlur={(event) => handleCostBlur(row, event.target.value)}
+                                  inputMode="decimal"
+                                  placeholder="0,00"
+                                  className="flex-1 text-right text-sm h-9"
+                                />
+                                {savingRowKey === row.rowKey && (
+                                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground flex-shrink-0" />
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </TableCell>
-                      </TableRow>
+                        </div>
+                      </Card>
                     );
-                  })
-                )}
-              </TableBody>
-            </Table>
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>

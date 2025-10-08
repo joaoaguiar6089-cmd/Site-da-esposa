@@ -73,14 +73,9 @@ const getCurrentMonthKey = () => {
 const formatCurrency = (value: number) => currencyFormatter.format(value);
 
 const parsePriceInput = (value: string): number | null => {
-  if (!value) {
-    return null;
-  }
-
+  if (!value) return null;
   const trimmed = value.replace(/R\$/gi, "").trim();
-  if (!trimmed) {
-    return null;
-  }
+  if (!trimmed) return null;
 
   const hasComma = trimmed.includes(",");
   const hasDot = trimmed.includes(".");
@@ -93,10 +88,7 @@ const parsePriceInput = (value: string): number | null => {
   }
 
   const parsed = Number(normalized);
-  if (!Number.isFinite(parsed)) {
-    return null;
-  }
-
+  if (!Number.isFinite(parsed)) return null;
   return Math.round(parsed * 100) / 100;
 };
 
@@ -106,7 +98,6 @@ const getMonthLabel = (isoDate: string | null) => {
   if (Number.isNaN(parsed.getTime())) return "";
   return monthFormatter.format(parsed);
 };
-
 const ProcedurePricingTable = () => {
   const { toast } = useToast();
 
@@ -167,7 +158,7 @@ const ProcedurePricingTable = () => {
       console.error("Erro ao carregar categorias:", error);
       toast({
         title: "Erro ao carregar dados",
-        description: "N�o foi poss�vel carregar categorias e subcategorias.",
+        description: "Nao foi possivel carregar categorias e subcategorias.",
         variant: "destructive",
       });
     }
@@ -218,17 +209,18 @@ const ProcedurePricingTable = () => {
 
       if (specificationsError) throw specificationsError;
 
-      const procedureRows: PricingRow[] = (proceduresData as ProcedureWithRelations[] | null)?.map((procedure) => ({
-        rowKey: `procedure-${procedure.id}`,
-        type: "procedure",
-        procedureId: procedure.id,
-        displayName: procedure.name,
-        price: procedure.price,
-        categoryId: procedure.category_id,
-        subcategoryId: procedure.subcategory_id,
-        categoryName: procedure.categories?.name ?? null,
-        subcategoryName: procedure.subcategories?.name ?? null,
-      })) ?? [];
+      const procedureRows: PricingRow[] =
+        (proceduresData as ProcedureWithRelations[] | null)?.map((procedure) => ({
+          rowKey: `procedure-${procedure.id}`,
+          type: "procedure",
+          procedureId: procedure.id,
+          displayName: procedure.name,
+          price: procedure.price,
+          categoryId: procedure.category_id,
+          subcategoryId: procedure.subcategory_id,
+          categoryName: procedure.categories?.name ?? null,
+          subcategoryName: procedure.subcategories?.name ?? null,
+        })) ?? [];
 
       const specificationRows: PricingRow[] =
         (specificationsData as SpecificationWithProcedure[] | null)
@@ -252,10 +244,10 @@ const ProcedurePricingTable = () => {
       setRows(combined);
       setEditingValues({});
     } catch (error: any) {
-      console.error("Erro ao carregar tabela de pre�os:", error);
+      console.error("Erro ao carregar precos:", error);
       toast({
         title: "Erro ao carregar procedimentos",
-        description: "Confira sua conex�o e tente novamente.",
+        description: "Confira sua conexao e tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -311,7 +303,7 @@ const ProcedurePricingTable = () => {
       console.error("Erro ao carregar metas:", error);
       toast({
         title: "Erro ao carregar metas",
-        description: "N�o foi poss�vel recuperar as metas do m�s.",
+        description: "Nao foi possivel recuperar as metas do mes.",
         variant: "destructive",
       });
     } finally {
@@ -347,12 +339,13 @@ const ProcedurePricingTable = () => {
         ? rows.find((row) => row.type === "specification" && row.specificationId === goal.specification_id)
         : rows.find((row) => row.type === "procedure" && row.procedureId === goal.procedure_id);
 
-      const procedureName = matchingRow?.type === "specification"
-        ? matchingRow.displayName.split(" - ")[0]
-        : matchingRow?.displayName ?? goal.procedures?.name ?? "Procedimento";
+      const procedureName =
+        matchingRow?.type === "specification"
+          ? matchingRow.displayName.split(" - ")[0]
+          : matchingRow?.displayName ?? goal.procedures?.name ?? "Procedimento";
 
       const specificationName = goal.specification_id
-        ? goal.procedure_specifications?.name ?? matchingRow?.displayName.split(" - ")[1] ?? "Especifica��o"
+        ? goal.procedure_specifications?.name ?? matchingRow?.displayName.split(" - ")[1] ?? "Especificacao"
         : null;
 
       const displayName = specificationName ? `${procedureName} - ${specificationName}` : procedureName;
@@ -384,7 +377,6 @@ const ProcedurePricingTable = () => {
     const key = getCurrentMonthKey();
     return getMonthLabel(key);
   }, []);
-
   const handlePriceChange = (rowKey: string, value: string) => {
     setEditingValues((prev) => ({
       ...prev,
@@ -398,8 +390,8 @@ const ProcedurePricingTable = () => {
 
     if (parsedValue === null) {
       toast({
-        title: "Valor inv�lido",
-        description: "Informe um valor num�rico maior ou igual a zero.",
+        title: "Valor invalido",
+        description: "Informe um valor numerico maior ou igual a zero.",
         variant: "destructive",
       });
       setEditingValues((prev) => ({
@@ -421,10 +413,7 @@ const ProcedurePricingTable = () => {
     setSavingRowKey(row.rowKey);
     try {
       if (row.type === "procedure") {
-        const { error } = await supabase
-          .from("procedures")
-          .update({ price: parsedValue })
-          .eq("id", row.procedureId);
+        const { error } = await supabase.from("procedures").update({ price: parsedValue }).eq("id", row.procedureId);
         if (error) throw error;
       } else {
         const { error } = await supabase
@@ -459,7 +448,7 @@ const ProcedurePricingTable = () => {
       console.error("Erro ao atualizar valor:", error);
       toast({
         title: "Erro ao salvar",
-        description: "N�o foi poss�vel salvar o novo valor. Tente novamente.",
+        description: "Nao foi possivel salvar o novo valor. Tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -476,8 +465,8 @@ const ProcedurePricingTable = () => {
   const handleCreateGoal = async () => {
     if (!selectedGoalTarget) {
       toast({
-        title: "Selecione um alvo",
-        description: "Escolha um procedimento ou especifica��o para a meta.",
+        title: "Selecione um item",
+        description: "Escolha um procedimento ou especificacao para a meta.",
         variant: "destructive",
       });
       return;
@@ -486,7 +475,7 @@ const ProcedurePricingTable = () => {
     const parsedQuantity = Number.parseInt(goalQuantity, 10);
     if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
       toast({
-        title: "Quantidade inv�lida",
+        title: "Quantidade invalida",
         description: "Informe uma quantidade inteira maior que zero.",
         variant: "destructive",
       });
@@ -496,8 +485,8 @@ const ProcedurePricingTable = () => {
     const [targetType, targetId] = selectedGoalTarget.split("|");
     if (!targetType || !targetId) {
       toast({
-        title: "Alvo inv�lido",
-        description: "N�o foi poss�vel identificar o item selecionado.",
+        title: "Item invalido",
+        description: "Nao foi possivel identificar o item selecionado.",
         variant: "destructive",
       });
       return;
@@ -505,13 +494,13 @@ const ProcedurePricingTable = () => {
 
     const selectedRow =
       targetType === "procedure"
-        ? rows.find((row) => row.type === "procedure" && row.procedureId === targetId)
-        : rows.find((row) => row.type === "specification" && row.specificationId === targetId);
+        ? rows.find((item) => item.type === "procedure" && item.procedureId === targetId)
+        : rows.find((item) => item.type === "specification" && item.specificationId === targetId);
 
     if (!selectedRow) {
       toast({
-        title: "Item n�o encontrado",
-        description: "Atualize a p�gina e tente novamente.",
+        title: "Item nao encontrado",
+        description: "Atualize a pagina e tente novamente.",
         variant: "destructive",
       });
       return;
@@ -532,8 +521,8 @@ const ProcedurePricingTable = () => {
       if (error) {
         if (error.code === "23505") {
           toast({
-            title: "Meta j� cadastrada",
-            description: "Este item j� possui uma meta para o m�s atual.",
+            title: "Meta ja cadastrada",
+            description: "Este item ja possui uma meta para o mes atual.",
             variant: "destructive",
           });
         } else {
@@ -552,7 +541,7 @@ const ProcedurePricingTable = () => {
       console.error("Erro ao criar meta:", error);
       toast({
         title: "Erro ao criar meta",
-        description: "N�o foi poss�vel salvar a meta. Tente novamente.",
+        description: "Nao foi possivel salvar a meta. Tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -571,7 +560,7 @@ const ProcedurePricingTable = () => {
     const parsedQuantity = Number.parseInt(rawValue, 10);
     if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
       toast({
-        title: "Quantidade inv�lida",
+        title: "Quantidade invalida",
         description: "Informe um valor inteiro maior que zero.",
         variant: "destructive",
       });
@@ -613,7 +602,7 @@ const ProcedurePricingTable = () => {
       console.error("Erro ao atualizar meta:", error);
       toast({
         title: "Erro ao atualizar meta",
-        description: "N�o foi poss�vel atualizar a quantidade. Tente novamente.",
+        description: "Nao foi possivel atualizar a quantidade. Tente novamente.",
         variant: "destructive",
       });
       setGoalQuantityMap((prev) => ({
@@ -640,13 +629,13 @@ const ProcedurePricingTable = () => {
 
       toast({
         title: "Meta removida",
-        description: "A meta foi exclu�da com sucesso.",
+        description: "A meta foi excluida com sucesso.",
       });
     } catch (error: any) {
       console.error("Erro ao remover meta:", error);
       toast({
         title: "Erro ao remover meta",
-        description: "N�o foi poss�vel remover a meta. Tente novamente.",
+        description: "Nao foi possivel remover a meta. Tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -660,38 +649,42 @@ const ProcedurePricingTable = () => {
       label: row.displayName,
     }));
   }, [rows]);
-
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              Metas do M�s
+      <Card className="overflow-hidden border-none bg-gradient-to-br from-primary/10 via-background to-rose-50 shadow-md">
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-2">
+            <CardTitle className="flex items-center gap-3 text-2xl font-semibold text-foreground">
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary">
+                <TrendingUp className="h-6 w-6" />
+              </span>
+              Metas do M\u00eas
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Acompanhe as metas de vendas para {currentMonthLabel || "o m�s atual"}.
+              Acompanhe as metas de vendas para {currentMonthLabel || "o m\u00eas atual"}.
             </p>
           </div>
-          <div className="flex flex-col items-start gap-2 sm:items-end">
-            <div className="text-sm text-muted-foreground">Total Previsto</div>
-            <div className="text-2xl font-semibold text-primary">{formatCurrency(totalGoalsValue)}</div>
-            <Button variant="link" onClick={() => setGoalDialogOpen(true)} className="px-0">
-              <Plus className="mr-2 h-4 w-4" />
-              Criar Meta
+          <div className="flex flex-col items-start gap-2 rounded-2xl border border-primary/15 bg-background/95 px-5 py-4 text-right shadow-sm sm:items-end">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total previsto</span>
+            <span className="text-3xl font-bold text-primary">{formatCurrency(totalGoalsValue)}</span>
+            <Button variant="secondary" size="sm" onClick={() => setGoalDialogOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Criar meta
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="bg-background/70">
           {goalsLoading ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               Carregando metas...
             </div>
           ) : goalsWithDetails.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
-              Nenhuma meta cadastrada para este m�s. Clique em &quot;Criar Meta&quot; para adicionar uma nova meta.
+            <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-primary/30 bg-background p-8 text-center text-muted-foreground">
+              <TrendingUp className="h-8 w-8 text-primary/60" />
+              <p className="max-w-xs text-sm">
+                Nenhuma meta cadastrada para este m\u00eas. Clique em &quot;Criar meta&quot; para adicionar uma nova meta.
+              </p>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -701,13 +694,16 @@ const ProcedurePricingTable = () => {
                 const monthLabel = getMonthLabel(goal.target_month);
 
                 return (
-                  <div key={goal.id} className="flex flex-col justify-between rounded-lg border bg-card/80 p-4 shadow-sm">
+                  <div
+                    key={goal.id}
+                    className="flex flex-col justify-between rounded-2xl border border-border/80 bg-background p-5 shadow-sm transition hover:shadow-md"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2">
                           {goal.specification_id ? (
                             <Badge variant="secondary" className="text-xs">
-                              Especifica��o
+                              Especificacao
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="text-xs">
@@ -720,7 +716,7 @@ const ProcedurePricingTable = () => {
                         </div>
                         <h3 className="mt-1 text-base font-semibold text-foreground">{goal.displayName}</h3>
                         <p className="text-xs text-muted-foreground">
-                          {goal.subcategoryName && <span>{goal.subcategoryName} • </span>}
+                          {goal.subcategoryName && <span>{goal.subcategoryName} \u2022 </span>}
                           {monthLabel || currentMonthLabel}
                         </p>
                       </div>
@@ -755,18 +751,18 @@ const ProcedurePricingTable = () => {
                           />
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground">Valor Unit�rio</p>
+                          <p className="text-xs text-muted-foreground">Valor unitario</p>
                           <p className="text-sm font-medium text-foreground">{formatCurrency(goal.unitPrice)}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground">Total Previsto</p>
+                          <p className="text-xs text-muted-foreground">Total previsto</p>
                           <p className="text-lg font-semibold text-primary">{formatCurrency(totalValue)}</p>
                         </div>
                       </div>
                       {updatingGoalId === goal.id && (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          Salvando altera��es...
+                          Salvando alteracoes...
                         </div>
                       )}
                     </div>
@@ -777,20 +773,21 @@ const ProcedurePricingTable = () => {
           )}
         </CardContent>
       </Card>
-      <Card>
+
+      <Card className="border-none bg-card/95 shadow-md">
         <CardHeader className="space-y-2">
-          <CardTitle className="text-2xl font-bold text-foreground">Tabela de Procedimentos</CardTitle>
+          <CardTitle className="text-2xl font-semibold text-foreground">Tabela de Procedimentos</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Atualize rapidamente os valores de procedimentos e especifica��es com filtros semelhantes a uma planilha.
+            Atualize rapidamente os valores de procedimentos e especificacoes com filtros semelhantes a uma planilha.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex w-full flex-col gap-3 sm:flex-row">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar procedimento ou especifica��o"
+                  placeholder="Buscar procedimento ou especificacao"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                   className="pl-9"
@@ -801,7 +798,7 @@ const ProcedurePricingTable = () => {
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger className="w-full sm:w-[220px]">
                   <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
-                  <SelectValue />
+                  <SelectValue placeholder="Todas as categorias" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL_CATEGORIES}>Todas as categorias</SelectItem>
@@ -820,7 +817,7 @@ const ProcedurePricingTable = () => {
               >
                 <SelectTrigger className="w-full sm:w-[220px]">
                   <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
-                  <SelectValue />
+                  <SelectValue placeholder="Todas as subcategorias" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL_SUBCATEGORIES}>Todas as subcategorias</SelectItem>
@@ -834,11 +831,11 @@ const ProcedurePricingTable = () => {
             </div>
           </div>
 
-          <div className="rounded-md border">
+          <div className="overflow-hidden rounded-xl border">
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-muted/40">
                 <TableRow>
-                  <TableHead>Procedimento / Especifica��o</TableHead>
+                  <TableHead>Procedimento / Especificacao</TableHead>
                   <TableHead className="w-[220px] text-right">Valor (R$)</TableHead>
                 </TableRow>
               </TableHeader>
@@ -848,7 +845,7 @@ const ProcedurePricingTable = () => {
                     <TableCell colSpan={2}>
                       <div className="flex items-center gap-2 py-6 text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Carregando tabela de pre�os...
+                        Carregando tabela de precos...
                       </div>
                     </TableCell>
                   </TableRow>
@@ -867,13 +864,13 @@ const ProcedurePricingTable = () => {
                       (row.price !== null && row.price !== undefined ? row.price.toString() : "");
 
                     return (
-                      <TableRow key={row.rowKey}>
+                      <TableRow key={row.rowKey} className="hover:bg-muted/40">
                         <TableCell>
                           <div className="space-y-1">
                             <div className="flex flex-wrap items-center gap-2">
                               {row.type === "specification" ? (
                                 <Badge variant="secondary" className="text-xs">
-                                  Especifica��o
+                                  Especificacao
                                 </Badge>
                               ) : (
                                 <Badge variant="outline" className="text-xs">
@@ -886,7 +883,7 @@ const ProcedurePricingTable = () => {
                               {row.categoryName && <span>{row.categoryName}</span>}
                               {row.subcategoryName && (
                                 <span>
-                                  {row.categoryName ? " • " : ""}
+                                  {row.categoryName ? " \u2022 " : ""}
                                   {row.subcategoryName}
                                 </span>
                               )}
@@ -933,7 +930,7 @@ const ProcedurePricingTable = () => {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-sm font-medium text-muted-foreground">Procedimento ou Especifica��o</Label>
+              <Label className="text-sm font-medium text-muted-foreground">Procedimento ou especificacao</Label>
               <Select value={selectedGoalTarget} onValueChange={setSelectedGoalTarget}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecione o item para a meta" />
@@ -950,7 +947,7 @@ const ProcedurePricingTable = () => {
 
             <div className="space-y-2">
               <Label htmlFor="goal-quantity" className="text-sm font-medium text-muted-foreground">
-                Quantidade desejada no m�s
+                Quantidade desejada no mes
               </Label>
               <Input
                 id="goal-quantity"
@@ -967,7 +964,7 @@ const ProcedurePricingTable = () => {
             </Button>
             <Button onClick={handleCreateGoal} disabled={creatingGoal}>
               {creatingGoal && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Criar Meta
+              Criar meta
             </Button>
           </DialogFooter>
         </DialogContent>

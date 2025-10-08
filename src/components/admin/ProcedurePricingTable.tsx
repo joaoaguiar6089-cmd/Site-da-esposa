@@ -303,7 +303,7 @@ const ProcedurePricingTable = () => {
       console.error("Erro ao carregar metas:", error);
       toast({
         title: "Erro ao carregar metas",
-        description: "Nao foi possivel recuperar as metas do mes.",
+        description: "Não foi possível recuperar as metas do mês.",
         variant: "destructive",
       });
     } finally {
@@ -658,10 +658,10 @@ const ProcedurePricingTable = () => {
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary">
                 <TrendingUp className="h-6 w-6" />
               </span>
-              Metas do M\u00eas
+              Metas do Mês
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Acompanhe as metas de vendas para {currentMonthLabel || "o m\u00eas atual"}.
+              Acompanhe as metas de vendas para {currentMonthLabel || "o mês atual"}.
             </p>
           </div>
           <div className="flex flex-col items-start gap-2 rounded-2xl border border-primary/15 bg-background/95 px-5 py-4 text-right shadow-sm sm:items-end">
@@ -683,7 +683,7 @@ const ProcedurePricingTable = () => {
             <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-primary/30 bg-background p-8 text-center text-muted-foreground">
               <TrendingUp className="h-8 w-8 text-primary/60" />
               <p className="max-w-xs text-sm">
-                Nenhuma meta cadastrada para este m\u00eas. Clique em &quot;Criar meta&quot; para adicionar uma nova meta.
+                Nenhuma meta cadastrada para este mês. Clique em "Criar meta" para adicionar uma nova meta.
               </p>
             </div>
           ) : (

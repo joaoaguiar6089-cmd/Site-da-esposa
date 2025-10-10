@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Calendar, Plus, Phone } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ArrowLeft, Calendar, Plus, Phone, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,8 @@ const AgendamentosCliente = ({
   const [newPhone, setNewPhone] = useState("");
   const [updatingPhone, setUpdatingPhone] = useState(false);
   const [localClient, setLocalClient] = useState<Client>(client); // Estado local do cliente
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -46,7 +49,7 @@ const AgendamentosCliente = ({
         .order('appointment_date', { ascending: false });
 
       if (error) throw error;
-      setAppointments(data || []);
+      setAppointments((data as any) || []);
     } catch (error) {
       console.error('Erro ao carregar agendamentos:', error);
       toast({
@@ -91,6 +94,30 @@ const AgendamentosCliente = ({
     
     const statusInfo = statusMap[status as keyof typeof statusMap] || { label: status, variant: 'outline' as const };
     return <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>;
+  };
+
+  const getPaymentStatusBadge = (paymentStatus?: string | null) => {
+    const status = paymentStatus || 'aguardando';
+    
+    const statusConfig = {
+      'aguardando': { label: 'Aguardando', className: 'bg-white border-2 border-gray-300 text-gray-700' },
+      'nao_pago': { label: 'Não Pago', className: 'bg-red-500 text-white border-0' },
+      'pago_parcialmente': { label: 'Pago Parcialmente', className: 'bg-yellow-500 text-white border-0' },
+      'pago': { label: 'Pago', className: 'bg-green-500 text-white border-0' },
+    };
+
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.aguardando;
+    
+    return (
+      <Badge className={`text-xs ${config.className}`}>
+        {config.label}
+      </Badge>
+    );
+  };
+
+  const handleOpenPaymentDialog = (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setPaymentDialogOpen(true);
   };
 
   const handlePhoneInputChange = (value: string) => {
@@ -297,7 +324,18 @@ const AgendamentosCliente = ({
                         </p>
                       )}
                     </div>
-                    {getStatusBadge(appointment.status)}
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(appointment.status)}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleOpenPaymentDialog(appointment)}
+                        className="h-8 w-8 p-0"
+                        title="Ver detalhes de pagamento"
+                      >
+                        <DollarSign className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -305,6 +343,78 @@ const AgendamentosCliente = ({
           )}
         </CardContent>
       </Card>
+
+      {/* Dialog de detalhes de pagamento (somente leitura) */}
+      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Detalhes de Pagamento</DialogTitle>
+          </DialogHeader>
+          
+          {selectedAppointment && (
+            <div className="space-y-4">
+              <div className="text-sm bg-muted p-3 rounded">
+                <p><strong>Procedimento:</strong> {selectedAppointment.procedures.name}</p>
+                <p><strong>Data:</strong> {formatDate(selectedAppointment.appointment_date)} às {formatTime(selectedAppointment.appointment_time)}</p>
+                <p><strong>Valor do Procedimento:</strong> R$ {selectedAppointment.procedures.price?.toFixed(2)}</p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium">Status do Pagamento</label>
+                <div className="mt-2">
+                  {getPaymentStatusBadge((selectedAppointment as any).payment_status)}
+                </div>
+              </div>
+
+              {(selectedAppointment as any).payment_status && (selectedAppointment as any).payment_status !== 'aguardando' ? (
+                <div className="space-y-3 text-sm border-t pt-3">
+                  {(selectedAppointment as any).payment_value && (
+                    <div>
+                      <strong>Valor Pago:</strong>
+                      <p className="mt-1">R$ {(selectedAppointment as any).payment_value.toFixed(2)}</p>
+                    </div>
+                  )}
+                  {(selectedAppointment as any).payment_method && (
+                    <div>
+                      <strong>Forma de Pagamento:</strong>
+                      <p className="mt-1">{
+                        (selectedAppointment as any).payment_method === 'pix' ? 'PIX' :
+                        (selectedAppointment as any).payment_method === 'cartao' ? 'Cartão' :
+                        'Dinheiro'
+                      }</p>
+                    </div>
+                  )}
+                  {(selectedAppointment as any).payment_method === 'cartao' && (selectedAppointment as any).payment_installments && (
+                    <div>
+                      <strong>Parcelas:</strong>
+                      <p className="mt-1">{(selectedAppointment as any).payment_installments}x</p>
+                    </div>
+                  )}
+                  {(selectedAppointment as any).payment_notes && (
+                    <div>
+                      <strong>Observações:</strong>
+                      <p className="mt-1 text-muted-foreground">{(selectedAppointment as any).payment_notes}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground border-t pt-3">
+                  Ainda não há informações de pagamento para este agendamento.
+                </p>
+              )}
+
+              <div className="flex justify-end pt-4">
+                <Button
+                  onClick={() => setPaymentDialogOpen(false)}
+                  className="w-full"
+                >
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Botão Voltar */}
       <Button

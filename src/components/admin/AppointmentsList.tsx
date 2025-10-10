@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Clock, User, Phone, Edit, Trash2, Search, MessageSquare, Filter, Plus } from "lucide-react";
+import { Calendar, Clock, User, Phone, Edit, Trash2, Search, MessageSquare, Filter, Plus, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatLocationBlock } from "@/utils/location";
@@ -22,6 +22,11 @@ interface Appointment {
   status: string;
   city_id?: string | null;
   notes?: string;
+  payment_status?: string | null;
+  payment_method?: string | null;
+  payment_value?: number | null;
+  payment_installments?: number | null;
+  payment_notes?: string | null;
   city_settings?: {
     city_name?: string | null;
     clinic_name?: string | null;
@@ -68,6 +73,12 @@ const AppointmentsList = () => {
   const [showNewAppointmentForm, setShowNewAppointmentForm] = useState(false);
   const [confirmingAppointment, setConfirmingAppointment] = useState<Appointment | null>(null);
   const [selectedProfessional, setSelectedProfessional] = useState("");
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentValue, setPaymentValue] = useState("");
+  const [paymentInstallments, setPaymentInstallments] = useState("1");
+  const [paymentNotes, setPaymentNotes] = useState("");
   const { toast } = useToast();
 
   // Carregar todos os agendamentos (apenas de hoje em diante)
@@ -87,6 +98,11 @@ const AppointmentsList = () => {
           status,
           city_id,
           notes,
+          payment_status,
+          payment_method,
+          payment_value,
+          payment_installments,
+          payment_notes,
           city_settings:city_settings (
             city_name
           ),
@@ -116,7 +132,7 @@ const AppointmentsList = () => {
 
       if (error) throw error;
 
-      setAppointments(data || []);
+      setAppointments((data as any) || []);
     } catch (error) {
       console.error('Erro ao carregar agendamentos:', error);
       toast({
@@ -696,6 +712,63 @@ Aguardamos você!`;
     window.open(`https://wa.me/55${cleanPhone}?text=${encodedMessage}`, '_blank');
   };
 
+  // Abrir dialog de pagamento
+  const handleOpenPaymentDialog = (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setPaymentStatus(appointment.payment_status || 'aguardando');
+    setPaymentMethod(appointment.payment_method || '');
+    setPaymentValue(appointment.payment_value?.toString() || '');
+    setPaymentInstallments(appointment.payment_installments?.toString() || '1');
+    setPaymentNotes(appointment.payment_notes || '');
+    setPaymentDialogOpen(true);
+  };
+
+  // Salvar informações de pagamento
+  const handleSavePayment = async () => {
+    if (!selectedAppointment) return;
+
+    try {
+      const paymentData: Record<string, any> = {
+        payment_status: paymentStatus,
+      };
+
+      if (paymentStatus !== 'aguardando') {
+        paymentData.payment_method = paymentMethod || null;
+        paymentData.payment_value = paymentValue ? parseFloat(paymentValue) : null;
+        paymentData.payment_installments = paymentMethod === 'cartao' && paymentInstallments ? parseInt(paymentInstallments) : null;
+        paymentData.payment_notes = paymentNotes || null;
+      } else {
+        // Se voltou para aguardando, limpar todos os campos
+        paymentData.payment_method = null;
+        paymentData.payment_value = null;
+        paymentData.payment_installments = null;
+        paymentData.payment_notes = null;
+      }
+
+      const { error } = await supabase
+        .from('appointments')
+        .update(paymentData)
+        .eq('id', selectedAppointment.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Pagamento atualizado",
+        description: "As informações de pagamento foram atualizadas com sucesso.",
+      });
+
+      setPaymentDialogOpen(false);
+      loadAppointments();
+    } catch (error) {
+      console.error('Erro ao salvar pagamento:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar informações de pagamento.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Badge de status
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -709,6 +782,26 @@ Aguardamos você!`;
     
     return (
       <Badge variant={config.variant} className="text-xs">
+        {config.label}
+      </Badge>
+    );
+  };
+
+  // Badge de status de pagamento
+  const getPaymentStatusBadge = (paymentStatus?: string | null) => {
+    const status = paymentStatus || 'aguardando';
+    
+    const statusConfig = {
+      'aguardando': { label: 'Aguardando', className: 'bg-white border-2 border-gray-300 text-gray-700' },
+      'nao_pago': { label: 'Não Pago', className: 'bg-red-500 text-white border-0' },
+      'pago_parcialmente': { label: 'Pago Parcialmente', className: 'bg-yellow-500 text-white border-0' },
+      'pago': { label: 'Pago', className: 'bg-green-500 text-white border-0' },
+    };
+
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.aguardando;
+    
+    return (
+      <Badge className={`text-xs ${config.className}`}>
         {config.label}
       </Badge>
     );
@@ -761,7 +854,7 @@ Aguardamos você!`;
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Calendar className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold">Lista de Agendamentos</h1>
+          <h1 className="text-2xl font-bold">Histórico de Agendamentos</h1>
         </div>
         <Button 
           onClick={() => setShowNewAppointmentForm(true)}
@@ -813,11 +906,12 @@ Aguardamos você!`;
           </Card>
         ) : (
           filteredAppointments.map((appointment) => (
-            <Card key={appointment.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
+            <Card key={appointment.id} className="hover:bg-muted/50 transition-colors">
               <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-2" onClick={() => handleAppointmentClick(appointment)}>
-                    <div className="flex items-center gap-2">
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Coluna Esquerda - Informações do Cliente */}
+                  <div className="space-y-3 cursor-pointer" onClick={() => handleAppointmentClick(appointment)}>
+                    <div className="flex items-center gap-2 flex-wrap">
                       <User className="h-4 w-4 text-primary" />
                       <span className="font-medium">
                         {appointment.clients.nome} {appointment.clients.sobrenome}
@@ -825,16 +919,14 @@ Aguardamos você!`;
                       {getStatusBadge(appointment.status)}
                     </div>
                     
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
+                    <div className="space-y-1 text-sm">
+                      <div className="flex items-center gap-1 text-muted-foreground">
                         <Calendar className="h-3 w-3" />
-                        {format(parseISO(appointment.appointment_date), 'dd/MM/yyyy', { locale: ptBR })}
+                        <span>{format(parseISO(appointment.appointment_date), 'dd/MM/yyyy', { locale: ptBR })}</span>
+                        <Clock className="h-3 w-3 ml-3" />
+                        <span>{appointment.appointment_time}</span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {appointment.appointment_time}
-                      </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 text-muted-foreground">
                         <Phone className="h-3 w-3" />
                         {appointment.clients.celular}
                       </div>
@@ -851,43 +943,90 @@ Aguardamos você!`;
                     )}
                   </div>
                   
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        sendWhatsApp(appointment.clients.celular, appointment);
-                      }}
-                      className="flex items-center gap-1"
-                    >
-                      <MessageSquare className="h-3 w-3" />
-                    </Button>
+                  {/* Coluna Direita - Informações de Pagamento */}
+                  <div className="border-l pl-6 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-sm flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-primary" />
+                        Pagamento
+                      </h3>
+                      {getPaymentStatusBadge(appointment.payment_status)}
+                    </div>
                     
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedAppointment(appointment);
-                        handleEditAppointment();
-                      }}
-                      className="flex items-center gap-1"
-                    >
-                      <Edit className="h-3 w-3" />
-                    </Button>
+                    {appointment.payment_status && appointment.payment_status !== 'aguardando' ? (
+                      <div className="space-y-2 text-sm">
+                        {appointment.payment_value && (
+                          <p><strong>Valor:</strong> R$ {appointment.payment_value.toFixed(2)}</p>
+                        )}
+                        {appointment.payment_method && (
+                          <p><strong>Forma:</strong> {
+                            appointment.payment_method === 'pix' ? 'PIX' :
+                            appointment.payment_method === 'cartao' ? 'Cartão' :
+                            'Dinheiro'
+                          }</p>
+                        )}
+                        {appointment.payment_method === 'cartao' && appointment.payment_installments && (
+                          <p><strong>Parcelas:</strong> {appointment.payment_installments}x</p>
+                        )}
+                        {appointment.payment_notes && (
+                          <p className="text-muted-foreground"><strong>Obs:</strong> {appointment.payment_notes}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Sem informações de pagamento</p>
+                    )}
                     
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteAppointment(appointment.id);
-                      }}
-                      className="flex items-center gap-1"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          sendWhatsApp(appointment.clients.celular, appointment);
+                        }}
+                        className="flex items-center gap-1"
+                      >
+                        <MessageSquare className="h-3 w-3" />
+                      </Button>
+                      
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenPaymentDialog(appointment);
+                        }}
+                        className="flex items-center gap-1"
+                        title="Gerenciar Pagamento"
+                      >
+                        <DollarSign className="h-3 w-3" />
+                      </Button>
+                      
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedAppointment(appointment);
+                          handleEditAppointment();
+                        }}
+                        className="flex items-center gap-1"
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteAppointment(appointment.id);
+                        }}
+                        className="flex items-center gap-1"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -1013,6 +1152,114 @@ Aguardamos você!`;
                 >
                   <Trash2 className="h-3 w-3" />
                   Deletar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de pagamento */}
+      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Informações de Pagamento</DialogTitle>
+          </DialogHeader>
+          
+          {selectedAppointment && (
+            <div className="space-y-4">
+              <div className="text-sm bg-muted p-3 rounded">
+                <p><strong>Cliente:</strong> {selectedAppointment.clients.nome} {selectedAppointment.clients.sobrenome}</p>
+                <p><strong>Procedimento:</strong> {selectedAppointment.procedures.name}</p>
+                <p><strong>Valor do Procedimento:</strong> R$ {selectedAppointment.procedures.price?.toFixed(2)}</p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium">Status do Pagamento *</label>
+                <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="aguardando">Aguardando</SelectItem>
+                    <SelectItem value="nao_pago">Não Pago</SelectItem>
+                    <SelectItem value="pago_parcialmente">Pago Parcialmente</SelectItem>
+                    <SelectItem value="pago">Pago</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {paymentStatus !== 'aguardando' && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium">Forma de Pagamento</label>
+                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                      <SelectTrigger className="mt-2">
+                        <SelectValue placeholder="Selecione a forma" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pix">PIX</SelectItem>
+                        <SelectItem value="cartao">Cartão</SelectItem>
+                        <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium">Valor Pago (R$)</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={paymentValue}
+                      onChange={(e) => setPaymentValue(e.target.value)}
+                      placeholder="0,00"
+                      className="mt-2"
+                    />
+                  </div>
+
+                  {paymentMethod === 'cartao' && (
+                    <div>
+                      <label className="text-sm font-medium">Número de Parcelas</label>
+                      <Select value={paymentInstallments} onValueChange={setPaymentInstallments}>
+                        <SelectTrigger className="mt-2">
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 12 }, (_, i) => i + 1).map((num) => (
+                            <SelectItem key={num} value={num.toString()}>
+                              {num}x
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-sm font-medium">Observações</label>
+                    <Input
+                      value={paymentNotes}
+                      onChange={(e) => setPaymentNotes(e.target.value)}
+                      placeholder="Observações sobre o pagamento..."
+                      className="mt-2"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setPaymentDialogOpen(false)}
+                  className="flex-1"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleSavePayment}
+                  className="flex-1"
+                >
+                  Concluir
                 </Button>
               </div>
             </div>

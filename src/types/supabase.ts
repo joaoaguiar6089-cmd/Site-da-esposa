@@ -130,6 +130,11 @@ export type Database = {
           created_at: string
           id: string
           notes: string | null
+          payment_installments: number | null
+          payment_method: string | null
+          payment_notes: string | null
+          payment_status: string | null
+          payment_value: number | null
           procedure_id: string
           professional_id: string | null
           selected_gender: string | null
@@ -144,6 +149,11 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string | null
+          payment_installments?: number | null
+          payment_method?: string | null
+          payment_notes?: string | null
+          payment_status?: string | null
+          payment_value?: number | null
           procedure_id: string
           professional_id?: string | null
           selected_gender?: string | null
@@ -158,6 +168,11 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string | null
+          payment_installments?: number | null
+          payment_method?: string | null
+          payment_notes?: string | null
+          payment_status?: string | null
+          payment_value?: number | null
           procedure_id?: string
           professional_id?: string | null
           selected_gender?: string | null

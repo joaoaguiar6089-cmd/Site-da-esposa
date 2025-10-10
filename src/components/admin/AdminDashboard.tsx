@@ -54,8 +54,11 @@ interface GoalProgress {
   target_value: number;
   current_quantity: number;
   current_value: number;
-  month: number;
-  year: number;
+}
+
+interface OtherProceduresStats {
+  current_quantity: number;
+  current_value: number;
 }
 
 const AdminDashboard = () => {
@@ -75,6 +78,8 @@ const AdminDashboard = () => {
 
   const [recentAppointments, setRecentAppointments] = useState<RecentAppointment[]>([]);
   const [goalsProgress, setGoalsProgress] = useState<GoalProgress[]>([]);
+  const [otherProcedures, setOtherProcedures] = useState<OtherProceduresStats>({ current_quantity: 0, current_value: 0 });
+  const [totalGoalsStats, setTotalGoalsStats] = useState({ totalQuantity: 0, totalValue: 0, targetQuantity: 0, targetValue: 0 });
   const [selectedAppointment, setSelectedAppointment] = useState<RecentAppointment | null>(null);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -198,116 +203,106 @@ const AdminDashboard = () => {
       const now = new Date();
       const currentMonth = now.getMonth() + 1;
       const currentYear = now.getFullYear();
-
-      // Buscar metas do mês atual
       const firstDay = new Date(currentYear, currentMonth - 1, 1).toISOString().split('T')[0];
       const lastDay = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0];
-      
-      const { data: goals, error: goalsError} = await supabase
+
+      // Buscar metas do mês atual (ignorar specification_id)
+      const { data: goals, error: goalsError } = await supabase
         .from('procedure_monthly_goals')
         .select(`
           id,
           procedure_id,
-          specification_id,
           quantity,
           target_month,
           procedures (
             name,
             price
-          ),
-          procedure_specifications (
-            specification_name,
-            specification_price
           )
         `)
         .gte('target_month', firstDay)
-        .lte('target_month', lastDay);
+        .lte('target_month', lastDay)
+        .is('specification_id', null); // Apenas metas sem especificação
 
       if (goalsError) throw goalsError;
 
-      if (!goals || goals.length === 0) {
-        setGoalsProgress([]);
-        return;
-      }
+      // Buscar TODOS os agendamentos realizados do mês
+      const { data: allAppointments, error: aptError } = await supabase
+        .from('appointments')
+        .select('procedure_id, payment_value, payment_status, procedures(price)')
+        .eq('status', 'realizado')
+        .gte('appointment_date', firstDay)
+        .lte('appointment_date', lastDay);
 
-      // Para cada meta, calcular o progresso
-      const progressPromises = goals.map(async (goal: any) => {
-        const monthStart = new Date(goal.target_month);
-        const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
-        const firstDay = monthStart.toISOString().split('T')[0];
-        const lastDay = monthEnd.toISOString().split('T')[0];
+      if (aptError) throw aptError;
 
-        // Buscar agendamentos realizados
-        let query = supabase
-          .from('appointments')
-          .select('payment_value, payment_status')
-          .eq('procedure_id', goal.procedure_id)
-          .eq('status', 'realizado')
-          .gte('appointment_date', firstDay)
-          .lte('appointment_date', lastDay);
+      const appointmentsData = (allAppointments as any) || [];
 
-        // Se tiver specification_id, filtrar também
-        if (goal.specification_id) {
-          const { data: aptWithSpecs } = await supabase
-            .from('appointment_specifications')
-            .select('appointment_id')
-            .eq('specification_id', goal.specification_id);
-          
-          const aptIds = aptWithSpecs?.map(s => s.appointment_id) || [];
-          if (aptIds.length > 0) {
-            query = query.in('id', aptIds);
-          } else {
-            // Nenhum agendamento com essa especificação
-            return {
-              id: goal.id,
-              procedure_id: goal.procedure_id,
-              procedure_name: goal.specification_id && goal.procedure_specifications
-                ? `${goal.procedures.name} - ${goal.procedure_specifications.specification_name}`
-                : goal.procedures.name,
-              target_quantity: goal.quantity,
-              target_value: goal.specification_id && goal.procedure_specifications
-                ? goal.procedure_specifications.specification_price * goal.quantity
-                : (goal.procedures.price || 0) * goal.quantity,
-              current_quantity: 0,
-              current_value: 0,
-              month: monthStart.getMonth() + 1,
-              year: monthStart.getFullYear(),
-            };
-          }
-        }
+      // Criar set de procedure_ids que têm metas
+      const procedureIdsWithGoals = new Set((goals || []).map((g: any) => g.procedure_id));
 
-        const { data: appointments, error: aptError } = await query;
-        if (aptError) throw aptError;
+      // Separar agendamentos com meta e sem meta
+      const appointmentsWithGoals = appointmentsData.filter((apt: any) =>
+        procedureIdsWithGoals.has(apt.procedure_id)
+      );
+      const appointmentsWithoutGoals = appointmentsData.filter((apt: any) =>
+        !procedureIdsWithGoals.has(apt.procedure_id)
+      );
 
-        const currentQuantity = appointments?.length || 0;
-        const currentValue = (appointments as any)?.reduce((sum: number, apt: any) => {
-          // Considerar apenas pagamentos completos ou parciais
+      // Calcular progresso de cada meta
+      const progress: GoalProgress[] = (goals || []).map((goal: any) => {
+        const goalAppointments = appointmentsWithGoals.filter(
+          (apt: any) => apt.procedure_id === goal.procedure_id
+        );
+
+        const currentQuantity = goalAppointments.length;
+        const currentValue = goalAppointments.reduce((sum: number, apt: any) => {
+          // Usar valor pago ou preço do procedimento
           if (apt.payment_status === 'pago' || apt.payment_status === 'pago_parcialmente') {
-            return sum + (apt.payment_value || 0);
+            return sum + (apt.payment_value || apt.procedures?.price || 0);
           }
-          return sum;
-        }, 0) || 0;
+          return sum + (apt.procedures?.price || 0);
+        }, 0);
 
-        const price = goal.specification_id && goal.procedure_specifications
-          ? goal.procedure_specifications.specification_price
-          : goal.procedures.price || 0;
+        const price = goal.procedures?.price || 0;
 
         return {
           id: goal.id,
           procedure_id: goal.procedure_id,
-          procedure_name: goal.specification_id && goal.procedure_specifications
-            ? `${goal.procedures.name} - ${goal.procedure_specifications.specification_name}`
-            : goal.procedures.name,
+          procedure_name: goal.procedures?.name || 'Procedimento',
           target_quantity: goal.quantity,
           target_value: price * goal.quantity,
           current_quantity: currentQuantity,
           current_value: currentValue,
-          month: monthStart.getMonth() + 1,
-          year: monthStart.getFullYear(),
         };
       });
 
-      const progress = await Promise.all(progressPromises);
+      // Calcular "Outros Procedimentos"
+      const othersQuantity = appointmentsWithoutGoals.length;
+      const othersValue = appointmentsWithoutGoals.reduce((sum: number, apt: any) => {
+        if (apt.payment_status === 'pago' || apt.payment_status === 'pago_parcialmente') {
+          return sum + (apt.payment_value || apt.procedures?.price || 0);
+        }
+        return sum + (apt.procedures?.price || 0);
+      }, 0);
+
+      setOtherProcedures({
+        current_quantity: othersQuantity,
+        current_value: othersValue,
+      });
+
+      // Calcular totais
+      const totalQuantity = progress.reduce((sum, g) => sum + g.current_quantity, 0) + othersQuantity;
+      const totalValue = progress.reduce((sum, g) => sum + g.current_value, 0) + othersValue;
+      const targetQuantity = progress.reduce((sum, g) => sum + g.target_quantity, 0);
+      const targetValue = progress.reduce((sum, g) => sum + g.target_value, 0);
+
+      setTotalGoalsStats({
+        totalQuantity,
+        totalValue,
+        targetQuantity,
+        targetValue,
+      });
+
       setGoalsProgress(progress);
     } catch (error) {
       console.error('Erro ao carregar progresso das metas:', error);
@@ -605,50 +600,45 @@ const AdminDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Painel de Metas */}
-      {goalsProgress.length > 0 && (
+      {/* Painel de Metas do Mês */}
+      {(goalsProgress.length > 0 || otherProcedures.current_quantity > 0) && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5" />
-              Metas do Mês
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Target className="h-5 w-5" />
+                Metas do Mês
+              </div>
+              <div className="text-sm font-normal text-muted-foreground">
+                Total: {totalGoalsStats.totalQuantity} procedimentos | R$ {totalGoalsStats.totalValue.toFixed(2)}
+              </div>
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Acompanhe o progresso das suas metas mensais
+              Progresso dos procedimentos realizados no mês atual
             </p>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Cards de Metas */}
               {goalsProgress.map((goal) => {
-                const quantityProgress = (goal.current_quantity / goal.target_quantity) * 100;
-                const valueProgress = (goal.current_value / goal.target_value) * 100;
+                const quantityProgress = goal.target_quantity > 0 ? (goal.current_quantity / goal.target_quantity) * 100 : 0;
+                const valueProgress = goal.target_value > 0 ? (goal.current_value / goal.target_value) * 100 : 0;
                 
                 return (
-                  <Card
-                    key={goal.id}
-                    className="cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => {
-                      // Navegar para histórico filtrado pelo procedimento
-                      navigate('/admin/appointments', {
-                        state: {
-                          procedureFilter: goal.procedure_id
-                        }
-                      });
-                    }}
-                  >
+                  <Card key={goal.id} className="border-2 hover:border-primary/50 transition-colors">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base">{goal.procedure_name}</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-3">
                       {/* Progresso de Quantidade */}
                       <div>
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm text-muted-foreground">Realizados</span>
-                          <span className="text-sm font-medium">
+                          <span className="text-sm text-muted-foreground">Quantidade</span>
+                          <span className="text-sm font-bold">
                             {goal.current_quantity}/{goal.target_quantity}
                           </span>
                         </div>
-                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
                           <div
                             className={`h-full transition-all ${
                               quantityProgress >= 100
@@ -670,12 +660,12 @@ const AdminDashboard = () => {
                       {/* Progresso de Valor */}
                       <div>
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm text-muted-foreground">Valor Recebido</span>
-                          <span className="text-sm font-medium text-green-600">
+                          <span className="text-sm text-muted-foreground">Valor</span>
+                          <span className="text-sm font-bold text-green-600">
                             R$ {goal.current_value.toFixed(2)}
                           </span>
                         </div>
-                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
                           <div
                             className={`h-full transition-all ${
                               valueProgress >= 100
@@ -697,7 +687,64 @@ const AdminDashboard = () => {
                   </Card>
                 );
               })}
+
+              {/* Card Outros Procedimentos */}
+              {otherProcedures.current_quantity > 0 && (
+                <Card className="border-2 border-dashed">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base text-muted-foreground">Outros Procedimentos</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm text-muted-foreground">Quantidade Realizada</span>
+                        <span className="text-2xl font-bold">
+                          {otherProcedures.current_quantity}
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm text-muted-foreground">Valor Recebido</span>
+                        <span className="text-2xl font-bold text-green-600">
+                          R$ {otherProcedures.current_value.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Procedimentos sem meta definida
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
             </div>
+
+            {/* Resumo Total */}
+            {totalGoalsStats.targetQuantity > 0 && (
+              <div className="mt-6 p-4 bg-accent/50 rounded-lg">
+                <h4 className="font-semibold mb-3">Resumo Geral</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total de Procedimentos</p>
+                    <p className="text-xl font-bold">
+                      {totalGoalsStats.totalQuantity} / {totalGoalsStats.targetQuantity}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {((totalGoalsStats.totalQuantity / totalGoalsStats.targetQuantity) * 100).toFixed(0)}% das metas
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Valor Total</p>
+                    <p className="text-xl font-bold text-green-600">
+                      R$ {totalGoalsStats.totalValue.toFixed(2)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {((totalGoalsStats.totalValue / totalGoalsStats.targetValue) * 100).toFixed(0)}% de R$ {totalGoalsStats.targetValue.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

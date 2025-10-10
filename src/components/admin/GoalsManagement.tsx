@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Target, Plus, Edit, Trash2, TrendingUp } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Target, Plus, Edit, Trash2, TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -32,15 +33,22 @@ interface Procedure {
   price: number;
 }
 
+interface MonthGroup {
+  month: string;
+  monthName: string;
+  isOpen: boolean;
+  goals: Goal[];
+}
+
 const GoalsManagement = () => {
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [monthGroups, setMonthGroups] = useState<MonthGroup[]>([]);
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [formData, setFormData] = useState({
     procedure_id: "",
-    specification_id: "",
     quantity: "",
     target_month: new Date().toISOString().slice(0, 7), // YYYY-MM
   });
@@ -49,6 +57,53 @@ const GoalsManagement = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (goals.length > 0) {
+      organizeGoalsByMonth();
+    }
+  }, [goals]);
+
+  const organizeGoalsByMonth = () => {
+    const now = new Date();
+    const currentMonth = now.toISOString().slice(0, 7);
+    
+    // Agrupar metas por mês
+    const grouped = goals.reduce((acc, goal) => {
+      const month = goal.target_month.slice(0, 7);
+      if (!acc[month]) {
+        acc[month] = [];
+      }
+      acc[month].push(goal);
+      return acc;
+    }, {} as Record<string, Goal[]>);
+
+    // Ordenar meses e criar grupos
+    const sortedMonths = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+    
+    const groups: MonthGroup[] = sortedMonths.map((month, index) => {
+      const date = new Date(month + '-01');
+      const monthName = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      const isCurrentMonth = month === currentMonth;
+      
+      return {
+        month,
+        monthName: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+        isOpen: isCurrentMonth, // Abrir apenas o mês atual por padrão
+        goals: grouped[month],
+      };
+    });
+
+    setMonthGroups(groups);
+  };
+
+  const toggleMonth = (month: string) => {
+    setMonthGroups(prev =>
+      prev.map(group =>
+        group.month === month ? { ...group, isOpen: !group.isOpen } : group
+      )
+    );
+  };
 
   const loadData = async () => {
     try {
@@ -102,7 +157,6 @@ const GoalsManagement = () => {
       setEditingGoal(goal);
       setFormData({
         procedure_id: goal.procedure_id,
-        specification_id: goal.specification_id || "",
         quantity: goal.quantity.toString(),
         target_month: goal.target_month.slice(0, 7), // YYYY-MM
       });
@@ -110,7 +164,6 @@ const GoalsManagement = () => {
       setEditingGoal(null);
       setFormData({
         procedure_id: "",
-        specification_id: "",
         quantity: "",
         target_month: new Date().toISOString().slice(0, 7),
       });
@@ -129,15 +182,12 @@ const GoalsManagement = () => {
     }
 
     try {
-      const goalData: any = {
+      const goalData = {
         procedure_id: formData.procedure_id,
         quantity: parseInt(formData.quantity),
         target_month: formData.target_month + '-01', // Converter YYYY-MM para YYYY-MM-01
+        specification_id: null, // Sempre null, ignoramos especificações
       };
-
-      if (formData.specification_id) {
-        goalData.specification_id = formData.specification_id;
-      }
 
       if (editingGoal) {
         const { error } = await supabase
@@ -244,7 +294,7 @@ const GoalsManagement = () => {
         </Button>
       </div>
 
-      {goals.length === 0 ? (
+      {monthGroups.length === 0 ? (
         <Card>
           <CardContent className="py-8">
             <div className="text-center text-muted-foreground">
@@ -255,68 +305,84 @@ const GoalsManagement = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {goals.map((goal) => {
-            const monthDate = new Date(goal.target_month);
-            const monthName = monthDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-            const displayName = goal.specification_id && goal.procedure_specifications
-              ? `${goal.procedures?.name} - ${goal.procedure_specifications.specification_name}`
-              : goal.procedures?.name || 'Procedimento';
-            const price = goal.specification_id && goal.procedure_specifications
-              ? goal.procedure_specifications.specification_price
-              : goal.procedures?.price || 0;
-            
-            return (
-              <Card key={goal.id}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-base">
-                        {displayName}
-                      </CardTitle>
-                      <Badge variant="outline" className="mt-2 capitalize">
-                        {monthName}
-                      </Badge>
+        <div className="space-y-4">
+          {monthGroups.map((group) => (
+            <Card key={group.month}>
+              <Collapsible open={group.isOpen} onOpenChange={() => toggleMonth(group.month)}>
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <CardTitle className="text-lg">{group.monthName}</CardTitle>
+                        <Badge variant="secondary">{group.goals.length} meta{group.goals.length !== 1 ? 's' : ''}</Badge>
+                      </div>
+                      {group.isOpen ? (
+                        <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                      )}
                     </div>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleOpenDialog(goal)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteGoal(goal.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-600" />
-                      </Button>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="pt-0">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                      {group.goals.map((goal) => {
+                        const displayName = goal.procedures?.name || 'Procedimento';
+                        const price = goal.procedures?.price || 0;
+                        
+                        return (
+                          <Card key={goal.id} className="border-2">
+                            <CardHeader className="pb-3">
+                              <div className="flex items-start justify-between">
+                                <CardTitle className="text-base">
+                                  {displayName}
+                                </CardTitle>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleOpenDialog(goal)}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteGoal(goal.id)}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-red-600" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <div>
+                                <p className="text-sm text-muted-foreground">Quantidade Alvo</p>
+                                <p className="text-2xl font-bold flex items-center gap-2">
+                                  <TrendingUp className="h-5 w-5 text-blue-600" />
+                                  {goal.quantity}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground">Valor Estimado</p>
+                                <p className="text-2xl font-bold text-green-600">
+                                  R$ {(price * goal.quantity).toFixed(2)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  R$ {price.toFixed(2)} x {goal.quantity}
+                                </p>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Quantidade Alvo</p>
-                    <p className="text-2xl font-bold flex items-center gap-2">
-                      <TrendingUp className="h-5 w-5 text-blue-600" />
-                      {goal.quantity}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Valor Estimado</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      R$ {(price * goal.quantity).toFixed(2)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      R$ {price.toFixed(2)} x {goal.quantity}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                  </CardContent>
+                </CollapsibleContent>
+              </Collapsible>
+            </Card>
+          ))}
         </div>
       )}
 

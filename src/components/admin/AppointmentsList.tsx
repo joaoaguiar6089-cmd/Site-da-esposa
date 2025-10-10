@@ -63,9 +63,16 @@ interface Professional {
 interface AppointmentsListProps {
   initialPaymentFilters?: string[];
   initialSearchTerm?: string;
+  initialDateFrom?: string; // YYYY-MM-DD
+  initialDateTo?: string; // YYYY-MM-DD
 }
 
-const AppointmentsList = ({ initialPaymentFilters, initialSearchTerm }: AppointmentsListProps = {}) => {
+const AppointmentsList = ({ 
+  initialPaymentFilters, 
+  initialSearchTerm,
+  initialDateFrom,
+  initialDateTo 
+}: AppointmentsListProps = {}) => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [filteredAppointments, setFilteredAppointments] = useState<Appointment[]>([]);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
@@ -96,7 +103,7 @@ const AppointmentsList = ({ initialPaymentFilters, initialSearchTerm }: Appointm
       // Obter a data atual no formato YYYY-MM-DD
       const today = new Date().toISOString().split('T')[0];
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('appointments')
         .select(`
           id,
@@ -132,10 +139,22 @@ const AppointmentsList = ({ initialPaymentFilters, initialSearchTerm }: Appointm
             specification_name,
             specification_price
           )
-        `)
-        .gte('appointment_date', today) // Filtro para datas >= hoje
-        .order('appointment_date')
-        .order('appointment_time');
+        `);
+      
+      // Aplicar filtros de data se fornecidos, senão usar padrão
+      if (initialDateFrom) {
+        query = query.gte('appointment_date', initialDateFrom);
+      } else {
+        query = query.gte('appointment_date', today); // Filtro padrão para datas >= hoje
+      }
+      
+      if (initialDateTo) {
+        query = query.lte('appointment_date', initialDateTo);
+      }
+      
+      query = query.order('appointment_date').order('appointment_time');
+
+      const { data, error } = await query;
 
       if (error) throw error;
 

@@ -94,6 +94,8 @@ const Admin = () => {
         return <AppointmentsList 
           initialPaymentFilters={state?.initialPaymentFilters}
           initialSearchTerm={state?.searchTerm}
+          initialDateFrom={state?.dateFrom}
+          initialDateTo={state?.dateTo}
         />;
       case "clients":
         return <ClientManagement />;

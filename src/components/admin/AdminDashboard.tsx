@@ -235,11 +235,11 @@ const AdminDashboard = () => {
 
       if (goalsError) throw goalsError;
 
-      // Buscar TODOS os agendamentos realizados do mês
+      // Buscar TODOS os agendamentos do mês (exceto cancelados)
       const { data: allAppointments, error: aptError } = await supabase
         .from('appointments')
         .select('procedure_id, payment_value, payment_status, procedures(price)')
-        .eq('status', 'realizado')
+        .neq('status', 'cancelado') // Ignorar cancelados
         .gte('appointment_date', firstDay)
         .lte('appointment_date', lastDay);
 
@@ -730,11 +730,18 @@ const AdminDashboard = () => {
                       {goal.pending_payments_count > 0 && (
                         <button
                           onClick={() => {
+                            // Calcular primeiro e último dia do mês atual
+                            const now = new Date();
+                            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+                            const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+                            
                             navigate('/admin', {
                               state: {
                                 tab: 'appointments',
                                 initialPaymentFilters: ['aguardando', 'nao_pago', 'pago_parcialmente'],
-                                searchTerm: goal.procedure_name
+                                searchTerm: goal.procedure_name,
+                                dateFrom: firstDay,
+                                dateTo: lastDay
                               }
                             });
                           }}

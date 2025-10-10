@@ -54,6 +54,7 @@ interface GoalProgress {
   target_value: number;
   current_quantity: number;
   current_value: number;
+  pending_payments_count: number; // Quantidade de appointments sem payment_value
 }
 
 interface OtherProceduresStats {
@@ -255,13 +256,20 @@ const AdminDashboard = () => {
         );
 
         const currentQuantity = goalAppointments.length;
-        const currentValue = goalAppointments.reduce((sum: number, apt: any) => {
-          // Usar valor pago ou preço do procedimento
-          if (apt.payment_status === 'pago' || apt.payment_status === 'pago_parcialmente') {
-            return sum + (apt.payment_value || apt.procedures?.price || 0);
+        
+        // Contar apenas appointments COM payment_value preenchido
+        let currentValue = 0;
+        let pendingPaymentsCount = 0;
+        
+        goalAppointments.forEach((apt: any) => {
+          if (apt.payment_value && apt.payment_value > 0) {
+            // Soma apenas se tem valor de pagamento preenchido
+            currentValue += apt.payment_value;
+          } else {
+            // Conta como pagamento pendente
+            pendingPaymentsCount++;
           }
-          return sum + (apt.procedures?.price || 0);
-        }, 0);
+        });
 
         const price = goal.procedures?.price || 0;
 
@@ -273,16 +281,17 @@ const AdminDashboard = () => {
           target_value: price * goal.quantity,
           current_quantity: currentQuantity,
           current_value: currentValue,
+          pending_payments_count: pendingPaymentsCount,
         };
       });
 
-      // Calcular "Outros Procedimentos"
+      // Calcular "Outros Procedimentos" - apenas valores COM payment_value preenchido
       const othersQuantity = appointmentsWithoutGoals.length;
       const othersValue = appointmentsWithoutGoals.reduce((sum: number, apt: any) => {
-        if (apt.payment_status === 'pago' || apt.payment_status === 'pago_parcialmente') {
-          return sum + (apt.payment_value || apt.procedures?.price || 0);
+        if (apt.payment_value && apt.payment_value > 0) {
+          return sum + apt.payment_value;
         }
-        return sum + (apt.procedures?.price || 0);
+        return sum; // Não adiciona se não tem payment_value
       }, 0);
 
       setOtherProcedures({
@@ -707,6 +716,24 @@ const AdminDashboard = () => {
                           {valueProgress.toFixed(0)}% de R$ {goal.target_value.toFixed(2)}
                         </p>
                       </div>
+
+                      {/* Link para pagamentos pendentes */}
+                      {goal.pending_payments_count > 0 && (
+                        <button
+                          onClick={() => {
+                            navigate('/admin', {
+                              state: {
+                                tab: 'appointments',
+                                initialPaymentFilters: ['aguardando', 'nao_pago', 'pago_parcialmente'],
+                                searchTerm: goal.procedure_name
+                              }
+                            });
+                          }}
+                          className="text-xs text-orange-600 hover:text-orange-700 hover:underline flex items-center gap-1 mt-2"
+                        >
+                          * Ver {goal.pending_payments_count} pagamento{goal.pending_payments_count > 1 ? 's' : ''} pendente{goal.pending_payments_count > 1 ? 's' : ''}
+                        </button>
+                      )}
                     </CardContent>
                   </Card>
                 );

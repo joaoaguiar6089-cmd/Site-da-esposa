@@ -65,6 +65,8 @@ const GoalsManagement = () => {
   }, [goals]);
 
   const organizeGoalsByMonth = () => {
+    console.log('Organizando goals:', goals);
+    
     const now = new Date();
     const currentMonth = now.toISOString().slice(0, 7);
     
@@ -77,6 +79,8 @@ const GoalsManagement = () => {
       acc[month].push(goal);
       return acc;
     }, {} as Record<string, Goal[]>);
+
+    console.log('Grouped:', grouped);
 
     // Ordenar meses e criar grupos
     const sortedMonths = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
@@ -94,6 +98,7 @@ const GoalsManagement = () => {
       };
     });
 
+    console.log('Month groups criados:', groups);
     setMonthGroups(groups);
   };
 
@@ -118,7 +123,7 @@ const GoalsManagement = () => {
       if (procError) throw procError;
       setProcedures(proceduresData || []);
 
-      // Carregar metas
+      // Carregar metas (apenas aquelas sem specification_id, para simplificar)
       const { data: goalsData, error: goalsError } = await supabase
         .from('procedure_monthly_goals')
         .select(`
@@ -130,15 +135,14 @@ const GoalsManagement = () => {
           procedures (
             name,
             price
-          ),
-          procedure_specifications (
-            specification_name,
-            specification_price
           )
         `)
+        .is('specification_id', null)
         .order('target_month', { ascending: false });
 
       if (goalsError) throw goalsError;
+      
+      console.log('Goals carregadas:', goalsData);
       setGoals((goalsData as any) || []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);

@@ -91,7 +91,10 @@ const Admin = () => {
       case "calendar":
         return <AdminCalendar initialDate={state?.initialDate} />;
       case "appointments":
-        return <AppointmentsList initialPaymentFilters={state?.initialPaymentFilters} />;
+        return <AppointmentsList 
+          initialPaymentFilters={state?.initialPaymentFilters}
+          initialSearchTerm={state?.searchTerm}
+        />;
       case "clients":
         return <ClientManagement />;
       case "professionals":

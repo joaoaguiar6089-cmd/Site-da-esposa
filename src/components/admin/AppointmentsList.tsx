@@ -62,14 +62,15 @@ interface Professional {
 
 interface AppointmentsListProps {
   initialPaymentFilters?: string[];
+  initialSearchTerm?: string;
 }
 
-const AppointmentsList = ({ initialPaymentFilters }: AppointmentsListProps = {}) => {
+const AppointmentsList = ({ initialPaymentFilters, initialSearchTerm }: AppointmentsListProps = {}) => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [filteredAppointments, setFilteredAppointments] = useState<Appointment[]>([]);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(initialSearchTerm || "");
   const [statusFilter, setStatusFilter] = useState("todos");
   const [paymentStatusFilters, setPaymentStatusFilters] = useState<string[]>(initialPaymentFilters || []);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);

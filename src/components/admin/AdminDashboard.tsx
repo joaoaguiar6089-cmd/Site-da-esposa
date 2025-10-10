@@ -149,10 +149,6 @@ const AdminDashboard = () => {
       const todayStr = now.toISOString().split('T')[0];
       const currentTime = now.toTimeString().slice(0, 5); // HH:MM
 
-      console.log('=== DEBUG AGENDAMENTOS RECENTES ===');
-      console.log('Data de hoje:', todayStr);
-      console.log('Hora atual:', currentTime);
-
       const { data, error } = await supabase
         .from('appointments')
         .select(`
@@ -183,14 +179,6 @@ const AdminDashboard = () => {
 
       if (error) throw error;
 
-      console.log('Total de agendamentos retornados do banco:', data?.length || 0);
-      console.log('Primeiros 5 agendamentos:', data?.slice(0, 5).map((apt: any) => ({
-        data: apt.appointment_date,
-        hora: apt.appointment_time,
-        status: apt.status,
-        procedimento: apt.procedures?.name
-      })));
-
       // Filtrar pelo lado do cliente para incluir apenas os que já passaram (data + hora)
       const filtered = ((data as any) || []).filter((apt: any) => {
         const aptDate = apt.appointment_date;
@@ -205,14 +193,6 @@ const AdminDashboard = () => {
         return false;
       });
 
-      console.log('Após filtro de data/hora:', filtered.length);
-      console.log('Agendamentos filtrados:', filtered.map((apt: any) => ({
-        data: apt.appointment_date,
-        hora: apt.appointment_time,
-        procedimento: apt.procedures?.name,
-        cliente: apt.clients?.nome
-      })));
-
       // Ordenar do mais recente para o mais antigo (data DESC, hora DESC)
       filtered.sort((a: any, b: any) => {
         // Primeiro comparar datas
@@ -223,18 +203,8 @@ const AdminDashboard = () => {
         return b.appointment_time.localeCompare(a.appointment_time);
       });
 
-      const top10 = filtered.slice(0, 10);
-      console.log('Após ordenação - top 10:', top10.map((apt: any) => ({
-        data: apt.appointment_date,
-        hora: apt.appointment_time,
-        procedimento: apt.procedures?.name,
-        cliente: apt.clients?.nome
-      })));
-
-      console.log('VERIFICAÇÃO: Tem agendamentos do dia 09?', top10.filter((apt: any) => apt.appointment_date === '2025-10-09').length);
-
       // Limitar a 10 após ordenação
-      setRecentAppointments(top10);
+      setRecentAppointments(filtered.slice(0, 10));
     } catch (error) {
       console.error('Erro ao carregar agendamentos recentes:', error);
     }

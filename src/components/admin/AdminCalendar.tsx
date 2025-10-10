@@ -679,8 +679,8 @@ Aguardamos você!`;
   };
 
   // Badge de status de pagamento
-  const getPaymentStatusBadge = (paymentStatus?: string | null) => {
-    const status = paymentStatus || 'aguardando';
+  const getPaymentStatusBadge = (appointment: Appointment) => {
+    const status = appointment.payment_status || 'aguardando';
     
     const statusConfig = {
       'aguardando': { label: 'Aguardando', className: 'bg-white border-2 border-gray-300 text-gray-700' },
@@ -1029,7 +1029,10 @@ Aguardamos você!`;
                       <span className="font-medium text-sm">
                         {appointment.appointment_time}
                       </span>
-                      {getStatusBadge(appointment.status)}
+                      <div className="flex gap-2">
+                        {getStatusBadge(appointment.status)}
+                        {getPaymentStatusBadge(appointment)}
+                      </div>
                     </div>
                     <p className="text-sm font-medium">
                       {appointment.clients.nome} {appointment.clients.sobrenome}
@@ -1037,6 +1040,30 @@ Aguardamos você!`;
                     <p className="text-xs">
                       {appointment.procedures.name}
                     </p>
+                    
+                    {/* Informações de Pagamento */}
+                    {appointment.payment_value && appointment.payment_value > 0 && (
+                      <div className="mt-2 pt-2 border-t text-xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">Pagamento:</span>
+                          <span className="font-bold text-green-600">
+                            R$ {appointment.payment_value.toFixed(2)}
+                          </span>
+                        </div>
+                        {appointment.payment_method && (
+                          <div className="flex items-center justify-between">
+                            <span>Forma:</span>
+                            <span className="capitalize">{appointment.payment_method}</span>
+                          </div>
+                        )}
+                        {appointment.payment_notes && (
+                          <div className="mt-1">
+                            <span className="font-medium">Obs:</span>
+                            <p className="text-muted-foreground">{appointment.payment_notes}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1156,7 +1183,7 @@ Aguardamos você!`;
                 <div className="border-t pt-4">
                   <strong>Pagamento:</strong>
                   <div className="mt-2 flex items-center justify-between">
-                    {getPaymentStatusBadge(selectedAppointment.payment_status)}
+                    {getPaymentStatusBadge(selectedAppointment)}
                     <Button
                       size="sm"
                       variant="outline"

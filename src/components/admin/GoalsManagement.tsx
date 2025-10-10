@@ -13,14 +13,17 @@ import { Badge } from "@/components/ui/badge";
 interface Goal {
   id: string;
   procedure_id: string;
-  target_quantity: number;
-  target_value: number;
-  month: number;
-  year: number;
+  specification_id?: string | null;
+  quantity: number;
+  target_month: string;
   procedures: {
     name: string;
-    price: number;
+    price: number | null;
   };
+  procedure_specifications?: {
+    specification_name: string;
+    specification_price: number;
+  } | null;
 }
 
 interface Procedure {
@@ -37,10 +40,9 @@ const GoalsManagement = () => {
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [formData, setFormData] = useState({
     procedure_id: "",
-    target_quantity: "",
-    target_value: "",
-    month: new Date().getMonth() + 1,
-    year: new Date().getFullYear(),
+    specification_id: "",
+    quantity: "",
+    target_month: new Date().toISOString().slice(0, 7), // YYYY-MM
   });
   const { toast } = useToast();
 
@@ -62,22 +64,24 @@ const GoalsManagement = () => {
       setProcedures(proceduresData || []);
 
       // Carregar metas
-      const { data: goalsData, error: goalsError } = await (supabase as any)
-        .from('goals')
+      const { data: goalsData, error: goalsError } = await supabase
+        .from('procedure_monthly_goals')
         .select(`
           id,
           procedure_id,
-          target_quantity,
-          target_value,
-          month,
-          year,
+          specification_id,
+          quantity,
+          target_month,
           procedures (
             name,
             price
+          ),
+          procedure_specifications (
+            specification_name,
+            specification_price
           )
         `)
-        .order('year', { ascending: false })
-        .order('month', { ascending: false });
+        .order('target_month', { ascending: false });
 
       if (goalsError) throw goalsError;
       setGoals((goalsData as any) || []);
@@ -98,26 +102,24 @@ const GoalsManagement = () => {
       setEditingGoal(goal);
       setFormData({
         procedure_id: goal.procedure_id,
-        target_quantity: goal.target_quantity.toString(),
-        target_value: goal.target_value.toString(),
-        month: goal.month,
-        year: goal.year,
+        specification_id: goal.specification_id || "",
+        quantity: goal.quantity.toString(),
+        target_month: goal.target_month.slice(0, 7), // YYYY-MM
       });
     } else {
       setEditingGoal(null);
       setFormData({
         procedure_id: "",
-        target_quantity: "",
-        target_value: "",
-        month: new Date().getMonth() + 1,
-        year: new Date().getFullYear(),
+        specification_id: "",
+        quantity: "",
+        target_month: new Date().toISOString().slice(0, 7),
       });
     }
     setDialogOpen(true);
   };
 
   const handleSaveGoal = async () => {
-    if (!formData.procedure_id || !formData.target_quantity || !formData.target_value) {
+    if (!formData.procedure_id || !formData.quantity || !formData.target_month) {
       toast({
         title: "Erro",
         description: "Preencha todos os campos obrigatórios.",
@@ -127,17 +129,19 @@ const GoalsManagement = () => {
     }
 
     try {
-      const goalData = {
+      const goalData: any = {
         procedure_id: formData.procedure_id,
-        target_quantity: parseInt(formData.target_quantity),
-        target_value: parseFloat(formData.target_value),
-        month: formData.month,
-        year: formData.year,
+        quantity: parseInt(formData.quantity),
+        target_month: formData.target_month + '-01', // Converter YYYY-MM para YYYY-MM-01
       };
 
+      if (formData.specification_id) {
+        goalData.specification_id = formData.specification_id;
+      }
+
       if (editingGoal) {
-        const { error } = await (supabase as any)
-          .from('goals')
+        const { error } = await supabase
+          .from('procedure_monthly_goals')
           .update(goalData)
           .eq('id', editingGoal.id);
 
@@ -148,8 +152,8 @@ const GoalsManagement = () => {
           description: "A meta foi atualizada com sucesso.",
         });
       } else {
-        const { error } = await (supabase as any)
-          .from('goals')
+        const { error } = await supabase
+          .from('procedure_monthly_goals')
           .insert([goalData]);
 
         if (error) throw error;
@@ -185,8 +189,8 @@ const GoalsManagement = () => {
     if (!confirm("Tem certeza que deseja excluir esta meta?")) return;
 
     try {
-      const { error } = await (supabase as any)
-        .from('goals')
+      const { error } = await supabase
+        .from('procedure_monthly_goals')
         .delete()
         .eq('id', goalId);
 
@@ -252,53 +256,67 @@ const GoalsManagement = () => {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {goals.map((goal) => (
-            <Card key={goal.id}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-base">
-                      {(goal.procedures as any)?.name}
-                    </CardTitle>
-                    <Badge variant="outline" className="mt-2">
-                      {getMonthName(goal.month)} {goal.year}
-                    </Badge>
+          {goals.map((goal) => {
+            const monthDate = new Date(goal.target_month);
+            const monthName = monthDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+            const displayName = goal.specification_id && goal.procedure_specifications
+              ? `${goal.procedures?.name} - ${goal.procedure_specifications.specification_name}`
+              : goal.procedures?.name || 'Procedimento';
+            const price = goal.specification_id && goal.procedure_specifications
+              ? goal.procedure_specifications.specification_price
+              : goal.procedures?.price || 0;
+            
+            return (
+              <Card key={goal.id}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardTitle className="text-base">
+                        {displayName}
+                      </CardTitle>
+                      <Badge variant="outline" className="mt-2 capitalize">
+                        {monthName}
+                      </Badge>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleOpenDialog(goal)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteGoal(goal.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-600" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleOpenDialog(goal)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteGoal(goal.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-red-600" />
-                    </Button>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Quantidade Alvo</p>
+                    <p className="text-2xl font-bold flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-blue-600" />
+                      {goal.quantity}
+                    </p>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Quantidade Alvo</p>
-                  <p className="text-2xl font-bold flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-blue-600" />
-                    {goal.target_quantity}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Valor Alvo</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    R$ {goal.target_value.toFixed(2)}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  <div>
+                    <p className="text-sm text-muted-foreground">Valor Estimado</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      R$ {(price * goal.quantity).toFixed(2)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      R$ {price.toFixed(2)} x {goal.quantity}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
@@ -324,55 +342,25 @@ const GoalsManagement = () => {
                 <SelectContent>
                   {procedures.map((proc) => (
                     <SelectItem key={proc.id} value={proc.id}>
-                      {proc.name} - R$ {proc.price.toFixed(2)}
+                      {proc.name} - R$ {(proc.price || 0).toFixed(2)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Mês *</Label>
-                <Select
-                  value={formData.month.toString()}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, month: parseInt(value) })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
-                      <SelectItem key={month} value={month.toString()}>
-                        {getMonthName(month)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label>Ano *</Label>
-                <Select
-                  value={formData.year.toString()}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, year: parseInt(value) })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 + i).map((year) => (
-                      <SelectItem key={year} value={year.toString()}>
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div>
+              <Label>Mês/Ano da Meta *</Label>
+              <Input
+                type="month"
+                value={formData.target_month}
+                onChange={(e) =>
+                  setFormData({ ...formData, target_month: e.target.value })
+                }
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Selecione o mês e ano para esta meta
+              </p>
             </div>
 
             <div>
@@ -380,31 +368,14 @@ const GoalsManagement = () => {
               <Input
                 type="number"
                 min="1"
-                value={formData.target_quantity}
+                value={formData.quantity}
                 onChange={(e) =>
-                  setFormData({ ...formData, target_quantity: e.target.value })
+                  setFormData({ ...formData, quantity: e.target.value })
                 }
                 placeholder="Ex: 10"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Número de agendamentos realizados desejados
-              </p>
-            </div>
-
-            <div>
-              <Label>Valor Alvo (R$) *</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.target_value}
-                onChange={(e) =>
-                  setFormData({ ...formData, target_value: e.target.value })
-                }
-                placeholder="Ex: 1500.00"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Valor total desejado a receber
+                Número de agendamentos realizados desejados neste mês
               </p>
             </div>
 

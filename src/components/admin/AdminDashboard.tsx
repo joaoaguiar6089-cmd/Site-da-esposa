@@ -200,21 +200,28 @@ const AdminDashboard = () => {
       const currentYear = now.getFullYear();
 
       // Buscar metas do mês atual
-      const { data: goals, error: goalsError } = await (supabase as any)
-        .from('goals')
+      const firstDay = new Date(currentYear, currentMonth - 1, 1).toISOString().split('T')[0];
+      const lastDay = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0];
+      
+      const { data: goals, error: goalsError} = await supabase
+        .from('procedure_monthly_goals')
         .select(`
           id,
           procedure_id,
-          target_quantity,
-          target_value,
-          month,
-          year,
+          specification_id,
+          quantity,
+          target_month,
           procedures (
-            name
+            name,
+            price
+          ),
+          procedure_specifications (
+            specification_name,
+            specification_price
           )
         `)
-        .eq('month', currentMonth)
-        .eq('year', currentYear);
+        .gte('target_month', firstDay)
+        .lte('target_month', lastDay);
 
       if (goalsError) throw goalsError;
 
@@ -225,10 +232,13 @@ const AdminDashboard = () => {
 
       // Para cada meta, calcular o progresso
       const progressPromises = goals.map(async (goal: any) => {
-        const firstDay = new Date(currentYear, currentMonth - 1, 1).toISOString().split('T')[0];
-        const lastDay = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0];
+        const monthStart = new Date(goal.target_month);
+        const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+        const firstDay = monthStart.toISOString().split('T')[0];
+        const lastDay = monthEnd.toISOString().split('T')[0];
 
-        const { data: appointments, error: aptError } = await supabase
+        // Buscar agendamentos realizados
+        let query = supabase
           .from('appointments')
           .select('payment_value, payment_status')
           .eq('procedure_id', goal.procedure_id)
@@ -236,6 +246,37 @@ const AdminDashboard = () => {
           .gte('appointment_date', firstDay)
           .lte('appointment_date', lastDay);
 
+        // Se tiver specification_id, filtrar também
+        if (goal.specification_id) {
+          const { data: aptWithSpecs } = await supabase
+            .from('appointment_specifications')
+            .select('appointment_id')
+            .eq('specification_id', goal.specification_id);
+          
+          const aptIds = aptWithSpecs?.map(s => s.appointment_id) || [];
+          if (aptIds.length > 0) {
+            query = query.in('id', aptIds);
+          } else {
+            // Nenhum agendamento com essa especificação
+            return {
+              id: goal.id,
+              procedure_id: goal.procedure_id,
+              procedure_name: goal.specification_id && goal.procedure_specifications
+                ? `${goal.procedures.name} - ${goal.procedure_specifications.specification_name}`
+                : goal.procedures.name,
+              target_quantity: goal.quantity,
+              target_value: goal.specification_id && goal.procedure_specifications
+                ? goal.procedure_specifications.specification_price * goal.quantity
+                : (goal.procedures.price || 0) * goal.quantity,
+              current_quantity: 0,
+              current_value: 0,
+              month: monthStart.getMonth() + 1,
+              year: monthStart.getFullYear(),
+            };
+          }
+        }
+
+        const { data: appointments, error: aptError } = await query;
         if (aptError) throw aptError;
 
         const currentQuantity = appointments?.length || 0;
@@ -247,16 +288,22 @@ const AdminDashboard = () => {
           return sum;
         }, 0) || 0;
 
+        const price = goal.specification_id && goal.procedure_specifications
+          ? goal.procedure_specifications.specification_price
+          : goal.procedures.price || 0;
+
         return {
           id: goal.id,
           procedure_id: goal.procedure_id,
-          procedure_name: goal.procedures.name,
-          target_quantity: goal.target_quantity,
-          target_value: goal.target_value,
+          procedure_name: goal.specification_id && goal.procedure_specifications
+            ? `${goal.procedures.name} - ${goal.procedure_specifications.specification_name}`
+            : goal.procedures.name,
+          target_quantity: goal.quantity,
+          target_value: price * goal.quantity,
           current_quantity: currentQuantity,
           current_value: currentValue,
-          month: goal.month,
-          year: goal.year,
+          month: monthStart.getMonth() + 1,
+          year: monthStart.getFullYear(),
         };
       });
 

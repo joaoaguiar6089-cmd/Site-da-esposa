@@ -149,21 +149,37 @@ const AppointmentsList = ({
       // Aplicar filtros de data se fornecidos, senão usar padrão
       if (initialDateFrom) {
         query = query.gte('appointment_date', initialDateFrom);
-      } else {
-        query = query.gte('appointment_date', today); // Filtro padrão para datas >= hoje
       }
       
       if (initialDateTo) {
         query = query.lte('appointment_date', initialDateTo);
+      } else {
+        // Histórico: mostrar apenas agendamentos até hoje
+        query = query.lte('appointment_date', today);
       }
       
-      query = query.order('appointment_date').order('appointment_time');
+      query = query.order('appointment_date', { ascending: false }).order('appointment_time', { ascending: false });
 
       const { data, error } = await query;
 
       if (error) throw error;
 
-      setAppointments((data as any) || []);
+      // Filtrar no lado do cliente para remover agendamentos futuros de hoje
+      const now = new Date();
+      const currentTime = now.toTimeString().slice(0, 8); // HH:MM:SS
+      
+      const filteredData = (data || []).filter((apt: any) => {
+        // Se for antes de hoje, incluir
+        if (apt.appointment_date < today) return true;
+        
+        // Se for hoje, verificar se o horário já passou
+        if (apt.appointment_date === today && apt.appointment_time <= currentTime) return true;
+        
+        // Agendamentos futuros não aparecem no histórico
+        return false;
+      });
+
+      setAppointments(filteredData as any);
     } catch (error) {
       console.error('Erro ao carregar agendamentos:', error);
       toast({

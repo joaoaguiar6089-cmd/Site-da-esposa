@@ -6,10 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Target, Plus, Edit, Trash2, TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
+import { Target, Plus, Edit, Trash2, TrendingUp, ChevronDown, ChevronUp, BarChart3, Eye, EyeOff, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 
 interface Goal {
   id: string;
@@ -40,6 +41,14 @@ interface MonthGroup {
   goals: Goal[];
 }
 
+interface GoalProgress {
+  procedure_id: string;
+  procedure_name: string;
+  target_quantity: number;
+  current_quantity: number;
+  current_value: number;
+}
+
 const GoalsManagement = () => {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [monthGroups, setMonthGroups] = useState<MonthGroup[]>([]);
@@ -52,6 +61,9 @@ const GoalsManagement = () => {
     quantity: "",
     target_month: new Date().toISOString().slice(0, 7), // YYYY-MM
   });
+  const [showProgress, setShowProgress] = useState<Record<string, boolean>>({});
+  const [monthProgress, setMonthProgress] = useState<Record<string, GoalProgress[]>>({});
+  const [loadingProgress, setLoadingProgress] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -86,7 +98,9 @@ const GoalsManagement = () => {
     const sortedMonths = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
     
     const groups: MonthGroup[] = sortedMonths.map((month, index) => {
-      const date = new Date(month + '-01');
+      // Parse the month correctly to avoid timezone issues
+      const [year, monthNum] = month.split('-');
+      const date = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
       const monthName = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
       const isCurrentMonth = month === currentMonth;
       
@@ -108,6 +122,88 @@ const GoalsManagement = () => {
         group.month === month ? { ...group, isOpen: !group.isOpen } : group
       )
     );
+  };
+
+  const toggleProgress = async (month: string) => {
+    const currentlyShowing = showProgress[month] || false;
+    
+    if (!currentlyShowing && !monthProgress[month]) {
+      // Load progress data if not already loaded
+      await loadMonthProgress(month);
+    }
+    
+    setShowProgress(prev => ({
+      ...prev,
+      [month]: !currentlyShowing,
+    }));
+  };
+
+  const loadMonthProgress = async (month: string) => {
+    try {
+      setLoadingProgress(prev => ({ ...prev, [month]: true }));
+
+      // Get the first and last day of the month
+      const [year, monthNum] = month.split('-');
+      const firstDay = `${year}-${monthNum}-01`;
+      const lastDay = new Date(parseInt(year), parseInt(monthNum), 0).getDate();
+      const lastDayStr = `${year}-${monthNum}-${String(lastDay).padStart(2, '0')}`;
+
+      // Load goals for this month
+      const { data: goalsData, error: goalsError } = await supabase
+        .from('procedure_monthly_goals')
+        .select(`
+          procedure_id,
+          quantity,
+          procedures (
+            name,
+            price
+          )
+        `)
+        .is('specification_id', null)
+        .gte('target_month', firstDay)
+        .lte('target_month', lastDayStr);
+
+      if (goalsError) throw goalsError;
+
+      // Load appointments for this month (excluding canceled)
+      const { data: appointmentsData, error: appointmentsError } = await supabase
+        .from('appointments')
+        .select('*')
+        .gte('appointment_date', firstDay)
+        .lte('appointment_date', lastDayStr)
+        .neq('status', 'cancelado');
+
+      if (appointmentsError) throw appointmentsError;
+
+      // Calculate progress
+      const progress: GoalProgress[] = (goalsData || []).map((goal: any) => {
+        const procedureAppointments = (appointmentsData || []).filter(
+          (apt: any) => apt.procedure_id === goal.procedure_id
+        );
+
+        return {
+          procedure_id: goal.procedure_id,
+          procedure_name: goal.procedures?.name || 'Procedimento',
+          target_quantity: goal.quantity,
+          current_quantity: procedureAppointments.length,
+          current_value: procedureAppointments.reduce((sum: number, apt: any) => sum + (apt.payment_value || 0), 0),
+        };
+      });
+
+      setMonthProgress(prev => ({
+        ...prev,
+        [month]: progress,
+      }));
+    } catch (error) {
+      console.error('Erro ao carregar progresso do mês:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar o progresso do mês.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingProgress(prev => ({ ...prev, [month]: false }));
+    }
   };
 
   const loadData = async () => {
@@ -330,6 +426,101 @@ const GoalsManagement = () => {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <CardContent className="pt-0">
+                    {/* Toggle para mostrar/ocultar progresso */}
+                    <div className="flex justify-end mb-4 mt-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => toggleProgress(group.month)}
+                        disabled={loadingProgress[group.month]}
+                      >
+                        {loadingProgress[group.month] ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                        ) : showProgress[group.month] ? (
+                          <EyeOff className="h-4 w-4 mr-2" />
+                        ) : (
+                          <Eye className="h-4 w-4 mr-2" />
+                        )}
+                        {showProgress[group.month] ? 'Ocultar' : 'Exibir'} Progresso
+                      </Button>
+                    </div>
+
+                    {/* Painel de Progresso */}
+                    {showProgress[group.month] && monthProgress[group.month] && (
+                      <div className="mb-6 space-y-4">
+                        <div className="flex items-center gap-2 mb-4">
+                          <BarChart3 className="h-5 w-5 text-primary" />
+                          <h3 className="text-lg font-semibold">Progresso do Mês</h3>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {monthProgress[group.month].map((progress) => {
+                            const percentQuantity = (progress.current_quantity / progress.target_quantity) * 100;
+                            const targetValue = progress.target_quantity * (procedures.find(p => p.id === progress.procedure_id)?.price || 0);
+                            const percentValue = targetValue > 0 ? (progress.current_value / targetValue) * 100 : 0;
+
+                            return (
+                              <Card key={progress.procedure_id} className="border-l-4 border-l-primary">
+                                <CardHeader className="pb-3">
+                                  <CardTitle className="text-sm font-medium">{progress.procedure_name}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                  {/* Progresso de Quantidade */}
+                                  <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-sm text-muted-foreground">Quantidade</span>
+                                      <span className="text-sm font-semibold">
+                                        {progress.current_quantity} / {progress.target_quantity}
+                                      </span>
+                                    </div>
+                                    <Progress value={Math.min(percentQuantity, 100)} className="h-2" />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {percentQuantity.toFixed(0)}% concluído
+                                    </p>
+                                  </div>
+
+                                  {/* Progresso de Valor */}
+                                  <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-sm text-muted-foreground">Valor</span>
+                                      <span className="text-sm font-semibold">
+                                        R$ {progress.current_value.toFixed(2)}
+                                      </span>
+                                    </div>
+                                    <Progress value={Math.min(percentValue, 100)} className="h-2" />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {percentValue.toFixed(0)}% de R$ {targetValue.toFixed(2)}
+                                    </p>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                        </div>
+
+                        {/* Resumo Total */}
+                        <Card className="bg-primary/5">
+                          <CardContent className="pt-6">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-sm text-muted-foreground mb-1">Total de Metas</p>
+                                <p className="text-2xl font-bold">
+                                  {monthProgress[group.month].reduce((sum, p) => sum + p.current_quantity, 0)} / {monthProgress[group.month].reduce((sum, p) => sum + p.target_quantity, 0)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground mb-1">Valor Obtido</p>
+                                <p className="text-2xl font-bold text-green-600">
+                                  R$ {monthProgress[group.month].reduce((sum, p) => sum + p.current_value, 0).toFixed(2)}
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    )}
+
+                    {/* Grade de Metas */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
                       {group.goals.map((goal) => {
                         const displayName = goal.procedures?.name || 'Procedimento';

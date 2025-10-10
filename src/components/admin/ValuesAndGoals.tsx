@@ -3,7 +3,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DollarSign, Target } from "lucide-react";
 import ProcedurePricingTable from "./ProcedurePricingTable";
 import GoalsManagement from "./GoalsManagement";
-import MonthGoalsProgress from "./MonthGoalsProgress";
 
 const ValuesAndGoals = () => {
   const [activeTab, setActiveTab] = useState("pricing");
@@ -25,9 +24,6 @@ const ValuesAndGoals = () => {
         </TabsList>
         
         <TabsContent value="pricing" className="mt-6 space-y-6">
-          {/* Painel de Metas do Mês */}
-          <MonthGoalsProgress />
-          
           {/* Tabela de Preços */}
           <ProcedurePricingTable />
         </TabsContent>

@@ -666,6 +666,16 @@ const AdminDashboard = () => {
           </p>
         </CardHeader>
         <CardContent>
+          {(() => {
+            console.log('🎨 RENDERIZANDO LISTA:', recentAppointments.length, 'appointments');
+            console.log('🎨 Appointments para renderizar:', recentAppointments.map((apt: any) => ({
+              data: apt.appointment_date,
+              hora: apt.appointment_time,
+              cliente: apt.clients?.nome,
+              procedimento: apt.procedures?.name
+            })));
+            return null;
+          })()}
           {recentAppointments.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">
               Nenhum agendamento pendente de pagamento.

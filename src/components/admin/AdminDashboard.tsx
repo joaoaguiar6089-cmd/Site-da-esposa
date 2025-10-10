@@ -149,9 +149,6 @@ const AdminDashboard = () => {
       const todayStr = now.toISOString().split('T')[0];
       const currentTime = now.toTimeString().slice(0, 8); // HH:MM:SS (com segundos)
 
-      console.log('🔍 CARREGANDO AGENDAMENTOS RECENTES');
-      console.log('Data atual:', todayStr, 'Hora atual:', currentTime);
-
       const { data, error } = await supabase
         .from('appointments')
         .select(`
@@ -180,26 +177,11 @@ const AdminDashboard = () => {
         .limit(100); // Buscar mais para garantir que após filtro temos suficientes
 
       if (error) throw error;
-
-      console.log('Total de appointments do DB:', data?.length);
-      const day09 = (data || []).filter((apt: any) => apt.appointment_date === '2025-10-09');
-      console.log('Appointments do dia 09 (TODOS):', day09.length);
-      if (day09.length > 0) {
-        console.log('Detalhes dia 09:', day09.map((apt: any) => ({
-          hora: apt.appointment_time,
-          status: apt.status,
-          cliente: apt.clients?.nome
-        })));
-      }
       
       // Filtrar cancelados no lado do cliente
       const notCanceled = (data || []).filter((apt: any) => {
         return apt.status?.toLowerCase() !== 'cancelado';
       });
-
-      console.log('Após remover cancelados:', notCanceled.length);
-      const day09NotCanceled = notCanceled.filter((apt: any) => apt.appointment_date === '2025-10-09');
-      console.log('Dia 09 não cancelados:', day09NotCanceled.length);
 
       // Filtrar pelo lado do cliente para incluir apenas os que já passaram (data + hora)
       const filtered = notCanceled.filter((apt: any) => {

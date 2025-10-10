@@ -171,11 +171,9 @@ const AdminDashboard = () => {
             price
           )
         `)
-        .lte('appointment_date', todayStr) // Incluir hoje
+        .lte('appointment_date', todayStr) // Incluir até hoje
         .or('payment_status.is.null,payment_status.eq.aguardando')
-        .order('appointment_date', { ascending: false })
-        .order('appointment_time', { ascending: false })
-        .limit(50);
+        .limit(100); // Buscar mais para garantir que após filtro temos suficientes
 
       if (error) throw error;
 
@@ -187,13 +185,24 @@ const AdminDashboard = () => {
         // Se for antes de hoje, incluir
         if (aptDate < todayStr) return true;
         
-        // Se for hoje, verificar se o horário já passou
-        if (aptDate === todayStr && aptTime < currentTime) return true;
+        // Se for hoje, verificar se o horário já passou (usar <= para incluir logo após)
+        if (aptDate === todayStr && aptTime <= currentTime) return true;
         
         return false;
-      }).slice(0, 10); // Limitar a 10 após o filtro
+      });
 
-      setRecentAppointments(filtered);
+      // Ordenar do mais recente para o mais antigo (data DESC, hora DESC)
+      filtered.sort((a: any, b: any) => {
+        // Primeiro comparar datas
+        if (a.appointment_date !== b.appointment_date) {
+          return b.appointment_date.localeCompare(a.appointment_date);
+        }
+        // Se datas iguais, comparar horários
+        return b.appointment_time.localeCompare(a.appointment_time);
+      });
+
+      // Limitar a 10 após ordenação
+      setRecentAppointments(filtered.slice(0, 10));
     } catch (error) {
       console.error('Erro ao carregar agendamentos recentes:', error);
     }

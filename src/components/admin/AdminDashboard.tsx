@@ -197,16 +197,6 @@ const AdminDashboard = () => {
         return false;
       });
 
-      console.log('Após filtro de data/hora:', filtered.length);
-      const day09Filtered = filtered.filter((apt: any) => apt.appointment_date === '2025-10-09');
-      console.log('Dia 09 após filtro:', day09Filtered.length);
-      if (day09Filtered.length > 0) {
-        console.log('Dia 09 que passaram no filtro:', day09Filtered.map((apt: any) => ({
-          hora: apt.appointment_time,
-          passou: apt.appointment_time <= currentTime
-        })));
-      }
-
       // Ordenar do mais recente para o mais antigo (data DESC, hora DESC)
       filtered.sort((a: any, b: any) => {
         // Primeiro comparar datas
@@ -217,14 +207,7 @@ const AdminDashboard = () => {
         return b.appointment_time.localeCompare(a.appointment_time);
       });
 
-      console.log('Top 10 após ordenação:');
-      filtered.slice(0, 10).forEach((apt: any, idx: number) => {
-        console.log(`${idx + 1}. ${apt.appointment_date} ${apt.appointment_time} - ${apt.clients?.nome} - ${apt.procedures?.name}`);
-      });
-
       const top10 = filtered.slice(0, 10);
-      console.log('⚡ CHAMANDO setRecentAppointments com', top10.length, 'appointments');
-      console.log('⚡ IDs dos appointments:', top10.map((apt: any) => apt.id));
       
       // Limitar a 10 após ordenação
       setRecentAppointments(top10 as any);
@@ -652,33 +635,26 @@ const AdminDashboard = () => {
           </p>
         </CardHeader>
         <CardContent>
-          {(() => {
-            console.log('🎨 RENDERIZANDO LISTA:', recentAppointments.length, 'appointments');
-            console.log('🎨 IDs na renderização:', recentAppointments.map((apt: any) => apt.id));
-            console.log('🎨 Appointments para renderizar:', recentAppointments.map((apt: any) => ({
-              id: apt.id,
-              data: apt.appointment_date,
-              hora: apt.appointment_time,
-              cliente: apt.clients?.nome,
-              procedimento: apt.procedures?.name
-            })));
-            return null;
-          })()}
           {recentAppointments.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">
               Nenhum agendamento pendente de pagamento.
             </p>
           ) : (
             <div className="space-y-3">
-              {recentAppointments.map((appointment) => (
-                <div
-                  key={appointment.id}
-                  className="flex items-center justify-between p-3 border rounded-lg"
-                >
-                  <div className="flex-1">
-                    <p className="font-medium">
-                      {format(new Date(appointment.appointment_date), "dd/MM/yyyy", { locale: ptBR })} às {appointment.appointment_time}
-                    </p>
+              {recentAppointments.map((appointment) => {
+                // Fix timezone issue: parse as UTC date
+                const [year, month, day] = appointment.appointment_date.split('-').map(Number);
+                const aptDate = new Date(year, month - 1, day);
+                
+                return (
+                  <div
+                    key={appointment.id}
+                    className="flex items-center justify-between p-3 border rounded-lg"
+                  >
+                    <div className="flex-1">
+                      <p className="font-medium">
+                        {format(aptDate, "dd/MM/yyyy", { locale: ptBR })} às {appointment.appointment_time}
+                      </p>
                     <p className="text-sm text-muted-foreground">
                       {(appointment.procedures as any)?.name} - {(appointment.clients as any)?.nome} {(appointment.clients as any)?.sobrenome}
                     </p>
@@ -705,7 +681,8 @@ const AdminDashboard = () => {
                     </Button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

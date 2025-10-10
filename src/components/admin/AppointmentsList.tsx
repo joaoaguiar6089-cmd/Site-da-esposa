@@ -42,6 +42,7 @@ interface Appointment {
     cpf: string;
   };
   procedures: {
+    id?: string;
     name: string;
     duration: number;
     price: number;
@@ -93,6 +94,9 @@ const AppointmentsList = ({
   const [paymentValue, setPaymentValue] = useState("");
   const [paymentInstallments, setPaymentInstallments] = useState("1");
   const [paymentNotes, setPaymentNotes] = useState("");
+  const [hasReturn, setHasReturn] = useState(false);
+  const [returnDate, setReturnDate] = useState("");
+  const [returnTime, setReturnTime] = useState("");
   const { toast } = useToast();
 
   // Carregar todos os agendamentos (apenas de hoje em diante)
@@ -128,6 +132,7 @@ const AppointmentsList = ({
             cpf
           ),
           procedures (
+            id,
             name,
             duration,
             price
@@ -762,6 +767,9 @@ Aguardamos você!`;
     setPaymentValue(appointment.payment_value?.toString() || '');
     setPaymentInstallments(appointment.payment_installments?.toString() || '1');
     setPaymentNotes(appointment.payment_notes || '');
+    setHasReturn(false);
+    setReturnDate('');
+    setReturnTime('');
     setPaymentDialogOpen(true);
   };
 
@@ -794,10 +802,33 @@ Aguardamos você!`;
 
       if (error) throw error;
 
-      toast({
-        title: "Pagamento atualizado",
-        description: "As informações de pagamento foram atualizadas com sucesso.",
-      });
+      // Se tiver retorno, criar novo agendamento
+      if (hasReturn && returnDate && returnTime) {
+        const returnAppointment = {
+          client_id: selectedAppointment.clients?.id,
+          procedure_id: selectedAppointment.procedures?.id,
+          appointment_date: returnDate,
+          appointment_time: returnTime,
+          status: 'agendado',
+          notes: `Retorno - ${selectedAppointment.procedures?.name || ''}`,
+        };
+
+        const { error: insertError } = await supabase
+          .from('appointments')
+          .insert([returnAppointment]);
+
+        if (insertError) throw insertError;
+
+        toast({
+          title: "Sucesso",
+          description: "Pagamento atualizado e retorno agendado!",
+        });
+      } else {
+        toast({
+          title: "Pagamento atualizado",
+          description: "As informações de pagamento foram atualizadas com sucesso.",
+        });
+      }
 
       setPaymentDialogOpen(false);
       loadAppointments();
@@ -1323,6 +1354,46 @@ Aguardamos você!`;
                   </div>
                 </>
               )}
+
+              {/* Seção de Retorno */}
+              <div className="border-t pt-4">
+                <div className="flex items-center space-x-2 mb-4">
+                  <Checkbox
+                    id="hasReturnHistory"
+                    checked={hasReturn}
+                    onCheckedChange={(checked) => setHasReturn(checked as boolean)}
+                  />
+                  <label
+                    htmlFor="hasReturnHistory"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Tem retorno?
+                  </label>
+                </div>
+
+                {hasReturn && (
+                  <div className="space-y-3 pl-6 border-l-2">
+                    <div>
+                      <label className="text-sm font-medium">Data do Retorno</label>
+                      <Input
+                        type="date"
+                        value={returnDate}
+                        onChange={(e) => setReturnDate(e.target.value)}
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Horário do Retorno</label>
+                      <Input
+                        type="time"
+                        value={returnTime}
+                        onChange={(e) => setReturnTime(e.target.value)}
+                        className="mt-2"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <div className="flex gap-2 pt-4">
                 <Button

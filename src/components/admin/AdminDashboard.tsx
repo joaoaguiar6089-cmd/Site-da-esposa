@@ -28,6 +28,7 @@ interface RecentAppointment {
   id: string;
   appointment_date: string;
   appointment_time: string;
+  status: string;
   payment_status?: string | null;
   payment_method?: string | null;
   payment_value?: number | null;
@@ -154,6 +155,7 @@ const AdminDashboard = () => {
           id,
           appointment_date,
           appointment_time,
+          status,
           payment_status,
           payment_method,
           payment_value,
@@ -172,7 +174,7 @@ const AdminDashboard = () => {
           )
         `)
         .lte('appointment_date', todayStr) // Incluir até hoje
-        .or('payment_status.is.null,payment_status.eq.aguardando')
+        .neq('status', 'cancelado') // Excluir cancelados
         .limit(100); // Buscar mais para garantir que após filtro temos suficientes
 
       if (error) throw error;
@@ -394,6 +396,36 @@ const AdminDashboard = () => {
         variant: "destructive",
       });
       return;
+    }
+
+    // Validar campos quando status é pago ou pago parcialmente
+    if (paymentStatus === 'pago' || paymentStatus === 'pago_parcialmente') {
+      if (!paymentMethod) {
+        toast({
+          title: "Erro",
+          description: "Por favor, selecione o método de pagamento.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!paymentValue || parseFloat(paymentValue) <= 0) {
+        toast({
+          title: "Erro",
+          description: "Por favor, informe o valor pago.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (paymentMethod === 'cartao' && (!paymentInstallments || parseInt(paymentInstallments) < 1)) {
+        toast({
+          title: "Erro",
+          description: "Por favor, informe o número de parcelas.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     try {
@@ -855,7 +887,6 @@ const AdminDashboard = () => {
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="aguardando">Aguardando Pagamento</SelectItem>
                   <SelectItem value="nao_pago">Não Pago</SelectItem>
                   <SelectItem value="pago_parcialmente">Pago Parcialmente</SelectItem>
                   <SelectItem value="pago">Pago</SelectItem>
@@ -863,42 +894,48 @@ const AdminDashboard = () => {
               </Select>
             </div>
 
-            <div>
-              <label className="text-sm font-medium">Método de Pagamento</label>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                  <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
-                  <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
-                  <SelectItem value="pix">PIX</SelectItem>
-                  <SelectItem value="transferencia">Transferência</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {(paymentStatus === 'pago' || paymentStatus === 'pago_parcialmente') && (
+              <>
+                <div>
+                  <label className="text-sm font-medium">Método de Pagamento *</label>
+                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pix">PIX</SelectItem>
+                      <SelectItem value="cartao">Cartão</SelectItem>
+                      <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div>
-              <label className="text-sm font-medium">Valor Pago</label>
-              <Input
-                type="number"
-                step="0.01"
-                value={paymentValue}
-                onChange={(e) => setPaymentValue(e.target.value)}
-                placeholder="0.00"
-              />
-            </div>
+                {paymentMethod === 'cartao' && (
+                  <div>
+                    <label className="text-sm font-medium">Número de Parcelas *</label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={paymentInstallments}
+                      onChange={(e) => setPaymentInstallments(e.target.value)}
+                      placeholder="1"
+                    />
+                  </div>
+                )}
 
-            <div>
-              <label className="text-sm font-medium">Parcelas</label>
-              <Input
-                type="number"
-                value={paymentInstallments}
-                onChange={(e) => setPaymentInstallments(e.target.value)}
-                placeholder="1"
-              />
-            </div>
+                <div>
+                  <label className="text-sm font-medium">Valor Pago *</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={paymentValue}
+                    onChange={(e) => setPaymentValue(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+              </>
+            )}
 
             <div>
               <label className="text-sm font-medium">Observações</label>

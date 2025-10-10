@@ -223,14 +223,18 @@ const AdminDashboard = () => {
         return b.appointment_time.localeCompare(a.appointment_time);
       });
 
-      console.log('Após ordenação - top 10:', filtered.slice(0, 10).map((apt: any) => ({
+      const top10 = filtered.slice(0, 10);
+      console.log('Após ordenação - top 10:', top10.map((apt: any) => ({
         data: apt.appointment_date,
         hora: apt.appointment_time,
-        procedimento: apt.procedures?.name
+        procedimento: apt.procedures?.name,
+        cliente: apt.clients?.nome
       })));
 
+      console.log('VERIFICAÇÃO: Tem agendamentos do dia 09?', top10.filter((apt: any) => apt.appointment_date === '2025-10-09').length);
+
       // Limitar a 10 após ordenação
-      setRecentAppointments(filtered.slice(0, 10));
+      setRecentAppointments(top10);
     } catch (error) {
       console.error('Erro ao carregar agendamentos recentes:', error);
     }

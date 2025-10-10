@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, BarChart3, Calendar, Users, User, UserPlus, Tag, Stethoscope, MessageSquare, Shield, Image, Clock, Badge, MapPin, Package, Table2 } from "lucide-react";
+import { Menu, BarChart3, Calendar, DollarSign, User, UserPlus, Tag, Stethoscope, MessageSquare, Shield, Image, Clock, Badge, MapPin, Package, Table2 } from "lucide-react";
 import { useState, useCallback } from "react";
 
 interface AdminSidebarProps {
@@ -23,12 +23,12 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: BarChart3 },
     { id: "calendar", label: "Calendário", icon: Calendar },
-    { id: "appointments", label: "Histórico", icon: Users },
+    { id: "appointments", label: "Histórico", icon: DollarSign },
     { id: "clients", label: "Clientes", icon: User },
     { id: "professionals", label: "Profissionais", icon: UserPlus },
     { id: "categories", label: "Categorias", icon: Tag },
     { id: "procedures", label: "Procedimentos", icon: Stethoscope },
-    { id: "pricing-table", label: "Tabela de Preços", icon: Table2 },
+    { id: "pricing-table", label: "Valores e metas", icon: Table2 },
     { id: "promotions", label: "Feed", icon: Badge },
     { id: "hero-image", label: "Imagem Principal", icon: Image },
     { id: "schedule", label: "Horários", icon: Clock },

@@ -47,6 +47,7 @@ interface NewBookingFlowProps {
   initialClient?: Client | null;
   sendNotification?: boolean;
   selectedDate?: Date;
+  allowPastDates?: boolean;
 }
 
 type ViewMode = 'form' | 'phone' | 'cadastro' | 'confirmation';
@@ -61,7 +62,8 @@ const NewBookingFlow = ({
   adminMode = false,
   initialClient = null,
   sendNotification = true,
-  selectedDate
+  selectedDate,
+  allowPastDates = false
 }: NewBookingFlowProps) => {
   const [currentView, setCurrentView] = useState<ViewMode>('form');
   const [procedures, setProcedures] = useState<Procedure[]>([]);
@@ -1074,6 +1076,9 @@ Olá {clientName}!
                           }
                         }}
                         disabled={(date) => {
+                          // Se allowPastDates for true, não desabilitar nenhuma data
+                          if (allowPastDates) return false;
+                          
                           const today = new Date();
                           today.setHours(0, 0, 0, 0);
                           

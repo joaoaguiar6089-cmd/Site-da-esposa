@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Clock, User, TrendingUp, AlertCircle, X, Check, DollarSign, Users } from "lucide-react";
+import { Calendar, Clock, User, TrendingUp, AlertCircle, X, Check, DollarSign, Users, Target } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
@@ -46,6 +46,18 @@ interface RecentAppointment {
   };
 }
 
+interface GoalProgress {
+  id: string;
+  procedure_id: string;
+  procedure_name: string;
+  target_quantity: number;
+  target_value: number;
+  current_quantity: number;
+  current_value: number;
+  month: number;
+  year: number;
+}
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -62,6 +74,7 @@ const AdminDashboard = () => {
   });
 
   const [recentAppointments, setRecentAppointments] = useState<RecentAppointment[]>([]);
+  const [goalsProgress, setGoalsProgress] = useState<GoalProgress[]>([]);
   const [selectedAppointment, setSelectedAppointment] = useState<RecentAppointment | null>(null);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -77,6 +90,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     loadStats();
     loadRecentAppointments();
+    loadGoalsProgress();
   }, []);
 
   const loadStats = async () => {
@@ -125,7 +139,8 @@ const AdminDashboard = () => {
   const loadRecentAppointments = async () => {
     try {
       const now = new Date();
-      const nowStr = now.toISOString();
+      const todayStr = now.toISOString().split('T')[0];
+      const currentTime = now.toTimeString().slice(0, 5); // HH:MM
 
       const { data, error } = await supabase
         .from('appointments')
@@ -150,16 +165,105 @@ const AdminDashboard = () => {
             price
           )
         `)
-        .lt('appointment_date', now.toISOString().split('T')[0])
+        .lte('appointment_date', todayStr) // Incluir hoje
         .or('payment_status.is.null,payment_status.eq.aguardando')
         .order('appointment_date', { ascending: false })
         .order('appointment_time', { ascending: false })
-        .limit(10);
+        .limit(50);
 
       if (error) throw error;
-      setRecentAppointments((data as any) || []);
+
+      // Filtrar pelo lado do cliente para incluir apenas os que já passaram (data + hora)
+      const filtered = ((data as any) || []).filter((apt: any) => {
+        const aptDate = apt.appointment_date;
+        const aptTime = apt.appointment_time;
+        
+        // Se for antes de hoje, incluir
+        if (aptDate < todayStr) return true;
+        
+        // Se for hoje, verificar se o horário já passou
+        if (aptDate === todayStr && aptTime < currentTime) return true;
+        
+        return false;
+      }).slice(0, 10); // Limitar a 10 após o filtro
+
+      setRecentAppointments(filtered);
     } catch (error) {
       console.error('Erro ao carregar agendamentos recentes:', error);
+    }
+  };
+
+  const loadGoalsProgress = async () => {
+    try {
+      const now = new Date();
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+
+      // Buscar metas do mês atual
+      const { data: goals, error: goalsError } = await (supabase as any)
+        .from('goals')
+        .select(`
+          id,
+          procedure_id,
+          target_quantity,
+          target_value,
+          month,
+          year,
+          procedures (
+            name
+          )
+        `)
+        .eq('month', currentMonth)
+        .eq('year', currentYear);
+
+      if (goalsError) throw goalsError;
+
+      if (!goals || goals.length === 0) {
+        setGoalsProgress([]);
+        return;
+      }
+
+      // Para cada meta, calcular o progresso
+      const progressPromises = goals.map(async (goal: any) => {
+        const firstDay = new Date(currentYear, currentMonth - 1, 1).toISOString().split('T')[0];
+        const lastDay = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0];
+
+        const { data: appointments, error: aptError } = await supabase
+          .from('appointments')
+          .select('payment_value, payment_status')
+          .eq('procedure_id', goal.procedure_id)
+          .eq('status', 'realizado')
+          .gte('appointment_date', firstDay)
+          .lte('appointment_date', lastDay);
+
+        if (aptError) throw aptError;
+
+        const currentQuantity = appointments?.length || 0;
+        const currentValue = (appointments as any)?.reduce((sum: number, apt: any) => {
+          // Considerar apenas pagamentos completos ou parciais
+          if (apt.payment_status === 'pago' || apt.payment_status === 'pago_parcialmente') {
+            return sum + (apt.payment_value || 0);
+          }
+          return sum;
+        }, 0) || 0;
+
+        return {
+          id: goal.id,
+          procedure_id: goal.procedure_id,
+          procedure_name: goal.procedures.name,
+          target_quantity: goal.target_quantity,
+          target_value: goal.target_value,
+          current_quantity: currentQuantity,
+          current_value: currentValue,
+          month: goal.month,
+          year: goal.year,
+        };
+      });
+
+      const progress = await Promise.all(progressPromises);
+      setGoalsProgress(progress);
+    } catch (error) {
+      console.error('Erro ao carregar progresso das metas:', error);
     }
   };
 
@@ -347,6 +451,54 @@ const AdminDashboard = () => {
         </Card>
       </div>
 
+      {/* Status dos Agendamentos e Ações Rápidas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Status dos Agendamentos</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Hoje</span>
+              <Badge className="bg-blue-500">{stats.hoje}</Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Amanhã</span>
+              <Badge className="bg-purple-500">{stats.amanha}</Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Ações Rápidas</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => navigate('/admin/calendario')}
+            >
+              Ver Agendamentos de Hoje
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => navigate('/admin/calendario')}
+            >
+              Ver Agendamentos de Amanhã
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => navigate('/admin/historico')}
+            >
+              Visualizar Pagamentos Pendentes
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Agendamentos Recentes sem Pagamento */}
       <Card>
         <CardHeader>
@@ -406,53 +558,102 @@ const AdminDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Status dos Agendamentos e Ações Rápidas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Painel de Metas */}
+      {goalsProgress.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Status dos Agendamentos</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5" />
+              Metas do Mês
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Acompanhe o progresso das suas metas mensais
+            </p>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Hoje</span>
-              <Badge className="bg-blue-500">{stats.hoje}</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Amanhã</span>
-              <Badge className="bg-purple-500">{stats.amanha}</Badge>
-            </div>
-          </CardContent>
-        </Card>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {goalsProgress.map((goal) => {
+                const quantityProgress = (goal.current_quantity / goal.target_quantity) * 100;
+                const valueProgress = (goal.current_value / goal.target_value) * 100;
+                
+                return (
+                  <Card
+                    key={goal.id}
+                    className="cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => {
+                      // Navegar para histórico filtrado pelo procedimento
+                      navigate('/admin/appointments', {
+                        state: {
+                          procedureFilter: goal.procedure_id
+                        }
+                      });
+                    }}
+                  >
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">{goal.procedure_name}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Progresso de Quantidade */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-muted-foreground">Realizados</span>
+                          <span className="text-sm font-medium">
+                            {goal.current_quantity}/{goal.target_quantity}
+                          </span>
+                        </div>
+                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all ${
+                              quantityProgress >= 100
+                                ? 'bg-green-500'
+                                : quantityProgress >= 75
+                                ? 'bg-blue-500'
+                                : quantityProgress >= 50
+                                ? 'bg-yellow-500'
+                                : 'bg-orange-500'
+                            }`}
+                            style={{ width: `${Math.min(quantityProgress, 100)}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {quantityProgress.toFixed(0)}% da meta
+                        </p>
+                      </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Ações Rápidas</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => navigate('/admin/calendario')}
-            >
-              Ver Agendamentos de Hoje
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => navigate('/admin/calendario')}
-            >
-              Ver Agendamentos de Amanhã
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => navigate('/admin/historico')}
-            >
-              Visualizar Pagamentos Pendentes
-            </Button>
+                      {/* Progresso de Valor */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-muted-foreground">Valor Recebido</span>
+                          <span className="text-sm font-medium text-green-600">
+                            R$ {goal.current_value.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all ${
+                              valueProgress >= 100
+                                ? 'bg-green-500'
+                                : valueProgress >= 75
+                                ? 'bg-blue-500'
+                                : valueProgress >= 50
+                                ? 'bg-yellow-500'
+                                : 'bg-orange-500'
+                            }`}
+                            style={{ width: `${Math.min(valueProgress, 100)}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {valueProgress.toFixed(0)}% de R$ {goal.target_value.toFixed(2)}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
-      </div>
+      )}
 
       {/* Dialog: Não Realizado */}
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>

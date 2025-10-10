@@ -355,6 +355,7 @@ const NewAppointmentForm = ({ onBack, onSuccess, selectedDate }: NewAppointmentF
             initialClient={selectedClient}
             sendNotification={sendNotification}
             selectedDate={selectedDate}
+            allowPastDates={true}
           />
         </div>
       </div>

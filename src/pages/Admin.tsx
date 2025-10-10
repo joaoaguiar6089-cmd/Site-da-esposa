@@ -9,7 +9,7 @@ import ClientManagement from "@/components/admin/ClientManagement";
 import ProfessionalsList from "@/components/admin/ProfessionalsList";
 import CategoriesList from "@/components/admin/CategoriesList";
 import ProceduresManagement from "@/components/admin/ProceduresManagement";
-import ProcedurePricingTable from "@/components/admin/ProcedurePricingTable";
+import ValuesAndGoals from "@/components/admin/ValuesAndGoals";
 import NotificationDebug from "@/components/admin/NotificationDebug";
 import AdminManagement from "@/components/admin/AdminManagement";
 import SecurityAuditLog from "@/components/admin/SecurityAuditLog";
@@ -89,7 +89,7 @@ const Admin = () => {
       case "procedures":
         return <ProceduresManagement />;
       case "pricing-table":
-        return <ProcedurePricingTable />;
+        return <ValuesAndGoals />;
       case "promotions":
         return <PromotionsManagement />;
       case "hero-image":

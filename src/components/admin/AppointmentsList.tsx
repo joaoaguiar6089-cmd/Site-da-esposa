@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar, Clock, User, Phone, Edit, Trash2, Search, MessageSquare, Filter, Plus, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -66,6 +67,7 @@ const AppointmentsList = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
+  const [paymentStatusFilters, setPaymentStatusFilters] = useState<string[]>([]);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<string | null>(null);
@@ -168,6 +170,13 @@ const AppointmentsList = () => {
       filtered = filtered.filter(apt => apt.status === statusFilter);
     }
 
+    if (paymentStatusFilters.length > 0) {
+      filtered = filtered.filter(apt => {
+        const status = apt.payment_status || 'aguardando';
+        return paymentStatusFilters.includes(status);
+      });
+    }
+
     if (searchTerm) {
       filtered = filtered.filter(apt => 
         apt.clients.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -179,12 +188,21 @@ const AppointmentsList = () => {
     }
 
     setFilteredAppointments(filtered);
-  }, [appointments, statusFilter, searchTerm]);
+  }, [appointments, statusFilter, searchTerm, paymentStatusFilters]);
 
   useEffect(() => {
     loadAppointments();
     loadProfessionals();
   }, []);
+
+  // Toggle filtro de pagamento
+  const togglePaymentFilter = (status: string) => {
+    setPaymentStatusFilters(prev => 
+      prev.includes(status) 
+        ? prev.filter(s => s !== status)
+        : [...prev, status]
+    );
+  };
 
   // Abrir detalhes do agendamento
   const handleAppointmentClick = (appointment: Appointment) => {
@@ -853,7 +871,7 @@ Aguardamos você!`;
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Calendar className="h-6 w-6 text-primary" />
+          <DollarSign className="h-6 w-6 text-primary" />
           <h1 className="text-2xl font-bold">Histórico de Agendamentos</h1>
         </div>
         <Button 
@@ -866,34 +884,83 @@ Aguardamos você!`;
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nome, CPF ou procedimento..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
-            <SelectItem value="agendado">Agendado</SelectItem>
-            <SelectItem value="confirmado">Confirmado</SelectItem>
-            <SelectItem value="realizado">Realizado</SelectItem>
-            <SelectItem value="cancelado">Cancelado</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome, CPF ou procedimento..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="agendado">Agendado</SelectItem>
+              <SelectItem value="confirmado">Confirmado</SelectItem>
+              <SelectItem value="realizado">Realizado</SelectItem>
+              <SelectItem value="cancelado">Cancelado</SelectItem>
+            </SelectContent>
+          </Select>
 
-        <Button onClick={loadAppointments} variant="outline" className="flex items-center gap-2">
-          <Filter className="w-4 h-4" />
-          Atualizar
-        </Button>
+          <Button onClick={loadAppointments} variant="outline" className="flex items-center gap-2">
+            <Filter className="w-4 h-4" />
+            Atualizar
+          </Button>
+        </div>
+
+        {/* Filtros de Status de Pagamento */}
+        <Card className="p-4">
+          <h3 className="text-sm font-semibold mb-3">Filtrar por Status de Pagamento:</h3>
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="filter-aguardando"
+                checked={paymentStatusFilters.includes('aguardando')}
+                onCheckedChange={() => togglePaymentFilter('aguardando')}
+              />
+              <label htmlFor="filter-aguardando" className="text-sm cursor-pointer">
+                Aguardando
+              </label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="filter-nao-pago"
+                checked={paymentStatusFilters.includes('nao_pago')}
+                onCheckedChange={() => togglePaymentFilter('nao_pago')}
+              />
+              <label htmlFor="filter-nao-pago" className="text-sm cursor-pointer">
+                Não Pago
+              </label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="filter-pago-parcialmente"
+                checked={paymentStatusFilters.includes('pago_parcialmente')}
+                onCheckedChange={() => togglePaymentFilter('pago_parcialmente')}
+              />
+              <label htmlFor="filter-pago-parcialmente" className="text-sm cursor-pointer">
+                Pago Parcialmente
+              </label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="filter-pago"
+                checked={paymentStatusFilters.includes('pago')}
+                onCheckedChange={() => togglePaymentFilter('pago')}
+              />
+              <label htmlFor="filter-pago" className="text-sm cursor-pointer">
+                Pago
+              </label>
+            </div>
+          </div>
+        </Card>
       </div>
 
       {/* Lista de agendamentos */}
@@ -991,28 +1058,14 @@ Aguardamos você!`;
                       
                       <Button
                         size="sm"
-                        variant="default"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleOpenPaymentDialog(appointment);
                         }}
-                        className="flex items-center gap-1"
+                        className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white"
                         title="Gerenciar Pagamento"
                       >
                         <DollarSign className="h-3 w-3" />
-                      </Button>
-                      
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedAppointment(appointment);
-                          handleEditAppointment();
-                        }}
-                        className="flex items-center gap-1"
-                      >
-                        <Edit className="h-3 w-3" />
                       </Button>
                       
                       <Button

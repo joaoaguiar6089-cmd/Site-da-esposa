@@ -240,8 +240,12 @@ const AdminDashboard = () => {
         console.log(`${idx + 1}. ${apt.appointment_date} ${apt.appointment_time} - ${apt.clients?.nome} - ${apt.procedures?.name}`);
       });
 
+      const top10 = filtered.slice(0, 10);
+      console.log('⚡ CHAMANDO setRecentAppointments com', top10.length, 'appointments');
+      console.log('⚡ IDs dos appointments:', top10.map((apt: any) => apt.id));
+      
       // Limitar a 10 após ordenação
-      setRecentAppointments(filtered.slice(0, 10) as any);
+      setRecentAppointments(top10 as any);
     } catch (error) {
       console.error('Erro ao carregar agendamentos recentes:', error);
     }
@@ -668,7 +672,9 @@ const AdminDashboard = () => {
         <CardContent>
           {(() => {
             console.log('🎨 RENDERIZANDO LISTA:', recentAppointments.length, 'appointments');
+            console.log('🎨 IDs na renderização:', recentAppointments.map((apt: any) => apt.id));
             console.log('🎨 Appointments para renderizar:', recentAppointments.map((apt: any) => ({
+              id: apt.id,
               data: apt.appointment_date,
               hora: apt.appointment_time,
               cliente: apt.clients?.nome,

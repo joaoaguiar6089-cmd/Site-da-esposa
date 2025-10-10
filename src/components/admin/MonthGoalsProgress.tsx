@@ -141,7 +141,9 @@ const MonthGoalsProgress = () => {
       });
 
       // Calcular totais
-      const totalQuantity = progress.reduce((sum, g) => sum + g.current_quantity, 0) + othersQuantity;
+      // Quantidade: APENAS procedimentos com meta (NÃO incluir "Outros")
+      const totalQuantity = progress.reduce((sum, g) => sum + g.current_quantity, 0);
+      // Valor: TODOS os procedimentos do mês (incluir "Outros")
       const totalValue = progress.reduce((sum, g) => sum + g.current_value, 0) + othersValue;
       const targetQuantity = progress.reduce((sum, g) => sum + g.target_quantity, 0);
       const targetValue = progress.reduce((sum, g) => sum + g.target_value, 0);

@@ -149,6 +149,8 @@ const AdminDashboard = () => {
       const todayStr = now.toISOString().split('T')[0];
       const currentTime = now.toTimeString().slice(0, 5); // HH:MM
 
+      console.log('🔍 DEBUG - Data atual:', todayStr, 'Hora atual:', currentTime);
+
       const { data, error } = await supabase
         .from('appointments')
         .select(`
@@ -174,13 +176,30 @@ const AdminDashboard = () => {
           )
         `)
         .lte('appointment_date', todayStr) // Incluir até hoje
-        .neq('status', 'cancelado') // Excluir cancelados
         .limit(100); // Buscar mais para garantir que após filtro temos suficientes
 
       if (error) throw error;
+      
+      console.log('🔍 DEBUG - Total de appointments do DB (ANTES de filtrar status):', data?.length);
+      
+      const day09 = (data || []).filter((apt: any) => apt.appointment_date === '2025-10-09');
+      console.log('🔍 DEBUG - Appointments do dia 09 (ANTES de filtrar status):', day09.length);
+      console.log('🔍 DEBUG - Status dos appointments do dia 09:', day09.map((apt: any) => ({
+        time: apt.appointment_time,
+        status: apt.status,
+        statusType: typeof apt.status
+      })));
+      
+      // Filtrar cancelados no lado do cliente
+      const notCanceled = (data || []).filter((apt: any) => {
+        return apt.status?.toLowerCase() !== 'cancelado';
+      });
+      
+      console.log('🔍 DEBUG - Após filtrar cancelados:', notCanceled.length);
+      console.log('🔍 DEBUG - Appointments do dia 09 após filtrar cancelados:', notCanceled.filter((apt: any) => apt.appointment_date === '2025-10-09').length);
 
       // Filtrar pelo lado do cliente para incluir apenas os que já passaram (data + hora)
-      const filtered = ((data as any) || []).filter((apt: any) => {
+      const filtered = notCanceled.filter((apt: any) => {
         const aptDate = apt.appointment_date;
         const aptTime = apt.appointment_time;
         
@@ -193,6 +212,9 @@ const AdminDashboard = () => {
         return false;
       });
 
+      console.log('🔍 DEBUG - Após filtro por data/hora:', filtered.length);
+      console.log('🔍 DEBUG - Appointments do dia 09 após filtro:', filtered.filter((apt: any) => apt.appointment_date === '2025-10-09'));
+
       // Ordenar do mais recente para o mais antigo (data DESC, hora DESC)
       filtered.sort((a: any, b: any) => {
         // Primeiro comparar datas
@@ -203,8 +225,15 @@ const AdminDashboard = () => {
         return b.appointment_time.localeCompare(a.appointment_time);
       });
 
+      console.log('🔍 DEBUG - Top 10 após ordenação:', filtered.slice(0, 10).map((apt: any) => ({
+        date: apt.appointment_date,
+        time: apt.appointment_time,
+        status: apt.status,
+        client: apt.clients?.nome
+      })));
+
       // Limitar a 10 após ordenação
-      setRecentAppointments(filtered.slice(0, 10));
+      setRecentAppointments(filtered.slice(0, 10) as any);
     } catch (error) {
       console.error('Erro ao carregar agendamentos recentes:', error);
     }

@@ -519,21 +519,45 @@ const AdminDashboard = () => {
             <Button
               variant="outline"
               className="w-full justify-start"
-              onClick={() => navigate('/admin/calendario')}
+              onClick={() => {
+                const today = new Date();
+                navigate('/admin', { 
+                  state: { 
+                    tab: 'calendar',
+                    initialDate: today
+                  } 
+                });
+              }}
             >
               Ver Agendamentos de Hoje
             </Button>
             <Button
               variant="outline"
               className="w-full justify-start"
-              onClick={() => navigate('/admin/calendario')}
+              onClick={() => {
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                navigate('/admin', { 
+                  state: { 
+                    tab: 'calendar',
+                    initialDate: tomorrow
+                  } 
+                });
+              }}
             >
               Ver Agendamentos de Amanhã
             </Button>
             <Button
               variant="outline"
               className="w-full justify-start"
-              onClick={() => navigate('/admin/historico')}
+              onClick={() => {
+                navigate('/admin', { 
+                  state: { 
+                    tab: 'appointments',
+                    initialPaymentFilters: ['aguardando', 'nao_pago', 'pago_parcialmente']
+                  } 
+                });
+              }}
             >
               Visualizar Pagamentos Pendentes
             </Button>

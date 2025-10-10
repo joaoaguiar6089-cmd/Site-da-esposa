@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { LogOut, Home } from "lucide-react";
 import AdminAuth from "@/components/admin/AdminAuth";
@@ -25,9 +26,18 @@ import { supabase } from "@/integrations/supabase/client";
 
 
 const Admin = () => {
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState("dashboard");
   const { toast } = useToast();
   const { user, isAdmin, signOut, loading } = useAuth();
+
+  // Processa navegação com configurações iniciais
+  useEffect(() => {
+    const state = location.state as any;
+    if (state?.tab) {
+      setActiveTab(state.tab);
+    }
+  }, [location]);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -73,13 +83,15 @@ const Admin = () => {
   }
 
   const renderContent = () => {
+    const state = location.state as any;
+    
     switch (activeTab) {
       case "dashboard":
         return <AdminDashboard />;
       case "calendar":
-        return <AdminCalendar />;
+        return <AdminCalendar initialDate={state?.initialDate} />;
       case "appointments":
-        return <AppointmentsList />;
+        return <AppointmentsList initialPaymentFilters={state?.initialPaymentFilters} />;
       case "clients":
         return <ClientManagement />;
       case "professionals":

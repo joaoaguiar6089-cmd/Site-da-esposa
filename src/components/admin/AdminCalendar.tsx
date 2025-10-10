@@ -52,8 +52,12 @@ interface Appointment {
   } | null;
 }
 
-const AdminCalendar = () => {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+interface AdminCalendarProps {
+  initialDate?: Date;
+}
+
+const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
+  const [selectedDate, setSelectedDate] = useState<Date>(initialDate || new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [dayAppointments, setDayAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);

@@ -60,14 +60,18 @@ interface Professional {
   name: string;
 }
 
-const AppointmentsList = () => {
+interface AppointmentsListProps {
+  initialPaymentFilters?: string[];
+}
+
+const AppointmentsList = ({ initialPaymentFilters }: AppointmentsListProps = {}) => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [filteredAppointments, setFilteredAppointments] = useState<Appointment[]>([]);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
-  const [paymentStatusFilters, setPaymentStatusFilters] = useState<string[]>([]);
+  const [paymentStatusFilters, setPaymentStatusFilters] = useState<string[]>(initialPaymentFilters || []);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<string | null>(null);

@@ -4,7 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar as CalendarIcon, Clock, User, Phone, Edit, Trash2, MessageSquare, Plus } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Calendar as CalendarIcon, Clock, User, Phone, Edit, Trash2, MessageSquare, Plus, CheckCircle, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -21,6 +24,11 @@ interface Appointment {
   status: string;
   city_id?: string | null;
   notes?: string;
+  payment_status?: string | null;
+  payment_method?: string | null;
+  payment_value?: number | null;
+  payment_installments?: number | null;
+  payment_notes?: string | null;
   city_settings?: {
     city_name?: string | null;
     clinic_name?: string | null;
@@ -54,6 +62,14 @@ const AdminCalendar = () => {
   const [editingAppointment, setEditingAppointment] = useState<string | null>(null);
   const [showEditForm, setShowEditForm] = useState(false);
   const [showNewAppointmentForm, setShowNewAppointmentForm] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [sendCancelNotification, setSendCancelNotification] = useState(true);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentValue, setPaymentValue] = useState("");
+  const [paymentInstallments, setPaymentInstallments] = useState("1");
+  const [paymentNotes, setPaymentNotes] = useState("");
   const { toast } = useToast();
 
   // Carregar todos os agendamentos
@@ -69,6 +85,11 @@ const AdminCalendar = () => {
           status,
           city_id,
           notes,
+          payment_status,
+          payment_method,
+          payment_value,
+          payment_installments,
+          payment_notes,
           city_settings:city_settings (
             city_name
           ),
@@ -93,7 +114,7 @@ const AdminCalendar = () => {
 
       if (error) throw error;
 
-      setAppointments(data || []);
+      setAppointments((data as any) || []);
     } catch (error) {
       console.error('Erro ao carregar agendamentos:', error);
       toast({
@@ -122,6 +143,103 @@ const AdminCalendar = () => {
   // Verificar se uma data tem agendamentos
   const hasAppointments = (date: Date) => {
     return appointments.some(apt => isSameDay(parseISO(apt.appointment_date), date));
+  };
+
+  // Determinar a cor do dia baseado nos status de pagamento
+  const getDayPaymentStatus = (date: Date) => {
+    const dayAppts = appointments.filter(apt => isSameDay(parseISO(apt.appointment_date), date));
+    
+    if (dayAppts.length === 0) return null;
+
+    // Verificar se é futuro
+    const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const today = new Date();
+    const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    
+    if (dateOnly > todayOnly) {
+      return 'future';
+    }
+
+    // Verificar se tem pagamentos passados (data/hora já passou)
+    const pastAppts = dayAppts.filter(apt => isAppointmentPast(apt));
+    
+    if (pastAppts.length === 0) {
+      return 'future'; // Se não passou ainda, considerar futuro
+    }
+
+    // Verificar status de pagamento dos agendamentos passados
+    const hasPaymentInfo = pastAppts.some(apt => apt.payment_status && apt.payment_status !== 'aguardando');
+    
+    if (!hasPaymentInfo) {
+      return 'no-payment-info'; // Asterisco
+    }
+
+    const hasUnpaid = pastAppts.some(apt => apt.payment_status === 'nao_pago');
+    const hasPartial = pastAppts.some(apt => apt.payment_status === 'pago_parcialmente');
+    const hasPaid = pastAppts.some(apt => apt.payment_status === 'pago');
+
+    // Priorizar o pior status
+    if (hasUnpaid) {
+      return 'unpaid'; // Vermelho
+    }
+    
+    if (hasPartial) {
+      return 'partial'; // Amarelo
+    }
+
+    if (hasPaid && pastAppts.every(apt => apt.payment_status === 'pago')) {
+      return 'paid'; // Verde (todos pagos)
+    }
+
+    return 'no-payment-info';
+  };
+
+  // Obter classe CSS do dia baseado no status de pagamento
+  const getDayClassName = (date: Date) => {
+    const status = getDayPaymentStatus(date);
+    
+    switch (status) {
+      case 'future':
+        return 'bg-blue-50 hover:bg-blue-100';
+      case 'paid':
+        return 'bg-green-100 hover:bg-green-200 font-semibold';
+      case 'unpaid':
+        return 'bg-red-100 hover:bg-red-200 font-semibold';
+      case 'partial':
+        return 'bg-yellow-100 hover:bg-yellow-200 font-semibold';
+      case 'no-payment-info':
+        return 'relative font-semibold after:content-["*"] after:absolute after:top-0 after:right-1 after:text-orange-500 after:text-sm';
+      default:
+        return '';
+    }
+  };
+
+  // Calcular resumo financeiro do dia
+  const getDayFinancialSummary = () => {
+    const planned = dayAppointments.reduce((sum, apt) => sum + (apt.procedures.price || 0), 0);
+    
+    const received = {
+      total: 0,
+      pix: 0,
+      cartao: 0,
+      dinheiro: 0,
+    };
+
+    dayAppointments.forEach(apt => {
+      if (apt.payment_value) {
+        received.total += apt.payment_value;
+        
+        if (apt.payment_method === 'pix') {
+          received.pix += apt.payment_value;
+        } else if (apt.payment_method === 'cartao') {
+          received.cartao += apt.payment_value;
+        } else if (apt.payment_method === 'dinheiro') {
+          received.dinheiro += apt.payment_value;
+        }
+      }
+    });
+
+    return { planned, received };
   };
 
   // Abrir detalhes do agendamento
@@ -556,6 +674,214 @@ Aguardamos você!`;
     );
   };
 
+  // Badge de status de pagamento
+  const getPaymentStatusBadge = (paymentStatus?: string | null) => {
+    const status = paymentStatus || 'aguardando';
+    
+    const statusConfig = {
+      'aguardando': { label: 'Aguardando', className: 'bg-white border-2 border-gray-300 text-gray-700' },
+      'nao_pago': { label: 'Não Pago', className: 'bg-red-500 text-white border-0' },
+      'pago_parcialmente': { label: 'Pago Parcialmente', className: 'bg-yellow-500 text-white border-0' },
+      'pago': { label: 'Pago', className: 'bg-green-500 text-white border-0' },
+    };
+
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.aguardando;
+    
+    return (
+      <Badge className={`text-xs ${config.className}`}>
+        {config.label}
+      </Badge>
+    );
+  };
+
+  // Verificar se agendamento já passou
+  const isAppointmentPast = (appointment: Appointment) => {
+    const appointmentDateTime = new Date(`${appointment.appointment_date}T${appointment.appointment_time}`);
+    return appointmentDateTime < new Date();
+  };
+
+  // Abrir dialog de confirmação de cancelamento
+  const handleOpenCancelDialog = () => {
+    setSendCancelNotification(true);
+    setCancelDialogOpen(true);
+  };
+
+  // Cancelar agendamento com opção de notificação
+  const handleCancelAppointment = async () => {
+    if (!selectedAppointment) return;
+
+    try {
+      const { data: appointmentData, error: fetchError } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          clients (*),
+          procedures (name, price, duration),
+          city_settings (city_name)
+        `)
+        .eq('id', selectedAppointment.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Atualizar status para cancelado
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'cancelado' })
+        .eq('id', selectedAppointment.id);
+
+      if (error) throw error;
+
+      // Enviar notificação se solicitado e estava confirmado
+      if (sendCancelNotification && appointmentData.status === 'confirmado') {
+        try {
+          const formatDateToBrazil = (dateString: string) => {
+            if (!dateString) return '';
+            try {
+              if (dateString.includes('-') && dateString.length === 10) {
+                const [year, month, day] = dateString.split('-');
+                if (year && month && day) {
+                  return `${day}/${month}/${year}`;
+                }
+              }
+              return dateString;
+            } catch (error) {
+              return dateString;
+            }
+          };
+
+          const { data: templateData } = await supabase.functions.invoke('get-whatsapp-template', {
+            body: {
+              templateType: 'cancelamento_cliente',
+              cityId: appointmentData.city_id,
+              variables: {
+                clientName: appointmentData.clients.nome,
+                appointmentDate: formatDateToBrazil(appointmentData.appointment_date),
+                appointmentTime: appointmentData.appointment_time,
+                procedureName: appointmentData.procedures.name,
+                notes: appointmentData.notes ? `\nObservações: ${appointmentData.notes}` : '',
+              },
+            },
+          });
+
+          const buildFallbackMessage = (heading: string, intro: string, outro: string, templateData?: any) => {
+            const detailsLines = [
+              `- Data: ${formatDateToBrazil(appointmentData.appointment_date)}`,
+              `- Horário: ${appointmentData.appointment_time}`,
+              `- Procedimento: ${appointmentData.procedures.name}`,
+            ];
+
+            if (appointmentData.notes) {
+              detailsLines.push(`- Observações: ${appointmentData.notes}`);
+            }
+
+            return templateData?.message || [
+              heading,
+              '',
+              `Olá ${appointmentData.clients.nome}!`,
+              '',
+              intro,
+              detailsLines.join('\n'),
+              '',
+              outro,
+            ].join('\n');
+          };
+
+          const message = buildFallbackMessage(
+            '❌ *Agendamento Cancelado*',
+            'Informamos que seu agendamento foi cancelado:',
+            '📞 Para reagendar, entre em contato conosco.',
+            templateData,
+          );
+
+          await supabase.functions.invoke('send-whatsapp', {
+            body: {
+              to: appointmentData.clients.celular,
+              message,
+            },
+          });
+        } catch (notificationError) {
+          console.error('Erro ao enviar notificação:', notificationError);
+        }
+      }
+
+      toast({
+        title: "Agendamento cancelado",
+        description: sendCancelNotification && appointmentData.status === 'confirmado'
+          ? "Cliente foi notificado via WhatsApp."
+          : "Agendamento foi cancelado com sucesso.",
+      });
+
+      setCancelDialogOpen(false);
+      setDialogOpen(false);
+      loadAppointments();
+    } catch (error) {
+      console.error('Erro ao cancelar agendamento:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao cancelar agendamento.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Abrir dialog de pagamento
+  const handleOpenPaymentDialog = (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setPaymentStatus(appointment.payment_status || 'aguardando');
+    setPaymentMethod(appointment.payment_method || '');
+    setPaymentValue(appointment.payment_value?.toString() || '');
+    setPaymentInstallments(appointment.payment_installments?.toString() || '1');
+    setPaymentNotes(appointment.payment_notes || '');
+    setPaymentDialogOpen(true);
+    setDialogOpen(false);
+  };
+
+  // Salvar informações de pagamento
+  const handleSavePayment = async () => {
+    if (!selectedAppointment) return;
+
+    try {
+      const paymentData: Record<string, any> = {
+        payment_status: paymentStatus,
+      };
+
+      if (paymentStatus !== 'aguardando') {
+        paymentData.payment_method = paymentMethod || null;
+        paymentData.payment_value = paymentValue ? parseFloat(paymentValue) : null;
+        paymentData.payment_installments = paymentMethod === 'cartao' && paymentInstallments ? parseInt(paymentInstallments) : null;
+        paymentData.payment_notes = paymentNotes || null;
+      } else {
+        paymentData.payment_method = null;
+        paymentData.payment_value = null;
+        paymentData.payment_installments = null;
+        paymentData.payment_notes = null;
+      }
+
+      const { error } = await supabase
+        .from('appointments')
+        .update(paymentData)
+        .eq('id', selectedAppointment.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Pagamento atualizado",
+        description: "As informações de pagamento foram atualizadas com sucesso.",
+      });
+
+      setPaymentDialogOpen(false);
+      loadAppointments();
+    } catch (error) {
+      console.error('Erro ao salvar pagamento:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar informações de pagamento.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -629,15 +955,44 @@ Aguardamos você!`;
               className="rounded-md border w-full"
               locale={ptBR}
               modifiers={{
-                hasAppointments: (date) => hasAppointments(date)
+                future: (date) => getDayPaymentStatus(date) === 'future',
+                paid: (date) => getDayPaymentStatus(date) === 'paid',
+                unpaid: (date) => getDayPaymentStatus(date) === 'unpaid',
+                partial: (date) => getDayPaymentStatus(date) === 'partial',
+                noPaymentInfo: (date) => getDayPaymentStatus(date) === 'no-payment-info',
               }}
               modifiersClassNames={{
-                hasAppointments: "bg-primary/20 font-bold"
+                future: 'bg-blue-50 hover:bg-blue-100',
+                paid: 'bg-green-100 hover:bg-green-200 font-semibold',
+                unpaid: 'bg-red-100 hover:bg-red-200 font-semibold',
+                partial: 'bg-yellow-100 hover:bg-yellow-200 font-semibold',
+                noPaymentInfo: 'relative font-semibold after:content-["*"] after:absolute after:top-0 after:right-1 after:text-orange-500 after:text-sm',
               }}
             />
-            <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-              <div className="w-3 h-3 bg-primary/20 rounded"></div>
-              <span>Dias com agendamentos</span>
+            <div className="mt-4 space-y-2 text-xs">
+              <p className="font-semibold mb-2">Legenda:</p>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-green-100 rounded border"></div>
+                <span>Todos pagos</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-red-100 rounded border"></div>
+                <span>Com não-pago</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-yellow-100 rounded border"></div>
+                <span>Parcial + Pago</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-blue-50 rounded border"></div>
+                <span>Futuros</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-white rounded border relative">
+                  <span className="absolute -top-1 -right-1 text-orange-500">*</span>
+                </div>
+                <span>Sem info pagamento</span>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -682,6 +1037,55 @@ Aguardamos você!`;
                 ))}
               </div>
             )}
+
+            {/* Resumo Financeiro do Dia */}
+            {dayAppointments.length > 0 && (() => {
+              const { planned, received } = getDayFinancialSummary();
+              return (
+                <div className="mt-6 pt-4 border-t space-y-3">
+                  <h3 className="font-semibold text-sm flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-primary" />
+                    Resumo Financeiro
+                  </h3>
+                  
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between p-2 bg-blue-50 rounded">
+                      <span className="font-medium">Valor Planejado:</span>
+                      <span className="font-bold">R$ {planned.toFixed(2)}</span>
+                    </div>
+                    
+                    <div className="flex justify-between p-2 bg-green-50 rounded">
+                      <span className="font-medium">Valor Recebido:</span>
+                      <span className="font-bold text-green-700">R$ {received.total.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  {received.total > 0 && (
+                    <div className="space-y-1 text-xs text-muted-foreground pl-4 border-l-2 border-green-200">
+                      <p className="font-medium text-foreground mb-1">Detalhamento:</p>
+                      {received.pix > 0 && (
+                        <div className="flex justify-between">
+                          <span>• PIX:</span>
+                          <span>R$ {received.pix.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {received.cartao > 0 && (
+                        <div className="flex justify-between">
+                          <span>• Cartão:</span>
+                          <span>R$ {received.cartao.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {received.dinheiro > 0 && (
+                        <div className="flex justify-between">
+                          <span>• Dinheiro:</span>
+                          <span>R$ {received.dinheiro.toFixed(2)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>
@@ -743,6 +1147,40 @@ Aguardamos você!`;
                 </div>
               </div>
 
+              {/* Box de Status de Pagamento - só aparece após a data/hora do agendamento */}
+              {isAppointmentPast(selectedAppointment) && (
+                <div className="border-t pt-4">
+                  <strong>Pagamento:</strong>
+                  <div className="mt-2 flex items-center justify-between">
+                    {getPaymentStatusBadge(selectedAppointment.payment_status)}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleOpenPaymentDialog(selectedAppointment)}
+                      className="flex items-center gap-1"
+                      title="Gerenciar Pagamento"
+                    >
+                      <DollarSign className="h-3 w-3" />
+                      Gerenciar
+                    </Button>
+                  </div>
+                  {selectedAppointment.payment_status && selectedAppointment.payment_status !== 'aguardando' && (
+                    <div className="mt-2 text-sm text-muted-foreground">
+                      {selectedAppointment.payment_value && (
+                        <p>Valor: R$ {selectedAppointment.payment_value.toFixed(2)}</p>
+                      )}
+                      {selectedAppointment.payment_method && (
+                        <p>Forma: {
+                          selectedAppointment.payment_method === 'pix' ? 'PIX' :
+                          selectedAppointment.payment_method === 'cartao' ? 'Cartão' :
+                          'Dinheiro'
+                        }</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Ações */}
               <div className="flex flex-wrap gap-2 pt-4 border-t">
                 <Button
@@ -766,13 +1204,26 @@ Aguardamos você!`;
                 </Button>
 
                 {selectedAppointment.status !== 'confirmado' && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => updateAppointmentStatus(selectedAppointment.id, 'confirmado')}
-                  >
-                    Confirmar
-                  </Button>
+                  <>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => updateAppointmentStatus(selectedAppointment.id, 'confirmado')}
+                    >
+                      Confirmar
+                    </Button>
+                    {isAppointmentPast(selectedAppointment) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleOpenPaymentDialog(selectedAppointment)}
+                        className="flex items-center gap-1"
+                        title="Gerenciar Pagamento"
+                      >
+                        <DollarSign className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </>
                 )}
 
                 {selectedAppointment.status !== 'realizado' && (
@@ -780,8 +1231,9 @@ Aguardamos você!`;
                     size="sm"
                     variant="default"
                     onClick={() => updateAppointmentStatus(selectedAppointment.id, 'realizado')}
+                    className="flex items-center gap-1 bg-green-600 hover:bg-green-700"
                   >
-                    Marcar como Realizado
+                    <CheckCircle className="h-4 w-4" />
                   </Button>
                 )}
 
@@ -789,7 +1241,7 @@ Aguardamos você!`;
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => updateAppointmentStatus(selectedAppointment.id, 'cancelado')}
+                    onClick={handleOpenCancelDialog}
                   >
                     Cancelar
                   </Button>
@@ -803,6 +1255,168 @@ Aguardamos você!`;
                 >
                   <Trash2 className="h-3 w-3" />
                   Deletar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de confirmação de cancelamento */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirmar Cancelamento</DialogTitle>
+          </DialogHeader>
+          
+          {selectedAppointment && (
+            <div className="space-y-4">
+              <p className="text-sm">
+                Tem certeza que deseja cancelar o agendamento de <strong>{selectedAppointment.clients.nome} {selectedAppointment.clients.sobrenome}</strong>?
+              </p>
+
+              <div className="text-sm bg-muted p-3 rounded">
+                <p><strong>Procedimento:</strong> {selectedAppointment.procedures.name}</p>
+                <p><strong>Data:</strong> {format(parseISO(selectedAppointment.appointment_date), 'dd/MM/yyyy', { locale: ptBR })}</p>
+                <p><strong>Horário:</strong> {selectedAppointment.appointment_time}</p>
+              </div>
+
+              <div className="flex items-center space-x-2 border-t pt-4">
+                <Checkbox
+                  id="send-notification"
+                  checked={sendCancelNotification}
+                  onCheckedChange={(checked) => setSendCancelNotification(checked as boolean)}
+                />
+                <label
+                  htmlFor="send-notification"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  Enviar notificação via WhatsApp para o cliente
+                </label>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setCancelDialogOpen(false)}
+                  className="flex-1"
+                >
+                  Não
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleCancelAppointment}
+                  className="flex-1"
+                >
+                  Sim, Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de pagamento */}
+      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Informações de Pagamento</DialogTitle>
+          </DialogHeader>
+          
+          {selectedAppointment && (
+            <div className="space-y-4">
+              <div className="text-sm bg-muted p-3 rounded">
+                <p><strong>Cliente:</strong> {selectedAppointment.clients.nome} {selectedAppointment.clients.sobrenome}</p>
+                <p><strong>Procedimento:</strong> {selectedAppointment.procedures.name}</p>
+                <p><strong>Valor do Procedimento:</strong> R$ {selectedAppointment.procedures.price?.toFixed(2)}</p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium">Status do Pagamento *</label>
+                <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="aguardando">Aguardando</SelectItem>
+                    <SelectItem value="nao_pago">Não Pago</SelectItem>
+                    <SelectItem value="pago_parcialmente">Pago Parcialmente</SelectItem>
+                    <SelectItem value="pago">Pago</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {paymentStatus !== 'aguardando' && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium">Forma de Pagamento</label>
+                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                      <SelectTrigger className="mt-2">
+                        <SelectValue placeholder="Selecione a forma" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pix">PIX</SelectItem>
+                        <SelectItem value="cartao">Cartão</SelectItem>
+                        <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium">Valor Pago (R$)</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={paymentValue}
+                      onChange={(e) => setPaymentValue(e.target.value)}
+                      placeholder="0,00"
+                      className="mt-2"
+                    />
+                  </div>
+
+                  {paymentMethod === 'cartao' && (
+                    <div>
+                      <label className="text-sm font-medium">Número de Parcelas</label>
+                      <Select value={paymentInstallments} onValueChange={setPaymentInstallments}>
+                        <SelectTrigger className="mt-2">
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 12 }, (_, i) => i + 1).map((num) => (
+                            <SelectItem key={num} value={num.toString()}>
+                              {num}x
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-sm font-medium">Observações</label>
+                    <Input
+                      value={paymentNotes}
+                      onChange={(e) => setPaymentNotes(e.target.value)}
+                      placeholder="Observações sobre o pagamento..."
+                      className="mt-2"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setPaymentDialogOpen(false)}
+                  className="flex-1"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleSavePayment}
+                  className="flex-1"
+                >
+                  Concluir
                 </Button>
               </div>
             </div>

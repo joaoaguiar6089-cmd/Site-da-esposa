@@ -55,7 +55,9 @@ interface GoalProgress {
   target_value: number;
   current_quantity: number;
   current_value: number;
-  pending_payments_count: number; // Quantidade de appointments sem payment_value
+  pending_payments_count: number; // Quantidade de appointments realizados sem payment_value
+  realized_quantity: number; // Quantidade de appointments que já aconteceram
+  scheduled_quantity: number; // Quantidade de appointments agendados (futuros)
 }
 
 interface OtherProceduresStats {
@@ -246,7 +248,7 @@ const AdminDashboard = () => {
       // Buscar TODOS os agendamentos do mês (exceto cancelados)
       const { data: allAppointments, error: aptError } = await supabase
         .from('appointments')
-        .select('procedure_id, payment_value, payment_status, procedures(price)')
+        .select('procedure_id, payment_value, payment_status, appointment_date, appointment_time, procedures(price)')
         .neq('status', 'cancelado') // Ignorar cancelados
         .gte('appointment_date', firstDay)
         .lte('appointment_date', lastDay);
@@ -254,15 +256,25 @@ const AdminDashboard = () => {
       if (aptError) throw aptError;
 
       const appointmentsData = (allAppointments as any) || [];
+      
+      // Determinar quais agendamentos já aconteceram
+      const todayStr = now.toISOString().split('T')[0];
+      const currentTime = now.toTimeString().slice(0, 8);
+      
+      const appointmentsWithStatus = appointmentsData.map((apt: any) => {
+        const isPast = apt.appointment_date < todayStr || 
+                      (apt.appointment_date === todayStr && apt.appointment_time <= currentTime);
+        return { ...apt, isPast };
+      });
 
       // Criar set de procedure_ids que têm metas
       const procedureIdsWithGoals = new Set((goals || []).map((g: any) => g.procedure_id));
 
       // Separar agendamentos com meta e sem meta
-      const appointmentsWithGoals = appointmentsData.filter((apt: any) =>
+      const appointmentsWithGoals = appointmentsWithStatus.filter((apt: any) =>
         procedureIdsWithGoals.has(apt.procedure_id)
       );
-      const appointmentsWithoutGoals = appointmentsData.filter((apt: any) =>
+      const appointmentsWithoutGoals = appointmentsWithStatus.filter((apt: any) =>
         !procedureIdsWithGoals.has(apt.procedure_id)
       );
 
@@ -274,16 +286,20 @@ const AdminDashboard = () => {
 
         const currentQuantity = goalAppointments.length;
         
-        // Contar apenas appointments COM payment_value preenchido
+        // Separar entre realizados e agendados (futuros)
+        const realizedAppointments = goalAppointments.filter((apt: any) => apt.isPast);
+        const scheduledAppointments = goalAppointments.filter((apt: any) => !apt.isPast);
+        
+        // Contar apenas appointments realizados COM payment_value preenchido
         let currentValue = 0;
         let pendingPaymentsCount = 0;
         
-        goalAppointments.forEach((apt: any) => {
+        realizedAppointments.forEach((apt: any) => {
           if (apt.payment_value && apt.payment_value > 0) {
             // Soma apenas se tem valor de pagamento preenchido
             currentValue += apt.payment_value;
           } else {
-            // Conta como pagamento pendente
+            // Conta como pagamento pendente (apenas se já foi realizado)
             pendingPaymentsCount++;
           }
         });
@@ -299,6 +315,8 @@ const AdminDashboard = () => {
           current_quantity: currentQuantity,
           current_value: currentValue,
           pending_payments_count: pendingPaymentsCount,
+          realized_quantity: realizedAppointments.length,
+          scheduled_quantity: scheduledAppointments.length,
         };
       });
 
@@ -726,23 +744,58 @@ const AdminDashboard = () => {
                             {goal.current_quantity}/{goal.target_quantity}
                           </span>
                         </div>
-                        <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full transition-all ${
-                              quantityProgress >= 100
-                                ? 'bg-green-500'
-                                : quantityProgress >= 75
-                                ? 'bg-blue-500'
-                                : quantityProgress >= 50
-                                ? 'bg-yellow-500'
-                                : 'bg-orange-500'
-                            }`}
-                            style={{ width: `${Math.min(quantityProgress, 100)}%` }}
-                          />
+                        <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden flex">
+                          {/* Verde: Realizados com pagamento */}
+                          {(() => {
+                            const paidQty = goal.realized_quantity - goal.pending_payments_count;
+                            const paidPercent = goal.target_quantity > 0 ? (paidQty / goal.target_quantity) * 100 : 0;
+                            const pendingPercent = goal.target_quantity > 0 ? (goal.pending_payments_count / goal.target_quantity) * 100 : 0;
+                            const scheduledPercent = goal.target_quantity > 0 ? (goal.scheduled_quantity / goal.target_quantity) * 100 : 0;
+                            
+                            return (
+                              <>
+                                {/* Verde: Pagos */}
+                                {paidPercent > 0 && (
+                                  <div
+                                    className="h-full bg-green-500 transition-all"
+                                    style={{ width: `${Math.min(paidPercent, 100)}%` }}
+                                    title={`${paidQty} realizados com pagamento`}
+                                  />
+                                )}
+                                {/* Laranja: Realizados sem pagamento */}
+                                {pendingPercent > 0 && (
+                                  <div
+                                    className="h-full bg-orange-500 transition-all"
+                                    style={{ width: `${Math.min(pendingPercent, 100)}%` }}
+                                    title={`${goal.pending_payments_count} pendentes de pagamento`}
+                                  />
+                                )}
+                                {/* Azul: Agendados (futuros) */}
+                                {scheduledPercent > 0 && (
+                                  <div
+                                    className="h-full bg-blue-500 transition-all"
+                                    style={{ width: `${Math.min(scheduledPercent, 100)}%` }}
+                                    title={`${goal.scheduled_quantity} agendados`}
+                                  />
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {quantityProgress.toFixed(0)}% da meta
-                        </p>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                          <span className="flex items-center gap-1">
+                            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                            {goal.realized_quantity - goal.pending_payments_count} pagos
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+                            {goal.pending_payments_count} pendentes
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                            {goal.scheduled_quantity} agendados
+                          </span>
+                        </div>
                       </div>
 
                       {/* Progresso de Valor */}

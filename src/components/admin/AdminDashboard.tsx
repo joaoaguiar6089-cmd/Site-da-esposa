@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { getCurrentDateBrazil, getCurrentDateTimeBrazil } from "@/utils/dateUtils";
 import { useNavigate } from "react-router-dom";
 
 interface DashboardStats {
@@ -104,15 +105,16 @@ const AdminDashboard = () => {
 
   const loadStats = async () => {
     try {
-      const today = new Date();
-      const todayStr = today.toISOString().split('T')[0];
+      // Usar horário do Brasil
+      const todayStr = getCurrentDateBrazil();
       
+      const today = getCurrentDateTimeBrazil();
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+      const tomorrowStr = format(tomorrow, 'yyyy-MM-dd');
 
-      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-      const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+      const firstDayOfMonth = format(new Date(today.getFullYear(), today.getMonth(), 1), 'yyyy-MM-dd');
+      const lastDayOfMonth = format(new Date(today.getFullYear(), today.getMonth() + 1, 0), 'yyyy-MM-dd');
 
       // Buscar agendamentos
       const { data: allAppointments } = await supabase
@@ -147,9 +149,10 @@ const AdminDashboard = () => {
 
   const loadRecentAppointments = async () => {
     try {
-      const now = new Date();
-      const todayStr = now.toISOString().split('T')[0];
-      const currentTime = now.toTimeString().slice(0, 8); // HH:MM:SS (com segundos)
+      // Usar horário do Brasil
+      const todayStr = getCurrentDateBrazil();
+      const now = getCurrentDateTimeBrazil();
+      const currentTime = format(now, 'HH:mm:ss');
 
       const { data, error } = await supabase
         .from('appointments')

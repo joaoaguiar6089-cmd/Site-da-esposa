@@ -156,8 +156,8 @@ const ProcedurePricingTable = () => {
     try {
       const [{ data: categoryData, error: categoryError }, { data: subcategoryData, error: subcategoryError }] =
         await Promise.all([
-          supabase.from("categories").select("id, name, description").order("name"),
-          supabase.from("subcategories").select("id, name, description, category_id").order("name"),
+          supabase.from("categories").select("id, name, description, created_at, updated_at").order("name"),
+          supabase.from("subcategories").select("id, name, description, category_id, created_at, updated_at").order("name"),
         ]);
 
       if (categoryError) throw categoryError;

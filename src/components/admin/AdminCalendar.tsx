@@ -220,7 +220,9 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
 
   // Calcular resumo financeiro do dia
   const getDayFinancialSummary = () => {
-    const planned = dayAppointments.reduce((sum, apt) => sum + (apt.procedures.price || 0), 0);
+    const planned = dayAppointments
+      .filter(apt => apt.status !== 'cancelado')
+      .reduce((sum, apt) => sum + (apt.procedures.price || 0), 0);
     
     const received = {
       total: 0,

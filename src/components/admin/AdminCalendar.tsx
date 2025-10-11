@@ -1035,7 +1035,7 @@ Aguardamos você!`;
                       {appointment.clients.nome} {appointment.clients.sobrenome}
                     </p>
                     <p className="text-xs">
-                      {appointment.procedures.name}
+                      {appointment.procedures.name} - R$ {appointment.procedures.price.toFixed(2)}
                     </p>
                     
                     {/* Informações de Pagamento */}

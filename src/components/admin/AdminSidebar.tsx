@@ -39,6 +39,11 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
     { id: "security", label: "Segurança", icon: Shield },
   ];
 
+  const timezoneInfo = {
+    label: "🌎 Fuso Horário: Brasil (UTC-3)",
+    sublabel: "Horário de Brasília"
+  };
+
   const MenuItem = ({ item, isMobile = false }: { item: typeof menuItems[0]; isMobile?: boolean }) => {
     const Icon = item.icon;
     const isActive = activeTab === item.id;
@@ -81,6 +86,15 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
               {menuItems.map((item) => (
                 <MenuItem key={item.id} item={item} isMobile />
               ))}
+              
+              {/* Timezone Info - Mobile */}
+              <div className="mt-6 pt-4 border-t">
+                <div className="px-3 py-2 rounded-md bg-muted/50">
+                  <p className="text-xs font-medium text-foreground">{timezoneInfo.label}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{timezoneInfo.sublabel}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Formato: DD/MM/YYYY</p>
+                </div>
+              </div>
             </div>
           </SheetContent>
         </Sheet>
@@ -92,6 +106,15 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
           {menuItems.map((item) => (
             <MenuItem key={item.id} item={item} />
           ))}
+          
+          {/* Timezone Info */}
+          <div className="mt-6 pt-4 border-t">
+            <div className="px-3 py-2 rounded-md bg-muted/50">
+              <p className="text-xs font-medium text-foreground">{timezoneInfo.label}</p>
+              <p className="text-xs text-muted-foreground mt-1">{timezoneInfo.sublabel}</p>
+              <p className="text-xs text-muted-foreground mt-1">Formato: DD/MM/YYYY</p>
+            </div>
+          </div>
         </div>
       </div>
     </>

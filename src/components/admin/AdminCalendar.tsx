@@ -663,16 +663,16 @@ Aguardamos você!`;
   // Badge de status
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      'agendado': { label: 'Agendado', variant: 'default' as const },
-      'confirmado': { label: 'Confirmado', variant: 'secondary' as const },
-      'realizado': { label: 'Realizado', variant: 'default' as const },
-      'cancelado': { label: 'Cancelado', variant: 'destructive' as const },
+      'agendado': { label: 'Agendado', className: 'bg-blue-600 text-white border-0' },
+      'confirmado': { label: 'Confirmado', className: 'bg-green-600 text-white border-0' },
+      'realizado': { label: 'Realizado', className: 'bg-gray-600 text-white border-0' },
+      'cancelado': { label: 'Cancelado', className: 'bg-red-600 text-white border-0' },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.agendado;
     
     return (
-      <Badge variant={config.variant} className="text-xs">
+      <Badge className={`text-xs ${config.className}`}>
         {config.label}
       </Badge>
     );
@@ -1019,10 +1019,7 @@ Aguardamos você!`;
                 {dayAppointments.map((appointment) => (
                   <div
                     key={appointment.id}
-                    className={cn(
-                      "p-3 border rounded-lg cursor-pointer transition-colors",
-                      appointment.status === 'confirmado' ? "bg-green-500 text-white hover:bg-green-600" : "hover:bg-muted/50"
-                    )}
+                    className="p-3 border rounded-lg cursor-pointer transition-colors bg-white hover:bg-muted/50"
                     onClick={() => handleAppointmentClick(appointment)}
                   >
                     <div className="flex items-center justify-between mb-2">

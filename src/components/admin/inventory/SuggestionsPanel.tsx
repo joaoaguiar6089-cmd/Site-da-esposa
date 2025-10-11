@@ -41,7 +41,8 @@ export const SuggestionsPanel = ({ onRefetch }: SuggestionsPanelProps) => {
           ),
           clients (
             id,
-            name
+            nome,
+            sobrenome
           )
         `
         )
@@ -140,7 +141,7 @@ export const SuggestionsPanel = ({ onRefetch }: SuggestionsPanelProps) => {
                   {suggestion.procedures?.name}
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  {suggestion.clients?.name}
+                  {suggestion.clients?.nome} {suggestion.clients?.sobrenome}
                 </div>
                 <div className="text-sm text-muted-foreground">
                   {format(

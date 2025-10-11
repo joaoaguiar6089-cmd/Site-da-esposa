@@ -44,6 +44,7 @@ interface Procedure {
   body_image_url_male: string;
   category_id?: string;
   subcategory_id?: string;
+  sessions?: number;
 }
 
 interface AreaGroup {
@@ -108,7 +109,7 @@ const AgendamentoForm = ({ client: rawClient, onAppointmentCreated, onBack, edit
       // Carregar procedimentos
       const { data: proceduresData, error: proceduresError } = await supabase
         .from('procedures')
-        .select('id, name, description, duration, price, requires_body_selection, requires_specifications, body_selection_type, body_image_url, body_image_url_male, category_id, subcategory_id')
+        .select('id, name, description, duration, price, requires_body_selection, requires_specifications, body_selection_type, body_image_url, body_image_url_male, category_id, subcategory_id, sessions')
         .order('name');
 
       if (proceduresError) throw proceduresError;
@@ -590,6 +591,33 @@ const AgendamentoForm = ({ client: rawClient, onAppointmentCreated, onBack, edit
           .select()
           .single();
       } else {
+        // Calcular o número da sessão ANTES de criar o agendamento
+        let sessionNumber = 1;
+        let totalSessions = 1;
+
+        if (selectedProcedure?.sessions && selectedProcedure.sessions > 1) {
+          // Buscar agendamentos anteriores deste cliente para este procedimento
+          const { data: previousAppointments, error: historyError } = await supabase
+            .from('appointments')
+            .select('id, session_number, appointment_date')
+            .eq('client_id', client.id)
+            .eq('procedure_id', formData.procedure_id)
+            .neq('status', 'cancelado')
+            .order('appointment_date', { ascending: true });
+
+          if (historyError) {
+            console.error('Erro ao buscar histórico:', historyError);
+          }
+
+          // Calcular qual é a sessão atual (sessões anteriores + 1)
+          const previousCount = (previousAppointments || []).length;
+          sessionNumber = previousCount + 1;
+          totalSessions = selectedProcedure.sessions;
+          
+          console.log(`Cliente tem ${previousCount} sessões anteriores. Esta será a sessão ${sessionNumber} de ${totalSessions}`);
+        }
+
+        // Criar agendamento JÁ com os dados corretos de sessão
         appointmentResult = await supabase
           .from('appointments')
           .insert({
@@ -603,7 +631,9 @@ const AgendamentoForm = ({ client: rawClient, onAppointmentCreated, onBack, edit
             selected_gender: selectedProcedure?.requires_body_selection ? selectedGender : null,
             total_body_areas_price: totalBodyAreasPrice,
             city_id: formData.city_id || null,
-          })
+            session_number: sessionNumber,
+            total_sessions: totalSessions,
+          } as any)
           .select()
           .single();
       }

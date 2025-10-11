@@ -16,6 +16,7 @@ import { format, parseISO, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import AgendamentoForm from "@/components/agendamento/AgendamentoForm";
 import NewAppointmentForm from "@/components/admin/NewAppointmentForm";
+import { getPackageInfo, formatSessionProgress } from "@/utils/packageUtils";
 
 interface Appointment {
   id: string;
@@ -29,6 +30,8 @@ interface Appointment {
   payment_value?: number | null;
   payment_installments?: number | null;
   payment_notes?: string | null;
+  session_number?: number | null;
+  total_sessions?: number | null;
   city_settings?: {
     city_name?: string | null;
     clinic_name?: string | null;
@@ -46,6 +49,7 @@ interface Appointment {
     name: string;
     duration: number;
     price: number;
+    sessions?: number | null;
   };
   professionals?: {
     name: string;
@@ -94,6 +98,8 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
           payment_value,
           payment_installments,
           payment_notes,
+          session_number,
+          total_sessions,
           city_settings:city_settings (
             city_name
           ),
@@ -107,7 +113,8 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
           procedures (
             name,
             duration,
-            price
+            price,
+            sessions
           ),
           professionals (
             name
@@ -1036,9 +1043,16 @@ Aguardamos você!`;
                     <p className="text-sm font-medium">
                       {appointment.clients.nome} {appointment.clients.sobrenome}
                     </p>
-                    <p className="text-xs">
-                      {appointment.procedures.name} - R$ {appointment.procedures.price.toFixed(2)}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs">
+                        {getPackageInfo(appointment).displayName} - R$ {appointment.procedures.price.toFixed(2)}
+                      </p>
+                      {getPackageInfo(appointment).isPackage && (
+                        <Badge variant="outline" className="text-xs">
+                          {formatSessionProgress(appointment)}
+                        </Badge>
+                      )}
+                    </div>
                     
                     {/* Informações de Pagamento */}
                     {appointment.payment_value && appointment.payment_value > 0 && (
@@ -1150,7 +1164,14 @@ Aguardamos você!`;
 
               <div>
                 <strong>Procedimento:</strong>
-                <p>{selectedAppointment.procedures.name}</p>
+                <div className="flex items-center gap-2">
+                  <p>{getPackageInfo(selectedAppointment).displayName}</p>
+                  {getPackageInfo(selectedAppointment).isPackage && (
+                    <Badge variant="outline">
+                      {formatSessionProgress(selectedAppointment)}
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground">
                   {selectedAppointment.procedures.duration}min - R$ {selectedAppointment.procedures.price?.toFixed(2)}
                 </p>
@@ -1318,7 +1339,14 @@ Aguardamos você!`;
               </p>
 
               <div className="text-sm bg-muted p-3 rounded">
-                <p><strong>Procedimento:</strong> {selectedAppointment.procedures.name}</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <p><strong>Procedimento:</strong> {getPackageInfo(selectedAppointment).displayName}</p>
+                  {getPackageInfo(selectedAppointment).isPackage && (
+                    <Badge variant="outline" className="text-xs">
+                      {formatSessionProgress(selectedAppointment)}
+                    </Badge>
+                  )}
+                </div>
                 <p><strong>Data:</strong> {format(parseISO(selectedAppointment.appointment_date), 'dd/MM/yyyy', { locale: ptBR })}</p>
                 <p><strong>Horário:</strong> {selectedAppointment.appointment_time}</p>
               </div>
@@ -1369,7 +1397,14 @@ Aguardamos você!`;
             <div className="space-y-4">
               <div className="text-sm bg-muted p-3 rounded">
                 <p><strong>Cliente:</strong> {selectedAppointment.clients.nome} {selectedAppointment.clients.sobrenome}</p>
-                <p><strong>Procedimento:</strong> {selectedAppointment.procedures.name}</p>
+                <div className="flex items-center gap-2">
+                  <p><strong>Procedimento:</strong> {getPackageInfo(selectedAppointment).displayName}</p>
+                  {getPackageInfo(selectedAppointment).isPackage && (
+                    <Badge variant="outline" className="text-xs">
+                      {formatSessionProgress(selectedAppointment)}
+                    </Badge>
+                  )}
+                </div>
                 <p><strong>Valor do Procedimento:</strong> R$ {selectedAppointment.procedures.price?.toFixed(2)}</p>
               </div>
 

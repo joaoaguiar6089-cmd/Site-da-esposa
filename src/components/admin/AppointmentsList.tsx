@@ -13,6 +13,7 @@ import { formatLocationBlock } from "@/utils/location";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatDateToBrazil } from '@/utils/dateUtils';
+import { getPackageInfo, formatSessionProgress } from "@/utils/packageUtils";
 import AgendamentoForm from "@/components/agendamento/AgendamentoForm";
 import NewAppointmentForm from "@/components/admin/NewAppointmentForm";
 
@@ -28,6 +29,9 @@ interface Appointment {
   payment_value?: number | null;
   payment_installments?: number | null;
   payment_notes?: string | null;
+  package_parent_id?: string | null;
+  session_number?: number;
+  total_sessions?: number;
   city_settings?: {
     city_name?: string | null;
     clinic_name?: string | null;
@@ -46,6 +50,7 @@ interface Appointment {
     name: string;
     duration: number;
     price: number;
+    sessions?: number;
   };
   professionals?: {
     name: string;
@@ -121,6 +126,9 @@ const AppointmentsList = ({
           payment_value,
           payment_installments,
           payment_notes,
+          package_parent_id,
+          session_number,
+          total_sessions,
           city_settings:city_settings (
             city_name
           ),
@@ -135,7 +143,8 @@ const AppointmentsList = ({
             id,
             name,
             duration,
-            price
+            price,
+            sessions
           ),
           professionals (
             name
@@ -1070,9 +1079,16 @@ Aguardamos você!`;
                       </div>
                     </div>
                     
-                    <p className="text-sm font-medium text-primary">
-                      {appointment.procedures.name}
-                    </p>
+                    <div>
+                      <p className="text-sm font-medium text-primary">
+                        {getPackageInfo(appointment).displayName}
+                      </p>
+                      {formatSessionProgress(appointment) && (
+                        <p className="text-xs text-blue-600 font-medium mt-1">
+                          📦 {formatSessionProgress(appointment)}
+                        </p>
+                      )}
+                    </div>
                     
                     {appointment.notes && (
                       <p className="text-sm text-muted-foreground">

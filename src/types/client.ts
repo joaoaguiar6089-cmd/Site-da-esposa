@@ -14,10 +14,14 @@ export interface Appointment {
   appointment_time: string;
   status: string;
   notes?: string;
+  package_parent_id?: string | null;
+  session_number?: number;
+  total_sessions?: number;
   procedures: {
     name: string;
     duration: number;
     price: number;
+    sessions?: number;
   };
 }
 
@@ -26,6 +30,7 @@ export interface Procedure {
   name: string;
   duration: number;
   price: number;
+  sessions?: number;
 }
 
 export interface ProcedureResult {

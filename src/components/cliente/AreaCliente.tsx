@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import AgendamentoForm from "@/components/agendamento/AgendamentoForm";
 import ClientDocuments from "./ClientDocuments";
 import type { Client, Appointment, ProcedureResult } from "@/types/client";
+import { getPackageInfo, formatSessionProgress } from "@/utils/packageUtils";
 
 interface AreaClienteProps {
   client: Client;
@@ -64,7 +65,7 @@ const AreaCliente = ({
         .from('appointments')
         .select(`
           *,
-          procedures!appointments_procedure_id_fkey(name, duration, price)
+          procedures!appointments_procedure_id_fkey(name, duration, price, sessions)
         `)
         .eq('client_id', client.id)
         .order('appointment_date', { ascending: false });
@@ -420,7 +421,14 @@ const AreaCliente = ({
                     <div key={appointment.id} className="border rounded-lg p-4 space-y-2">
                       <div className="flex items-start justify-between">
                         <div className="space-y-1">
-                          <h4 className="font-semibold">{appointment.procedures?.name}</h4>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold">{getPackageInfo(appointment).displayName}</h4>
+                            {getPackageInfo(appointment).isPackage && (
+                              <Badge variant="outline" className="text-xs">
+                                📦 {formatSessionProgress(appointment)}
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-sm text-muted-foreground">
                             {formatDate(appointment.appointment_date)} às {formatTime(appointment.appointment_time)}
                           </p>

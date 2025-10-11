@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getCurrentDateBrazil, getCurrentDateTimeBrazil } from "@/utils/dateUtils";
+import { getPackageInfo, formatSessionProgress, getPackageValue } from "@/utils/packageUtils";
 import { useNavigate } from "react-router-dom";
 
 interface DashboardStats {
@@ -166,6 +167,9 @@ const AdminDashboard = () => {
           payment_value,
           payment_installments,
           payment_notes,
+          package_parent_id,
+          session_number,
+          total_sessions,
           clients (
             id,
             nome,
@@ -175,7 +179,8 @@ const AdminDashboard = () => {
           procedures (
             id,
             name,
-            price
+            price,
+            sessions
           )
         `)
         .lte('appointment_date', todayStr) // Incluir até hoje
@@ -251,7 +256,7 @@ const AdminDashboard = () => {
       // Buscar TODOS os agendamentos do mês (exceto cancelados)
       const { data: allAppointments, error: aptError } = await supabase
         .from('appointments')
-        .select('procedure_id, payment_value, payment_status, appointment_date, appointment_time, procedures(price)')
+        .select('procedure_id, payment_value, payment_status, appointment_date, appointment_time, package_parent_id, session_number, total_sessions, procedures(price, sessions)')
         .neq('status', 'cancelado') // Ignorar cancelados
         .gte('appointment_date', firstDay)
         .lte('appointment_date', lastDay);
@@ -298,11 +303,16 @@ const AdminDashboard = () => {
         let pendingPaymentsCount = 0;
         
         realizedAppointments.forEach((apt: any) => {
+          // Usar getPackageValue para evitar duplicação em pacotes
+          const packageValue = getPackageValue(apt);
+          
           if (apt.payment_value && apt.payment_value > 0) {
             // Soma apenas se tem valor de pagamento preenchido
-            currentValue += apt.payment_value;
-          } else {
-            // Conta como pagamento pendente (apenas se já foi realizado)
+            // Para pacotes, só conta o valor na primeira sessão
+            currentValue += packageValue;
+          } else if (packageValue > 0) {
+            // Conta como pagamento pendente apenas se deveria ter valor
+            // (primeira sessão de pacote ou procedimento normal)
             pendingPaymentsCount++;
           }
         });
@@ -327,7 +337,8 @@ const AdminDashboard = () => {
       const othersQuantity = appointmentsWithoutGoals.length;
       const othersValue = appointmentsWithoutGoals.reduce((sum: number, apt: any) => {
         if (apt.payment_value && apt.payment_value > 0) {
-          return sum + apt.payment_value;
+          // Usar getPackageValue para evitar duplicação em pacotes
+          return sum + getPackageValue(apt);
         }
         return sum; // Não adiciona se não tem payment_value
       }, 0);
@@ -677,8 +688,19 @@ const AdminDashboard = () => {
                         {format(aptDate, "dd/MM/yyyy", { locale: ptBR })} às {appointment.appointment_time}
                       </p>
                     <p className="text-sm text-muted-foreground">
-                      {(appointment.procedures as any)?.name} - {(appointment.clients as any)?.nome} {(appointment.clients as any)?.sobrenome}
+                      {(() => {
+                        const packageInfo = getPackageInfo(appointment);
+                        return packageInfo.displayName;
+                      })()} - {(appointment.clients as any)?.nome} {(appointment.clients as any)?.sobrenome}
                     </p>
+                    {(() => {
+                      const sessionProgress = formatSessionProgress(appointment);
+                      return sessionProgress && (
+                        <p className="text-xs text-blue-600 font-medium">
+                          📦 {sessionProgress}
+                        </p>
+                      );
+                    })()}
                     <p className="text-sm font-medium text-green-600">
                       Valor: R$ {(appointment.procedures as any)?.price?.toFixed(2)}
                     </p>

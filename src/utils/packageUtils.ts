@@ -38,10 +38,17 @@ export function getPackageInfo(appointment: any): PackageSession {
 
 /**
  * Calcula o valor que deve ser considerado para um agendamento de pacote
- * Cada sessão tem seu próprio valor de pagamento
+ * Apenas a primeira sessão tem valor, retornos são zerados
  */
 export function getPackageValue(appointment: any): number {
-  // Retorna o valor registrado no pagamento ou o preço do procedimento
+  const packageInfo = getPackageInfo(appointment);
+  
+  // Se for pacote e NÃO for a primeira sessão, valor é 0
+  if (packageInfo.isPackage && !packageInfo.isFirstSession) {
+    return 0;
+  }
+  
+  // Caso contrário, retorna o valor normal
   return appointment.payment_value || appointment.procedures?.price || 0;
 }
 

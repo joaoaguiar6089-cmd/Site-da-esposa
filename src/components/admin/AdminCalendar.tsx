@@ -16,7 +16,7 @@ import { format, parseISO, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import AgendamentoForm from "@/components/agendamento/AgendamentoForm";
 import NewAppointmentForm from "@/components/admin/NewAppointmentForm";
-import { getPackageInfo, formatSessionProgress } from "@/utils/packageUtils";
+import { getPackageInfo, formatSessionProgress, getPackageValue } from "@/utils/packageUtils";
 
 interface Appointment {
   id: string;
@@ -229,7 +229,7 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
   const getDayFinancialSummary = () => {
     const planned = dayAppointments
       .filter(apt => apt.status !== 'cancelado')
-      .reduce((sum, apt) => sum + (apt.procedures.price || 0), 0);
+      .reduce((sum, apt) => sum + getPackageValue(apt), 0);
     
     const received = {
       total: 0,
@@ -1045,7 +1045,7 @@ Aguardamos você!`;
                     </p>
                     <div className="flex items-center gap-2">
                       <p className="text-xs">
-                        {getPackageInfo(appointment).displayName} - R$ {appointment.procedures.price.toFixed(2)}
+                        {getPackageInfo(appointment).displayName} - R$ {getPackageValue(appointment).toFixed(2)}
                       </p>
                       {getPackageInfo(appointment).isPackage && (
                         <Badge variant="outline" className="text-xs">
@@ -1173,7 +1173,7 @@ Aguardamos você!`;
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {selectedAppointment.procedures.duration}min - R$ {selectedAppointment.procedures.price?.toFixed(2)}
+                  {selectedAppointment.procedures.duration}min - R$ {getPackageValue(selectedAppointment).toFixed(2)}
                 </p>
               </div>
 
@@ -1405,7 +1405,7 @@ Aguardamos você!`;
                     </Badge>
                   )}
                 </div>
-                <p><strong>Valor do Procedimento:</strong> R$ {selectedAppointment.procedures.price?.toFixed(2)}</p>
+                <p><strong>Valor do Procedimento:</strong> R$ {getPackageValue(selectedAppointment).toFixed(2)}</p>
               </div>
 
               <div>

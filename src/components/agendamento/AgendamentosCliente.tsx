@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import type { Client, Appointment } from "@/types/client";
+import { formatDateToBrazil } from "@/utils/dateUtils";
 
 interface AgendamentosClienteProps {
   client: Client;
@@ -60,10 +61,6 @@ const AgendamentosCliente = ({
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('pt-BR');
   };
 
   const formatTime = (time: string) => {
@@ -316,7 +313,7 @@ const AgendamentosCliente = ({
                     <div className="flex-1">
                       <p className="font-medium">{appointment.procedures.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {formatDate(appointment.appointment_date)} às {formatTime(appointment.appointment_time)}
+                        {formatDateToBrazil(appointment.appointment_date)} às {formatTime(appointment.appointment_time)}
                       </p>
                       {appointment.notes && (
                         <p className="text-xs text-muted-foreground mt-1">
@@ -355,7 +352,7 @@ const AgendamentosCliente = ({
             <div className="space-y-4">
               <div className="text-sm bg-muted p-3 rounded">
                 <p><strong>Procedimento:</strong> {selectedAppointment.procedures.name}</p>
-                <p><strong>Data:</strong> {formatDate(selectedAppointment.appointment_date)} às {formatTime(selectedAppointment.appointment_time)}</p>
+                <p><strong>Data:</strong> {formatDateToBrazil(selectedAppointment.appointment_date)} às {formatTime(selectedAppointment.appointment_time)}</p>
                 <p><strong>Valor do Procedimento:</strong> R$ {selectedAppointment.procedures.price?.toFixed(2)}</p>
               </div>
 

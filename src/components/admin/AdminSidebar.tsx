@@ -1,7 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, BarChart3, Calendar, DollarSign, User, UserPlus, Tag, Stethoscope, MessageSquare, Shield, Image, Clock, Badge, MapPin, Package, Table2 } from "lucide-react";
+import { Menu, BarChart3, Calendar, DollarSign, User, UserPlus, Tag, Stethoscope, MessageSquare, Shield, Image, Clock, Badge, MapPin, Package, Table2, Settings } from "lucide-react";
 import { useState, useCallback } from "react";
+import { useTimezone } from "@/hooks/useTimezone";
+import { useNavigate } from "react-router-dom";
 
 interface AdminSidebarProps {
   activeTab: string;
@@ -10,6 +12,8 @@ interface AdminSidebarProps {
 
 const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const { timezoneName, dateFormat } = useTimezone();
+  const navigate = useNavigate();
 
   const handleTabChange = useCallback((tabId: string) => {
     console.log('AdminSidebar handleTabChange:', tabId);
@@ -19,6 +23,11 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
   const handleMobileClose = useCallback(() => {
     setIsOpen(false);
   }, []);
+
+  const handleTimezoneClick = useCallback(() => {
+    navigate('/admin/settings');
+    setIsOpen(false);
+  }, [navigate]);
 
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: BarChart3 },
@@ -38,11 +47,6 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
     { id: "admins", label: "Administradores", icon: Shield },
     { id: "security", label: "Segurança", icon: Shield },
   ];
-
-  const timezoneInfo = {
-    label: "🌎 Fuso Horário: Brasil (UTC-3)",
-    sublabel: "Horário de Brasília"
-  };
 
   const MenuItem = ({ item, isMobile = false }: { item: typeof menuItems[0]; isMobile?: boolean }) => {
     const Icon = item.icon;
@@ -89,11 +93,18 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
               
               {/* Timezone Info - Mobile */}
               <div className="mt-6 pt-4 border-t">
-                <div className="px-3 py-2 rounded-md bg-muted/50">
-                  <p className="text-xs font-medium text-foreground">{timezoneInfo.label}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{timezoneInfo.sublabel}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Formato: DD/MM/YYYY</p>
-                </div>
+                <button 
+                  onClick={handleTimezoneClick}
+                  className="w-full px-3 py-2 rounded-md bg-muted/50 hover:bg-muted transition-colors text-left"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-foreground">🌎 {timezoneName}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Formato: {dateFormat}</p>
+                    </div>
+                    <Settings className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                </button>
               </div>
             </div>
           </SheetContent>
@@ -109,11 +120,18 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
           
           {/* Timezone Info */}
           <div className="mt-6 pt-4 border-t">
-            <div className="px-3 py-2 rounded-md bg-muted/50">
-              <p className="text-xs font-medium text-foreground">{timezoneInfo.label}</p>
-              <p className="text-xs text-muted-foreground mt-1">{timezoneInfo.sublabel}</p>
-              <p className="text-xs text-muted-foreground mt-1">Formato: DD/MM/YYYY</p>
-            </div>
+            <button 
+              onClick={handleTimezoneClick}
+              className="w-full px-3 py-2 rounded-md bg-muted/50 hover:bg-muted transition-colors text-left"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-foreground">🌎 {timezoneName}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Formato: {dateFormat}</p>
+                </div>
+                <Settings className="w-4 h-4 text-muted-foreground" />
+              </div>
+            </button>
           </div>
         </div>
       </div>

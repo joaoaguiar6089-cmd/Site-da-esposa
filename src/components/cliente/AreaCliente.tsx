@@ -14,6 +14,7 @@ import AgendamentoForm from "@/components/agendamento/AgendamentoForm";
 import ClientDocuments from "./ClientDocuments";
 import type { Client, Appointment, ProcedureResult } from "@/types/client";
 import { getPackageInfo, formatSessionProgress } from "@/utils/packageUtils";
+import { formatDateToBrazil } from "@/utils/dateUtils";
 
 interface AreaClienteProps {
   client: Client;
@@ -120,10 +121,6 @@ const AreaCliente = ({
     } else {
       setFilteredAppointments(appointments.filter(apt => apt.status === statusFilter));
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR');
   };
 
   const formatTime = (timeString: string) => {
@@ -430,7 +427,7 @@ const AreaCliente = ({
                             )}
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            {formatDate(appointment.appointment_date)} às {formatTime(appointment.appointment_time)}
+                            {formatDateToBrazil(appointment.appointment_date)} às {formatTime(appointment.appointment_time)}
                           </p>
                           {appointment.notes && (
                             <p className="text-sm text-muted-foreground">

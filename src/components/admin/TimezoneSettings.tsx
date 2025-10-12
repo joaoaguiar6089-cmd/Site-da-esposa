@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,26 +9,59 @@ import { useTimezone } from "@/hooks/useTimezone";
 import { BRAZILIAN_TIMEZONES, type BrazilianTimezone } from "@/utils/timezones";
 
 const TimezoneSettings = () => {
-  const { timezone, timezoneName, dateFormat, timeFormat, updateTimezone } = useTimezone();
+  const timezoneContext = useTimezone();
+  const { timezone, timezoneName, dateFormat, timeFormat, updateTimezone, loading } = timezoneContext;
+  
+  console.log('🔍 TimezoneSettings renderizado:', {
+    timezone,
+    timezoneName,
+    loading,
+    contextCompleto: !!timezoneContext,
+    updateTimezoneTipo: typeof updateTimezone
+  });
+  
   const [selectedTimezone, setSelectedTimezone] = useState(timezone);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
+  // Sincronizar estado local quando o hook atualizar
+  useEffect(() => {
+    console.log('🔄 useEffect: timezone do hook mudou para:', timezone);
+    setSelectedTimezone(timezone);
+  }, [timezone]);
+
   const selectedTz = BRAZILIAN_TIMEZONES.find(tz => tz.value === selectedTimezone);
 
   const handleSave = async () => {
-    if (!selectedTz) return;
+    console.log('🔵 handleSave chamado');
+    console.log('selectedTz:', selectedTz);
+    console.log('timezone do hook:', timezone);
+    console.log('selectedTimezone (estado local):', selectedTimezone);
+    console.log('🔍 updateTimezone na hora do save:', typeof updateTimezone);
+    
+    if (!selectedTz) {
+      console.log('❌ selectedTz é null/undefined');
+      return;
+    }
 
     try {
       setSaving(true);
+      console.log('🟡 Chamando updateTimezone...', {
+        value: selectedTz.value,
+        label: selectedTz.label
+      });
+      
       await updateTimezone(selectedTz.value, selectedTz.label);
+      
+      console.log('✅ updateTimezone concluído');
+      console.log('✅ Badge deveria atualizar para:', selectedTz.label);
       
       toast({
         title: "Configurações salvas!",
         description: `Fuso horário alterado para ${selectedTz.label}`,
       });
     } catch (error) {
-      console.error('Erro ao salvar:', error);
+      console.error('❌ Erro ao salvar:', error);
       toast({
         title: "Erro",
         description: "Erro ao salvar configurações de fuso horário.",
@@ -36,6 +69,7 @@ const TimezoneSettings = () => {
       });
     } finally {
       setSaving(false);
+      console.log('🔵 handleSave finalizado');
     }
   };
 

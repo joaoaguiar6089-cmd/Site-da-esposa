@@ -20,13 +20,18 @@ interface TimezoneProviderProps {
 }
 
 export function TimezoneProvider({ children }: TimezoneProviderProps) {
+  console.log('🟢 TimezoneProvider FUNÇÃO EXECUTADA');
+  
   const [timezone, setTimezone] = useState<string>(DEFAULT_TIMEZONE);
   const [timezoneName, setTimezoneName] = useState<string>('Brasília (UTC-3)');
   const [dateFormat, setDateFormat] = useState<string>('DD/MM/YYYY');
   const [timeFormat, setTimeFormat] = useState<string>('HH:mm');
   const [loading, setLoading] = useState(true);
+  
+  console.log('🟢 TimezoneProvider STATE INICIALIZADO:', { timezone, timezoneName, loading });
 
   const loadSettings = async () => {
+    console.log('🔵 TimezoneProvider.loadSettings iniciado');
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -35,9 +40,11 @@ export function TimezoneProvider({ children }: TimezoneProviderProps) {
         .in('setting_key', ['timezone', 'timezone_name', 'date_format', 'time_format']);
 
       if (error) {
-        console.error('Erro ao carregar configurações:', error);
+        console.error('❌ Erro ao carregar configurações:', error);
         return;
       }
+
+      console.log('📊 Dados carregados do banco:', data);
 
       if (data) {
         const settings = data.reduce((acc: Record<string, string>, item: any) => {
@@ -45,7 +52,12 @@ export function TimezoneProvider({ children }: TimezoneProviderProps) {
           return acc;
         }, {} as Record<string, string>);
 
+        console.log('📋 Settings processados:', settings);
+
         const newTimezone = settings.timezone || DEFAULT_TIMEZONE;
+        
+        console.log('🌍 Configurando timezone:', newTimezone);
+        console.log('📛 Configurando timezoneName:', settings.timezone_name || 'Brasília (UTC-3)');
         
         setTimezone(newTimezone);
         setTimezoneName(settings.timezone_name || 'Brasília (UTC-3)');
@@ -54,40 +66,60 @@ export function TimezoneProvider({ children }: TimezoneProviderProps) {
         
         // Limpar cache para forçar o dateUtils a carregar o novo timezone
         clearTimezoneCache();
+        console.log('✅ loadSettings concluído');
       }
     } catch (error) {
-      console.error('Erro ao carregar configurações:', error);
+      console.error('❌ Erro ao carregar configurações:', error);
     } finally {
       setLoading(false);
+      console.log('🔵 loadSettings finalizado (loading = false)');
     }
   };
 
   const updateTimezone = async (newTimezone: string, newTimezoneName: string) => {
+    console.log('🔵 useTimezone.updateTimezone chamado:', { newTimezone, newTimezoneName });
+    
     try {
       // Atualizar timezone
+      console.log('🟡 Atualizando timezone no banco...');
       const { error: tzError } = await supabase
         .from('system_settings' as any)
         .update({ setting_value: newTimezone, updated_at: new Date().toISOString() })
         .eq('setting_key', 'timezone');
 
-      if (tzError) throw tzError;
+      if (tzError) {
+        console.error('❌ Erro ao atualizar timezone:', tzError);
+        throw tzError;
+      }
+      console.log('✅ Timezone atualizado no banco');
 
       // Atualizar timezone_name
+      console.log('🟡 Atualizando timezone_name no banco...');
       const { error: nameError } = await supabase
         .from('system_settings' as any)
         .update({ setting_value: newTimezoneName, updated_at: new Date().toISOString() })
         .eq('setting_key', 'timezone_name');
 
-      if (nameError) throw nameError;
+      if (nameError) {
+        console.error('❌ Erro ao atualizar timezone_name:', nameError);
+        throw nameError;
+      }
+      console.log('✅ Timezone_name atualizado no banco');
 
       // Limpar cache do dateUtils para forçar reload do novo timezone
+      console.log('🟡 Limpando cache do dateUtils...');
       clearTimezoneCache();
+      console.log('✅ Cache limpo');
 
       // Atualizar estado local
+      console.log('🟡 Atualizando estado local...');
       setTimezone(newTimezone);
       setTimezoneName(newTimezoneName);
+      console.log('✅ Estado local atualizado');
+      
+      console.log('✅ updateTimezone concluído com sucesso');
     } catch (error) {
-      console.error('Erro ao atualizar timezone:', error);
+      console.error('❌ Erro ao atualizar timezone:', error);
       throw error;
     }
   };
@@ -97,6 +129,7 @@ export function TimezoneProvider({ children }: TimezoneProviderProps) {
   };
 
   useEffect(() => {
+    console.log('🚀 TimezoneProvider montado - iniciando loadSettings');
     loadSettings();
   }, []);
 
@@ -118,10 +151,14 @@ export function TimezoneProvider({ children }: TimezoneProviderProps) {
 }
 
 export function useTimezone() {
+  console.log('🔵 useTimezone chamado');
   const context = useContext(TimezoneContext);
+  console.log('🔍 context recebido:', context);
+  
   if (context === undefined) {
     // Retornar valores padrão ao invés de lançar erro
     console.warn('useTimezone foi usado fora do TimezoneProvider. Usando valores padrão.');
+    console.trace('Stack trace de onde foi chamado:');
     return {
       timezone: DEFAULT_TIMEZONE,
       timezoneName: 'Brasília (UTC-3)',
@@ -136,5 +173,6 @@ export function useTimezone() {
       },
     };
   }
+  console.log('✅ useTimezone retornando context válido');
   return context;
 }

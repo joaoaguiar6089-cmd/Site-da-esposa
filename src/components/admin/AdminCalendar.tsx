@@ -32,6 +32,7 @@ interface Appointment {
   payment_notes?: string | null;
   session_number?: number | null;
   total_sessions?: number | null;
+  return_of_appointment_id?: string | null;
   city_settings?: {
     city_name?: string | null;
     clinic_name?: string | null;
@@ -91,7 +92,7 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
   const loadAppointments = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data, error} = await supabase
         .from('appointments')
         .select(`
           id,
@@ -107,6 +108,7 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
           payment_notes,
           session_number,
           total_sessions,
+          return_of_appointment_id,
           city_settings:city_settings (
             city_name
           ),
@@ -1092,23 +1094,39 @@ Aguardamos você!`;
                             <span className="text-muted-foreground">({proc.duration}min)</span>
                           </div>
                         ))}
-                        <div className="flex items-center gap-2 mt-1 pt-1 border-t">
+                        <div className="flex items-center gap-2 mt-1 pt-1 border-t flex-wrap">
                           <span className="font-medium">Total:</span>
                           <span>{appointment.total_duration}min</span>
                           <span className="text-muted-foreground">•</span>
                           <span className="font-medium">
                             R$ {appointment.all_procedures.reduce((sum, p) => sum + p.price, 0).toFixed(2)}
                           </span>
+                          {appointment.return_of_appointment_id && (
+                            <Badge 
+                              variant="secondary" 
+                              className="ml-2 bg-blue-100 text-blue-800 border-blue-300 text-xs"
+                            >
+                              Retorno
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-xs">
                           {getPackageInfo(appointment).displayName} - R$ {getPackageValue(appointment).toFixed(2)}
                         </p>
                         {getPackageInfo(appointment).isPackage && (
                           <Badge variant="outline" className="text-xs">
                             {formatSessionProgress(appointment)}
+                          </Badge>
+                        )}
+                        {appointment.return_of_appointment_id && (
+                          <Badge 
+                            variant="secondary" 
+                            className="bg-blue-100 text-blue-800 border-blue-300 text-xs"
+                          >
+                            Retorno
                           </Badge>
                         )}
                       </div>
@@ -1259,6 +1277,19 @@ Aguardamos você!`;
                   </div>
                 )}
               </div>
+
+              {selectedAppointment.return_of_appointment_id && (
+                <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="bg-blue-600 text-white">
+                      Retorno
+                    </Badge>
+                    <span className="text-sm text-blue-800 font-medium">
+                      Este é um retorno de outro procedimento
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {selectedAppointment.professionals && (
                 <div>

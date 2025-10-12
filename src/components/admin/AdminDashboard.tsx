@@ -14,6 +14,7 @@ import { ptBR } from "date-fns/locale";
 import { getCurrentDateBrazil, getCurrentDateTimeBrazil } from "@/utils/dateUtils";
 import { getPackageInfo, formatSessionProgress, getPackageValue } from "@/utils/packageUtils";
 import { useNavigate } from "react-router-dom";
+import NewBookingFlow from "@/components/agendamento/NewBookingFlow";
 
 interface DashboardStats {
   totalMes: number;
@@ -97,6 +98,13 @@ const AdminDashboard = () => {
   const [hasReturn, setHasReturn] = useState(false);
   const [returnDate, setReturnDate] = useState("");
   const [returnTime, setReturnTime] = useState("");
+  
+  // Estados para NewBookingFlow de retorno
+  const [showReturnBooking, setShowReturnBooking] = useState(false);
+  const [returnClient, setReturnClient] = useState<any>(null);
+  const [returnProcedureId, setReturnProcedureId] = useState<string>("");
+  const [originalAppointmentId, setOriginalAppointmentId] = useState<string>("");
+  const [originalPaymentData, setOriginalPaymentData] = useState<any>(null);
 
   useEffect(() => {
     loadStats();
@@ -529,41 +537,39 @@ const AdminDashboard = () => {
 
       if (updateError) throw updateError;
 
-      // Se tiver retorno, criar novo agendamento
-      if (hasReturn && returnDate && returnTime) {
-        const returnAppointment = {
-          client_id: (selectedAppointment.clients as any)?.id,
-          procedure_id: (selectedAppointment.procedures as any)?.id,
-          appointment_date: returnDate,
-          appointment_time: returnTime,
-          status: 'agendado',
-          notes: `Retorno - ${(selectedAppointment.procedures as any)?.name || ''}`,
-          payment_status: paymentStatus, // Espelhar o status de pagamento
+      // Se tiver retorno, abrir NewBookingFlow em vez de criar diretamente
+      if (hasReturn) {
+        // Guardar dados do pagamento para espelhar no retorno
+        setOriginalPaymentData({
+          payment_status: paymentStatus,
           payment_method: paymentMethod || null,
           payment_value: paymentValue ? parseFloat(paymentValue) : null,
           payment_installments: paymentInstallments ? parseInt(paymentInstallments) : null,
-        };
-
-        const { error: insertError } = await supabase
-          .from('appointments')
-          .insert([returnAppointment]);
-
-        if (insertError) throw insertError;
-
+        });
+        
+        // Preparar dados para NewBookingFlow
+        setOriginalAppointmentId(selectedAppointment.id);
+        setReturnClient(selectedAppointment.clients);
+        setReturnProcedureId((selectedAppointment.procedures as any)?.id);
+        
+        // Fechar modal de pagamento e abrir NewBookingFlow
+        setPaymentDialogOpen(false);
+        setShowReturnBooking(true);
+        
         toast({
-          title: "Sucesso",
-          description: "Pagamento salvo e retorno agendado!",
+          title: "Pagamento salvo!",
+          description: "Agora agende o retorno...",
         });
       } else {
         toast({
           title: "Sucesso",
           description: "Pagamento salvo com sucesso!",
         });
+        
+        setPaymentDialogOpen(false);
+        loadRecentAppointments();
+        loadStats();
       }
-
-      setPaymentDialogOpen(false);
-      loadRecentAppointments();
-      loadStats();
     } catch (error) {
       console.error('Erro ao salvar:', error);
       toast({
@@ -573,6 +579,89 @@ const AdminDashboard = () => {
       });
     }
   };
+
+  // Callback quando retorno for criado via NewBookingFlow
+  const handleReturnSuccess = async () => {
+    try {
+      // Buscar o último appointment criado para este cliente com este procedimento
+      const { data: lastAppointment, error: fetchError } = await supabase
+        .from('appointments')
+        .select('id')
+        .eq('client_id', returnClient.id)
+        .eq('procedure_id', returnProcedureId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (fetchError || !lastAppointment) {
+        throw new Error('Não foi possível encontrar o agendamento criado');
+      }
+
+      // Vincular o retorno ao agendamento original e espelhar dados de pagamento
+      const { error: updateError } = await supabase
+        .from('appointments')
+        .update({
+          return_of_appointment_id: originalAppointmentId,
+          ...originalPaymentData,
+        })
+        .eq('id', lastAppointment.id);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Sucesso!",
+        description: "Retorno agendado e vinculado ao procedimento original!",
+      });
+
+      // Limpar estados
+      setShowReturnBooking(false);
+      setReturnClient(null);
+      setReturnProcedureId("");
+      setOriginalAppointmentId("");
+      setOriginalPaymentData(null);
+      
+      // Recarregar dados
+      loadRecentAppointments();
+      loadStats();
+    } catch (error) {
+      console.error('Erro ao vincular retorno:', error);
+      toast({
+        title: "Aviso",
+        description: "Retorno criado, mas erro ao vincular ao original.",
+        variant: "destructive",
+      });
+      
+      // Mesmo com erro, limpar estados e recarregar
+      setShowReturnBooking(false);
+      setReturnClient(null);
+      setReturnProcedureId("");
+      setOriginalAppointmentId("");
+      setOriginalPaymentData(null);
+      loadRecentAppointments();
+      loadStats();
+    }
+  };
+
+  // Se está criando retorno, mostrar NewBookingFlow
+  if (showReturnBooking && returnClient) {
+    return (
+      <NewBookingFlow
+        onBack={() => {
+          setShowReturnBooking(false);
+          setReturnClient(null);
+          setReturnProcedureId("");
+          setOriginalAppointmentId("");
+          setOriginalPaymentData(null);
+        }}
+        onSuccess={handleReturnSuccess}
+        adminMode={true}
+        initialClient={returnClient}
+        preSelectedProcedureId={returnProcedureId}
+        sendNotification={true}
+        allowPastDates={false}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -1104,7 +1193,7 @@ const AdminDashboard = () => {
             </div>
 
             <div className="border-t pt-4">
-              <div className="flex items-center space-x-2 mb-4">
+              <div className="flex items-center space-x-2">
                 <Checkbox
                   id="hasReturn"
                   checked={hasReturn}
@@ -1119,23 +1208,13 @@ const AdminDashboard = () => {
               </div>
 
               {hasReturn && (
-                <div className="space-y-3 pl-6 border-l-2">
-                  <div>
-                    <label className="text-sm font-medium">Data do Retorno</label>
-                    <Input
-                      type="date"
-                      value={returnDate}
-                      onChange={(e) => setReturnDate(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Horário do Retorno</label>
-                    <Input
-                      type="time"
-                      value={returnTime}
-                      onChange={(e) => setReturnTime(e.target.value)}
-                    />
-                  </div>
+                <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    ✅ Após salvar o pagamento, você será direcionado para o formulário completo de agendamento para marcar o retorno.
+                  </p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    O status de pagamento será automaticamente copiado para o retorno.
+                  </p>
                 </div>
               )}
             </div>

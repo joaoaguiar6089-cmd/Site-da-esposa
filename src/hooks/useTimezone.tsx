@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { DEFAULT_TIMEZONE } from '@/utils/timezones';
+import { clearTimezoneCache } from '@/utils/dateUtils';
 
 interface TimezoneContextType {
   timezone: string;
@@ -44,10 +45,15 @@ export function TimezoneProvider({ children }: TimezoneProviderProps) {
           return acc;
         }, {} as Record<string, string>);
 
-        setTimezone(settings.timezone || DEFAULT_TIMEZONE);
+        const newTimezone = settings.timezone || DEFAULT_TIMEZONE;
+        
+        setTimezone(newTimezone);
         setTimezoneName(settings.timezone_name || 'Brasília (UTC-3)');
         setDateFormat(settings.date_format || 'DD/MM/YYYY');
         setTimeFormat(settings.time_format || 'HH:mm');
+        
+        // Limpar cache para forçar o dateUtils a carregar o novo timezone
+        clearTimezoneCache();
       }
     } catch (error) {
       console.error('Erro ao carregar configurações:', error);
@@ -73,6 +79,9 @@ export function TimezoneProvider({ children }: TimezoneProviderProps) {
         .eq('setting_key', 'timezone_name');
 
       if (nameError) throw nameError;
+
+      // Limpar cache do dateUtils para forçar reload do novo timezone
+      clearTimezoneCache();
 
       // Atualizar estado local
       setTimezone(newTimezone);

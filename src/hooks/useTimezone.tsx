@@ -111,7 +111,21 @@ export function TimezoneProvider({ children }: TimezoneProviderProps) {
 export function useTimezone() {
   const context = useContext(TimezoneContext);
   if (context === undefined) {
-    throw new Error('useTimezone must be used within a TimezoneProvider');
+    // Retornar valores padrão ao invés de lançar erro
+    console.warn('useTimezone foi usado fora do TimezoneProvider. Usando valores padrão.');
+    return {
+      timezone: DEFAULT_TIMEZONE,
+      timezoneName: 'Brasília (UTC-3)',
+      dateFormat: 'DD/MM/YYYY',
+      timeFormat: 'HH:mm',
+      loading: false,
+      updateTimezone: async () => {
+        console.error('updateTimezone chamado fora do TimezoneProvider');
+      },
+      refreshSettings: async () => {
+        console.error('refreshSettings chamado fora do TimezoneProvider');
+      },
+    };
   }
   return context;
 }

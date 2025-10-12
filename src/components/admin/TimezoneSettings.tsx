@@ -110,14 +110,22 @@ const TimezoneSettings = () => {
             )}
           </div>
 
+          {/* Aviso Principal */}
+          <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
+            <h4 className="text-sm font-medium text-green-900 mb-2">✅ Agendamentos Existentes:</h4>
+            <p className="text-xs text-green-700">
+              <strong>Os horários dos agendamentos já criados NÃO serão alterados.</strong> Esta configuração afeta apenas novos agendamentos, notificações futuras e a exibição de datas.
+            </p>
+          </div>
+
           {/* Avisos */}
           <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
-            <h4 className="text-sm font-medium text-yellow-900 mb-2">⚠️ Importante:</h4>
+            <h4 className="text-sm font-medium text-yellow-900 mb-2">⚠️ Esta configuração afeta:</h4>
             <ul className="text-xs text-yellow-700 space-y-1 list-disc list-inside">
-              <li>Esta configuração afeta TODO o sistema</li>
-              <li>Agendamentos serão exibidos no novo fuso horário</li>
-              <li>Notificações e lembretes usarão este fuso</li>
-              <li>Automações serão executadas baseadas neste horário</li>
+              <li><strong>Novos agendamentos</strong> criados após a mudança</li>
+              <li><strong>Formato de exibição</strong> de datas (DD/MM/YYYY)</li>
+              <li><strong>Notificações e lembretes</strong> futuros</li>
+              <li><strong>Automações</strong> baseadas em horário</li>
             </ul>
           </div>
 

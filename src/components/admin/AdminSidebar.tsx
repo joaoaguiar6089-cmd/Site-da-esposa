@@ -3,7 +3,6 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, BarChart3, Calendar, DollarSign, User, UserPlus, Tag, Stethoscope, MessageSquare, Shield, Image, Clock, Badge, MapPin, Package, Table2, Settings } from "lucide-react";
 import { useState, useCallback } from "react";
 import { useTimezone } from "@/hooks/useTimezone";
-import { useNavigate } from "react-router-dom";
 
 interface AdminSidebarProps {
   activeTab: string;
@@ -13,7 +12,6 @@ interface AdminSidebarProps {
 const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const { timezoneName, dateFormat } = useTimezone();
-  const navigate = useNavigate();
 
   const handleTabChange = useCallback((tabId: string) => {
     console.log('AdminSidebar handleTabChange:', tabId);
@@ -25,9 +23,9 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
   }, []);
 
   const handleTimezoneClick = useCallback(() => {
-    navigate('/admin/settings');
+    onTabChange('settings');
     setIsOpen(false);
-  }, [navigate]);
+  }, [onTabChange]);
 
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: BarChart3 },

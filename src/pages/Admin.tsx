@@ -20,6 +20,7 @@ import AdminCityAddresses from "@/components/admin/AdminCityAddresses";
 import PromotionsManagement from "@/components/admin/PromotionsManagement";
 import { InventoryManagement } from "@/components/admin/InventoryManagement";
 import AdminSidebar from "@/components/admin/AdminSidebar";
+import TimezoneSettings from "@/components/admin/TimezoneSettings";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/auth/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -123,6 +124,8 @@ const Admin = () => {
         return <AdminManagement />;
       case "security":
         return <SecurityAuditLog />;
+      case "settings":
+        return <TimezoneSettings />;
       default:
         return <AdminDashboard />;
     }

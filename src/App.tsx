@@ -12,7 +12,6 @@ import AreaClientePage from "./pages/AreaCliente";
 import Admin from "./pages/Admin";
 import AuthPage from "./components/auth/AuthPage";
 import CategoryProcedures from "./pages/CategoryProcedures";
-import SystemSettings from "./pages/SystemSettings";
 
 const queryClient = new QueryClient();
 
@@ -29,7 +28,6 @@ const App = () => (
             <Route path="/agendamento" element={<Agendamento />} />
             <Route path="/area-cliente" element={<AreaClientePage />} />
             <Route path="/admin" element={<Admin />} />
-            <Route path="/admin/settings" element={<SystemSettings />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/categoria/:categoryId" element={<CategoryProcedures />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

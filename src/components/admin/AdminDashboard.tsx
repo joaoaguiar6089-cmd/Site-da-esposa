@@ -194,17 +194,27 @@ const AdminDashboard = () => {
       });
 
       // Filtrar pelo lado do cliente para incluir apenas os que já passaram (data + hora)
+      // E QUE NÃO TENHAM INFORMAÇÕES DE PAGAMENTO
       const filtered = notCanceled.filter((apt: any) => {
         const aptDate = apt.appointment_date;
         const aptTime = apt.appointment_time;
         
-        // Se for antes de hoje, incluir
-        if (aptDate < todayStr) return true;
+        // Verificar se já passou (data + hora)
+        let hasPassed = false;
+        if (aptDate < todayStr) {
+          hasPassed = true;
+        } else if (aptDate === todayStr && aptTime <= currentTime) {
+          hasPassed = true;
+        }
         
-        // Se for hoje, verificar se o horário já passou
-        if (aptDate === todayStr && aptTime <= currentTime) return true;
+        // Se não passou, não incluir
+        if (!hasPassed) return false;
         
-        return false;
+        // Se já passou, verificar se NÃO tem informações de pagamento
+        const hasPaymentInfo = apt.payment_status || apt.payment_method || apt.payment_value;
+        
+        // Incluir apenas se NÃO tiver informações de pagamento
+        return !hasPaymentInfo;
       });
 
       // Ordenar do mais recente para o mais antigo (data DESC, hora DESC)
@@ -660,16 +670,16 @@ const AdminDashboard = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5" />
-            Agendamentos Recentes
+            Agendamentos Sem Informações de Pagamento
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Agendamentos passados que precisam de informações de pagamento
+            Agendamentos já realizados que ainda não têm dados de pagamento registrados
           </p>
         </CardHeader>
         <CardContent>
           {recentAppointments.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">
-              Nenhum agendamento pendente de pagamento.
+              ✅ Todos os agendamentos já possuem informações de pagamento!
             </p>
           ) : (
             <div className="space-y-3">

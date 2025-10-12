@@ -567,21 +567,7 @@ const ProcedureSpecificationSelector = ({
             )}
           </div>
 
-          {selectedSpecifications.length > 0 && (
-            <div className="mt-6 p-4 bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20">
-              <h4 className="font-semibold mb-3 text-sm text-primary">Especificações selecionadas:</h4>
-              <div className="grid gap-2">
-                {selectedSpecifications.map((s) => (
-                  <div key={s.id} className="flex justify-between items-center text-sm bg-background/50 p-2 rounded">
-                    <span className="font-medium">{s.name}</span>
-                    <span className="text-primary font-semibold">
-                      {s.price > 0 ? currency(s.price) : "Sem custo"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Box de especificações selecionadas removido - já aparece no resumo do agendamento */}
         </CardContent>
       </Card>
     </div>

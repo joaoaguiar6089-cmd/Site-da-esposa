@@ -3,7 +3,6 @@ import { useSearchParams } from "react-router-dom";
 import LoginCPF from "@/components/agendamento/LoginCPF";
 import CadastroCliente from "@/components/agendamento/CadastroCliente";
 import AgendamentosCliente from "@/components/agendamento/AgendamentosCliente";
-import AgendamentoForm from "@/components/agendamento/AgendamentoForm";
 import NewBookingFlow from "@/components/agendamento/NewBookingFlow";
 import type { Client } from "@/types/client";
 
@@ -120,11 +119,13 @@ const Agendamento = () => {
       
       case 'agendamento-existente':
         return selectedClient ? (
-          <AgendamentoForm
-            client={selectedClient}
-            onAppointmentCreated={handleAppointmentCreated}
+          <NewBookingFlow
             onBack={handleBack}
+            onSuccess={handleAppointmentCreated}
             preSelectedProcedureId={preSelectedProcedureId || undefined}
+            adminMode={false}
+            initialClient={selectedClient}
+            sendNotification={true}
           />
         ) : null;
       

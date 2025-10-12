@@ -181,6 +181,15 @@ const AdminDashboard = () => {
             name,
             price,
             sessions
+          ),
+          appointments_procedures (
+            order_index,
+            procedure:procedures (
+              id,
+              name,
+              duration,
+              price
+            )
           )
         `)
         .lte('appointment_date', todayStr) // Incluir até hoje
@@ -188,8 +197,32 @@ const AdminDashboard = () => {
 
       if (error) throw error;
       
+      // Processar appointments para incluir múltiplos procedimentos
+      const processedData = (data || []).map((apt: any) => {
+        const allProcedures = apt.appointments_procedures && apt.appointments_procedures.length > 0
+          ? apt.appointments_procedures
+              .sort((a: any, b: any) => a.order_index - b.order_index)
+              .map((ap: any) => ap.procedure)
+          : [apt.procedures];
+
+        const totalDuration = allProcedures.reduce((sum: number, proc: any) => 
+          sum + (proc?.duration || 0), 0
+        );
+        
+        const totalPrice = allProcedures.reduce((sum: number, proc: any) => 
+          sum + (proc?.price || 0), 0
+        );
+
+        return {
+          ...apt,
+          all_procedures: allProcedures,
+          total_duration: totalDuration,
+          total_price: totalPrice
+        };
+      });
+      
       // Filtrar cancelados no lado do cliente
-      const notCanceled = (data || []).filter((apt: any) => {
+      const notCanceled = processedData.filter((apt: any) => {
         return apt.status?.toLowerCase() !== 'cancelado';
       });
 
@@ -697,24 +730,46 @@ const AdminDashboard = () => {
                       <p className="font-medium">
                         {format(aptDate, "dd/MM/yyyy", { locale: ptBR })} às {appointment.appointment_time}
                       </p>
-                    <p className="text-sm text-muted-foreground">
-                      {(() => {
-                        const packageInfo = getPackageInfo(appointment);
-                        return packageInfo.displayName;
-                      })()} - {(appointment.clients as any)?.nome} {(appointment.clients as any)?.sobrenome}
-                    </p>
-                    {(() => {
-                      const sessionProgress = formatSessionProgress(appointment);
-                      return sessionProgress && (
-                        <p className="text-xs text-blue-600 font-medium">
-                          📦 {sessionProgress}
-                        </p>
-                      );
-                    })()}
-                    <p className="text-sm font-medium text-green-600">
-                      Valor: R$ {(appointment.procedures as any)?.price?.toFixed(2)}
-                    </p>
-                  </div>
+                      
+                      {/* Cliente */}
+                      <p className="text-sm text-muted-foreground">
+                        {(appointment.clients as any)?.nome} {(appointment.clients as any)?.sobrenome}
+                      </p>
+                      
+                      {/* Múltiplos Procedimentos */}
+                      {(appointment as any).all_procedures && (appointment as any).all_procedures.length > 1 ? (
+                        <div className="text-xs space-y-0.5 mt-1">
+                          {(appointment as any).all_procedures.map((proc: any, idx: number) => (
+                            <div key={idx} className="text-muted-foreground">
+                              • {proc.name} ({proc.duration}min)
+                            </div>
+                          ))}
+                          <p className="text-sm font-medium text-green-600 mt-1">
+                            Total: {(appointment as any).total_duration}min • R$ {(appointment as any).total_price?.toFixed(2)}
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm text-muted-foreground">
+                            {(() => {
+                              const packageInfo = getPackageInfo(appointment);
+                              return packageInfo.displayName;
+                            })()}
+                          </p>
+                          {(() => {
+                            const sessionProgress = formatSessionProgress(appointment);
+                            return sessionProgress && (
+                              <p className="text-xs text-blue-600 font-medium">
+                                📦 {sessionProgress}
+                              </p>
+                            );
+                          })()}
+                          <p className="text-sm font-medium text-green-600">
+                            Valor: R$ {(appointment.procedures as any)?.price?.toFixed(2)}
+                          </p>
+                        </>
+                      )}
+                    </div>
                   <div className="flex gap-2">
                     <Button
                       size="sm"

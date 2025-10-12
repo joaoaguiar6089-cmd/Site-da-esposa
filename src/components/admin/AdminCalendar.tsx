@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { formatLocationBlock } from "@/utils/location";
 import { format, parseISO, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import AgendamentoForm from "@/components/agendamento/AgendamentoForm";
+import NewBookingFlow from "@/components/agendamento/NewBookingFlow";
 import NewAppointmentForm from "@/components/admin/NewAppointmentForm";
 import { getPackageInfo, formatSessionProgress, getPackageValue } from "@/utils/packageUtils";
 
@@ -54,6 +54,13 @@ interface Appointment {
   professionals?: {
     name: string;
   } | null;
+  all_procedures?: Array<{
+    id: string;
+    name: string;
+    duration: number;
+    price: number;
+  }>;
+  total_duration?: number;
 }
 
 interface AdminCalendarProps {
@@ -118,6 +125,15 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
           ),
           professionals (
             name
+          ),
+          appointments_procedures (
+            order_index,
+            procedure:procedures (
+              id,
+              name,
+              duration,
+              price
+            )
           )
         `)
         .order('appointment_date')
@@ -125,7 +141,28 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
 
       if (error) throw error;
 
-      setAppointments((data as any) || []);
+      // Processar appointments para incluir múltiplos procedimentos
+      const processedAppointments = (data as any[])?.map(apt => {
+        // Se tem appointments_procedures, usar eles; senão, usar procedure principal
+        const allProcedures = apt.appointments_procedures && apt.appointments_procedures.length > 0
+          ? apt.appointments_procedures
+              .sort((a: any, b: any) => a.order_index - b.order_index)
+              .map((ap: any) => ap.procedure)
+          : [apt.procedures];
+
+        // Calcular duração total
+        const totalDuration = allProcedures.reduce((sum: number, proc: any) => 
+          sum + (proc?.duration || 0), 0
+        );
+
+        return {
+          ...apt,
+          all_procedures: allProcedures,
+          total_duration: totalDuration
+        };
+      }) || [];
+
+      setAppointments(processedAppointments);
     } catch (error) {
       console.error('Erro ao carregar agendamentos:', error);
       toast({
@@ -927,11 +964,12 @@ Aguardamos você!`;
         </div>
         
         <div className="max-w-5xl mx-auto w-full">
-          <AgendamentoForm
-            client={selectedAppointment.clients}
-            onAppointmentCreated={handleAppointmentUpdated}
+          <NewBookingFlow
             onBack={handleCloseEditForm}
-            editingId={editingAppointment || undefined}
+            onSuccess={handleAppointmentUpdated}
+            adminMode={true}
+            initialClient={selectedAppointment.clients}
+            sendNotification={true}
           />
         </div>
       </div>
@@ -1043,16 +1081,38 @@ Aguardamos você!`;
                     <p className="text-sm font-medium">
                       {appointment.clients.nome} {appointment.clients.sobrenome}
                     </p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs">
-                        {getPackageInfo(appointment).displayName} - R$ {getPackageValue(appointment).toFixed(2)}
-                      </p>
-                      {getPackageInfo(appointment).isPackage && (
-                        <Badge variant="outline" className="text-xs">
-                          {formatSessionProgress(appointment)}
-                        </Badge>
-                      )}
-                    </div>
+                    
+                    {/* Mostrar múltiplos procedimentos */}
+                    {appointment.all_procedures && appointment.all_procedures.length > 1 ? (
+                      <div className="text-xs space-y-1 mt-1">
+                        {appointment.all_procedures.map((proc, idx) => (
+                          <div key={idx} className="flex items-center gap-1">
+                            <span className="text-muted-foreground">•</span>
+                            <span>{proc.name}</span>
+                            <span className="text-muted-foreground">({proc.duration}min)</span>
+                          </div>
+                        ))}
+                        <div className="flex items-center gap-2 mt-1 pt-1 border-t">
+                          <span className="font-medium">Total:</span>
+                          <span>{appointment.total_duration}min</span>
+                          <span className="text-muted-foreground">•</span>
+                          <span className="font-medium">
+                            R$ {appointment.all_procedures.reduce((sum, p) => sum + p.price, 0).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs">
+                          {getPackageInfo(appointment).displayName} - R$ {getPackageValue(appointment).toFixed(2)}
+                        </p>
+                        {getPackageInfo(appointment).isPackage && (
+                          <Badge variant="outline" className="text-xs">
+                            {formatSessionProgress(appointment)}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                     
                     {/* Informações de Pagamento */}
                     {appointment.payment_value && appointment.payment_value > 0 && (
@@ -1163,18 +1223,41 @@ Aguardamos você!`;
               </div>
 
               <div>
-                <strong>Procedimento:</strong>
-                <div className="flex items-center gap-2">
-                  <p>{getPackageInfo(selectedAppointment).displayName}</p>
-                  {getPackageInfo(selectedAppointment).isPackage && (
-                    <Badge variant="outline">
-                      {formatSessionProgress(selectedAppointment)}
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {selectedAppointment.procedures.duration}min - R$ {getPackageValue(selectedAppointment).toFixed(2)}
-                </p>
+                <strong>{selectedAppointment.all_procedures && selectedAppointment.all_procedures.length > 1 ? 'Procedimentos:' : 'Procedimento:'}</strong>
+                
+                {/* Múltiplos Procedimentos */}
+                {selectedAppointment.all_procedures && selectedAppointment.all_procedures.length > 1 ? (
+                  <div className="space-y-2 mt-2">
+                    {selectedAppointment.all_procedures.map((proc, idx) => (
+                      <div key={idx} className="p-2 bg-muted/30 rounded">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{idx + 1}. {proc.name}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {proc.duration}min • R$ {proc.price.toFixed(2)}
+                        </p>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between p-2 bg-primary/10 rounded font-medium">
+                      <span>Total:</span>
+                      <span>{selectedAppointment.total_duration}min • R$ {selectedAppointment.all_procedures.reduce((sum, p) => sum + p.price, 0).toFixed(2)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p>{getPackageInfo(selectedAppointment).displayName}</p>
+                      {getPackageInfo(selectedAppointment).isPackage && (
+                        <Badge variant="outline">
+                          {formatSessionProgress(selectedAppointment)}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedAppointment.procedures.duration}min - R$ {getPackageValue(selectedAppointment).toFixed(2)}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {selectedAppointment.professionals && (

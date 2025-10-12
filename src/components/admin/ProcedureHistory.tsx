@@ -7,12 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Clock, Edit, Camera, Eye, Download, Trash2, Plus, CheckCircle } from "lucide-react";
+import { Calendar, Clock, Edit, Camera, Eye, Download, Trash2, Plus, CheckCircle, CreditCard, DollarSign, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import SimpleAppointmentForm from "./SimpleAppointmentForm";
+import { getPackageInfo, formatSessionProgress } from "@/utils/packageUtils";
+import NewBookingFlow from "@/components/agendamento/NewBookingFlow";
 import CompletedProcedureForm from "./CompletedProcedureForm";
 
 interface Appointment {
@@ -21,6 +22,11 @@ interface Appointment {
   appointment_time: string;
   status: string;
   notes?: string;
+  session_number?: number;
+  total_sessions?: number;
+  payment_status?: string;
+  payment_method?: string;
+  payment_value?: number;
   procedure: {
     name: string;
     duration: number;
@@ -368,13 +374,15 @@ const ProcedureHistory = ({
 
   if (showNewAppointmentForm) {
     return (
-      <SimpleAppointmentForm
-        client={client}
+      <NewBookingFlow
         onBack={() => setShowNewAppointmentForm(false)}
         onSuccess={() => {
           setShowNewAppointmentForm(false);
           onAppointmentUpdated();
         }}
+        adminMode={true}
+        initialClient={client}
+        sendNotification={true}
       />
     );
   }
@@ -439,6 +447,12 @@ const ProcedureHistory = ({
             const appointmentDate = new Date(`${appointment.appointment_date}T${appointment.appointment_time}`);
             const isPast = appointmentDate < new Date();
             
+            // Preparar objeto para packageUtils
+            const aptWithProcedures = {
+              ...appointment,
+              procedures: appointment.procedure
+            };
+            
             return (
               <Card key={appointment.id} className={`border-l-4 ${
                 isPast 
@@ -447,8 +461,21 @@ const ProcedureHistory = ({
               }`}>
                 <CardContent className="p-6">
                   <div className="flex justify-between items-start mb-4">
-                    <div className="space-y-2">
-                      <h3 className="text-lg font-semibold">{appointment.procedure.name}</h3>
+                    <div className="space-y-2 flex-1">
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-lg font-semibold">
+                          {appointment.session_number && appointment.total_sessions && appointment.total_sessions > 1
+                            ? getPackageInfo(aptWithProcedures).displayName
+                            : appointment.procedure.name
+                          }
+                        </h3>
+                        {appointment.session_number && appointment.total_sessions && appointment.total_sessions > 1 && (
+                          <Badge variant="secondary" className="text-xs">
+                            <TrendingUp className="h-3 w-3 mr-1" />
+                            {formatSessionProgress(aptWithProcedures)}
+                          </Badge>
+                        )}
+                      </div>
                       <div className="flex items-center gap-4 text-muted-foreground">
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4" />
@@ -500,6 +527,43 @@ const ProcedureHistory = ({
                       </div>
                     </div>
                   </div>
+
+                  {/* Informações de Pagamento */}
+                  {(appointment.payment_status || appointment.payment_method || appointment.payment_value) && (
+                    <div className="mb-4 p-3 bg-muted/30 rounded-lg border border-muted">
+                      <div className="flex items-center gap-2 mb-2">
+                        <DollarSign className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-semibold">Informações de Pagamento</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                        {appointment.payment_status && (
+                          <div>
+                            <span className="text-muted-foreground">Status: </span>
+                            <Badge variant={appointment.payment_status === 'pago' ? 'default' : 'secondary'} className="text-xs">
+                              {appointment.payment_status}
+                            </Badge>
+                          </div>
+                        )}
+                        {appointment.payment_method && (
+                          <div>
+                            <span className="text-muted-foreground">Método: </span>
+                            <span className="font-medium">{appointment.payment_method}</span>
+                          </div>
+                        )}
+                        {appointment.payment_value && (
+                          <div>
+                            <span className="text-muted-foreground">Valor: </span>
+                            <span className="font-medium">
+                              {new Intl.NumberFormat('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL'
+                              }).format(appointment.payment_value)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Botão para anexar fotos - apenas para realizados */}
                   {appointment.status === 'realizado' && (

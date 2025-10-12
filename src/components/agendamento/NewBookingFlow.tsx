@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { ArrowLeft, CheckCircle, Calendar as CalendarIcon, MessageCircle, Sparkles, Loader2, MapPin } from "lucide-react";
+import { ArrowLeft, CheckCircle, Calendar as CalendarIcon, MessageCircle, Sparkles, Loader2, MapPin, Plus, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentDateBrazil } from '@/utils/dateUtils';
@@ -82,6 +82,12 @@ const NewBookingFlow = ({
     city_id: "",
   });
   const [selectedSpecifications, setSelectedSpecifications] = useState<ProcedureSpecification[]>([]);
+  const [selectedProcedures, setSelectedProcedures] = useState<Array<{
+    id: string;
+    procedure: Procedure | null;
+    specifications?: ProcedureSpecification[];
+    specificationsTotal?: number; // Preço total das especificações (com desconto)
+  }>>([{ id: 'proc-1', procedure: null, specifications: [], specificationsTotal: 0 }]);
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [loadingTimes, setLoadingTimes] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -119,16 +125,12 @@ const NewBookingFlow = ({
     }
   }, [formData.appointment_date, formData.city_id]);
 
-  // Mostrar especificações automaticamente quando procedimento é selecionado
+  // Sincronizar formData.procedure_id com o primeiro procedimento
   useEffect(() => {
-    const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
-    if (selectedProcedure?.requires_specifications) {
-      setShowSpecifications(true);
-    } else {
-      setShowSpecifications(false);
-      setSelectedSpecifications([]);
+    if (selectedProcedures.length > 0 && selectedProcedures[0].procedure) {
+      setFormData(prev => ({ ...prev, procedure_id: selectedProcedures[0].procedure!.id }));
     }
-  }, [formData.procedure_id, procedures]);
+  }, [selectedProcedures]);
 
   const loadSiteSettings = async () => {
     try {
@@ -503,7 +505,14 @@ const NewBookingFlow = ({
     }
   };
 
-  const sendWhatsAppNotification = async (client: Client, appointment: any, procedure: any, city: any) => {
+  const sendWhatsAppNotification = async (
+    client: Client, 
+    appointment: any, 
+    procedure: any, 
+    city: any, 
+    hasMultipleProcedures: boolean = false,
+    proceduresToSave?: Array<{id: string, procedure: Procedure | null}>
+  ) => {
     try {
       console.log('=== INÍCIO WHATSAPP NOTIFICATION ===');
       console.log('Client:', client);
@@ -542,12 +551,17 @@ const NewBookingFlow = ({
       console.log('Template encontrado:', templateData);
       console.log('Template error:', templateError);
 
+      // Preparar nome dos procedimentos
+      const procedureName = hasMultipleProcedures && proceduresToSave
+        ? proceduresToSave.map((sp, idx) => `${idx + 1}. ${sp.procedure!.name}`).join('\n')
+        : procedure?.name || '';
+
       // Preparar variáveis para substituição
       const variables = {
         clientName: client.nome,
         appointmentDate: format(parseISO(appointment.appointment_date), "dd/MM/yyyy", { locale: ptBR }),
         appointmentTime: appointment.appointment_time,
-        procedureName: procedure?.name || '',
+        procedureName: procedureName,
         notes: notes,
         clinicLocation: clinicLocation,
         cityName: cityName,
@@ -607,8 +621,24 @@ Olá {clientName}!
     }
   };
 
-  const sendOwnerNotification = async (client: Client, appointment: any, procedure: any, city: any) => {
+  const sendOwnerNotification = async (
+    client: Client, 
+    appointment: any, 
+    procedure: any, 
+    city: any,
+    hasMultipleProcedures: boolean = false,
+    proceduresToSave?: Array<{id: string, procedure: Procedure | null}>
+  ) => {
     try {
+      // Preparar nome dos procedimentos
+      const procedureName = hasMultipleProcedures && proceduresToSave
+        ? proceduresToSave.map((sp, idx) => `${idx + 1}. ${sp.procedure!.name}`).join('\n')
+        : procedure?.name || '';
+
+      const totalDuration = hasMultipleProcedures && proceduresToSave
+        ? proceduresToSave.reduce((sum, sp) => sum + (sp.procedure?.duration || 0), 0)
+        : undefined;
+
       await supabase.functions.invoke('notify-owner', {
         body: {
           type: 'agendamento',
@@ -616,9 +646,11 @@ Olá {clientName}!
           clientPhone: client.celular,
           appointmentDate: appointment.appointment_date,
           appointmentTime: appointment.appointment_time,
-          procedureName: procedure?.name || '',
+          procedureName: procedureName,
           cityName: city?.city_name || '',
-          notes: appointment.notes || ''
+          notes: appointment.notes || '',
+          hasMultipleProcedures: hasMultipleProcedures,
+          totalDuration: totalDuration
         }
       });
     } catch (error) {
@@ -626,8 +658,24 @@ Olá {clientName}!
     }
   };
 
-  const sendAdminNotification = async (client: Client, appointment: any, procedure: any, city: any) => {
+  const sendAdminNotification = async (
+    client: Client, 
+    appointment: any, 
+    procedure: any, 
+    city: any,
+    hasMultipleProcedures: boolean = false,
+    proceduresToSave?: Array<{id: string, procedure: Procedure | null}>
+  ) => {
     try {
+      // Preparar nome dos procedimentos
+      const procedureName = hasMultipleProcedures && proceduresToSave
+        ? proceduresToSave.map((sp, idx) => `${idx + 1}. ${sp.procedure!.name}`).join('\n')
+        : procedure?.name || '';
+
+      const totalDuration = hasMultipleProcedures && proceduresToSave
+        ? proceduresToSave.reduce((sum, sp) => sum + (sp.procedure?.duration || 0), 0)
+        : undefined;
+
       await supabase.functions.invoke('notify-admins', {
         body: {
           type: 'agendamento',
@@ -635,9 +683,11 @@ Olá {clientName}!
           clientPhone: client.celular,
           appointmentDate: appointment.appointment_date,
           appointmentTime: appointment.appointment_time,
-          procedureName: procedure?.name || '',
+          procedureName: procedureName,
           cityName: city?.city_name || '',
-          notes: appointment.notes || ''
+          notes: appointment.notes || '',
+          hasMultipleProcedures: hasMultipleProcedures,
+          totalDuration: totalDuration
         }
       });
     } catch (error) {
@@ -653,6 +703,13 @@ Olá {clientName}!
 
       const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
       const selectedCity = cities.find(c => c.id === formData.city_id);
+
+      // Filtrar apenas procedimentos válidos
+      const proceduresToSave = selectedProcedures.filter(sp => sp.procedure !== null);
+      const hasMultipleProcedures = proceduresToSave.length > 1;
+
+      // Calcular duração total
+      const totalDuration = proceduresToSave.reduce((sum, sp) => sum + (sp.procedure?.duration || 0), 0);
 
       // Criar agendamento
       const { data: appointment, error: appointmentError } = await supabase
@@ -672,27 +729,52 @@ Olá {clientName}!
 
       if (appointmentError) throw appointmentError;
 
-      // Salvar especificações se houver
-      if (selectedSpecifications.length > 0) {
-        const { error: specificationsError } = await supabase
-          .from('appointment_specifications')
-          .insert(
-            selectedSpecifications.map(spec => ({
+      // Salvar procedimentos na tabela appointments_procedures
+      const proceduresData = proceduresToSave.map((sp, index) => ({
+        appointment_id: appointment.id,
+        procedure_id: sp.procedure!.id,
+        order_index: index
+      }));
+
+      const { error: proceduresError } = await (supabase as any)
+        .from('appointments_procedures')
+        .insert(proceduresData);
+
+      if (proceduresError) {
+        console.error('Erro ao salvar procedimentos:', proceduresError);
+        throw proceduresError;
+      }
+
+      console.log(`${proceduresData.length} procedimento(s) salvo(s) para o agendamento ${appointment.id}`);
+
+      // Salvar especificações de cada procedimento se houver
+      const allSpecifications: any[] = [];
+      proceduresToSave.forEach(sp => {
+        if (sp.specifications && sp.specifications.length > 0) {
+          sp.specifications.forEach(spec => {
+            allSpecifications.push({
               appointment_id: appointment.id,
               specification_id: spec.id,
               specification_name: spec.name,
               specification_price: spec.price || 0
-            }))
-          );
+            });
+          });
+        }
+      });
+
+      if (allSpecifications.length > 0) {
+        const { error: specificationsError } = await supabase
+          .from('appointment_specifications')
+          .insert(allSpecifications);
 
         if (specificationsError) throw specificationsError;
       }
 
       // Notificar se necessário
       if (sendNotification) {
-        await sendWhatsAppNotification(selectedClient, appointment, selectedProcedure, selectedCity);
-        await sendOwnerNotification(selectedClient, appointment, selectedProcedure, selectedCity);
-        await sendAdminNotification(selectedClient, appointment, selectedProcedure, selectedCity);
+        await sendWhatsAppNotification(selectedClient, appointment, selectedProcedure, selectedCity, hasMultipleProcedures, proceduresToSave);
+        await sendOwnerNotification(selectedClient, appointment, selectedProcedure, selectedCity, hasMultipleProcedures, proceduresToSave);
+        await sendAdminNotification(selectedClient, appointment, selectedProcedure, selectedCity, hasMultipleProcedures, proceduresToSave);
       }
 
       setAppointmentDetails(appointment);
@@ -712,23 +794,36 @@ Olá {clientName}!
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.procedure_id || !formData.appointment_date || !formData.appointment_time || !formData.city_id) {
+    // Validar se há pelo menos um procedimento selecionado
+    const validProcedures = selectedProcedures.filter(sp => sp.procedure !== null);
+    if (validProcedures.length === 0) {
+      toast({
+        title: "Procedimento obrigatório",
+        description: "Selecione pelo menos um procedimento.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!formData.appointment_date || !formData.appointment_time || !formData.city_id) {
       toast({
         title: "Campos obrigatórios",
-        description: "Por favor, preencha todos os campos obrigatórios (procedimento, cidade, data e horário).",
+        description: "Por favor, preencha todos os campos obrigatórios (cidade, data e horário).",
         variant: "destructive",
       });
       return;
     }
 
-    const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
-    if (selectedProcedure?.requires_specifications && selectedSpecifications.length === 0) {
-      toast({
-        title: "Especificação obrigatória",
-        description: "Por favor, selecione pelo menos uma especificação para este procedimento.",
-        variant: "destructive",
-      });
-      return;
+    // Validar especificações obrigatórias
+    for (const sp of validProcedures) {
+      if (sp.procedure?.requires_specifications && (!sp.specifications || sp.specifications.length === 0)) {
+        toast({
+          title: "Especificação obrigatória",
+          description: `Por favor, selecione especificações para ${sp.procedure.name}.`,
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     if (adminMode && selectedClient) {
@@ -739,8 +834,6 @@ Olá {clientName}!
       setCurrentView('phone');
     }
   };
-
-  const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
 
   const renderCurrentView = () => {
     switch (currentView) {
@@ -763,7 +856,10 @@ Olá {clientName}!
         );
       
       case 'confirmation':
-        const procedureName = procedures.find(p => p.id === formData.procedure_id)?.name || '';
+        const validProceduresForDisplay = selectedProcedures.filter(sp => sp.procedure !== null);
+        const procedureName = validProceduresForDisplay.length > 1
+          ? validProceduresForDisplay.map((sp, idx) => `${idx + 1}. ${sp.procedure!.name}`).join(', ')
+          : validProceduresForDisplay[0]?.procedure?.name || '';
         const cityName = cities.find(c => c.id === formData.city_id)?.city_name || '';
         
         return (
@@ -934,79 +1030,212 @@ Olá {clientName}!
             
             <CardContent className="p-8">
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Procedimento */}
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-primary" />
-                    Procedimento <span className="text-destructive">*</span>
-                  </label>
-                  <Select 
-                    value={formData.procedure_id} 
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, procedure_id: value }))}
-                  >
-                    <SelectTrigger className="h-14 border-2 hover:border-primary/50 transition-all duration-200 bg-background">
-                      <SelectValue placeholder="Selecione um procedimento" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[300px]">
-                      {procedures.map((procedure) => (
-                        <SelectItem key={procedure.id} value={procedure.id} className="py-3">
-                          <div className="flex flex-col items-start">
-                            <span className="font-medium">{procedure.name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {procedure.duration}min {procedure.price && `• ${currency(procedure.price)}`}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                {/* Seção de Procedimentos - Formato Vertical */}
+                <div className="space-y-6">
+                  {selectedProcedures.map((item, index) => (
+                    <div key={item.id} className="space-y-4">
+                      {/* Dropdown do Procedimento */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-foreground flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-primary" />
+                          Procedimento {selectedProcedures.length > 1 ? `${index + 1}` : ''} <span className="text-destructive">*</span>
+                        </label>
+                        <Select 
+                          value={item.procedure?.id || ""} 
+                          onValueChange={(value) => {
+                            const procedure = procedures.find(p => p.id === value);
+                            const newProcedures = [...selectedProcedures];
+                            newProcedures[index] = { 
+                              ...item, 
+                              procedure: procedure || null, 
+                              specifications: [],
+                              specificationsTotal: 0
+                            };
+                            setSelectedProcedures(newProcedures);
+                          }}
+                        >
+                          <SelectTrigger className="h-14 border-2 hover:border-primary/50 transition-all duration-200 bg-background">
+                            <SelectValue placeholder="Selecione um procedimento" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[300px]">
+                            {procedures.map((procedure) => (
+                              <SelectItem key={procedure.id} value={procedure.id} className="py-3">
+                                <div className="flex flex-col items-start">
+                                  <span className="font-medium">{procedure.name}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {procedure.duration}min • {currency(procedure.price || 0)}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Box de Descrição do Procedimento */}
+                      {item.procedure && (
+                        <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent shadow-lg">
+                          <CardContent className="p-6">
+                            <div className="flex items-start gap-4 min-w-0">
+                              <div className="p-3 bg-gradient-to-br from-primary to-primary/80 rounded-full shadow-md flex-shrink-0">
+                                <Sparkles className="h-6 w-6 text-primary-foreground" />
+                              </div>
+                              <div className="flex-1 min-w-0 space-y-3">
+                                <div className="flex items-center justify-between gap-2">
+                                  <h3 className="text-xl font-bold text-foreground">{item.procedure.name}</h3>
+                                  {index > 0 && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => {
+                                        const newProcedures = selectedProcedures.filter((_, i) => i !== index);
+                                        setSelectedProcedures(newProcedures);
+                                      }}
+                                      className="text-destructive hover:text-destructive flex-shrink-0"
+                                      title="Remover procedimento"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                                {item.procedure.description && (
+                                  <p className="text-sm text-muted-foreground leading-relaxed overflow-hidden break-words [overflow-wrap:anywhere] line-clamp-4">
+                                    {item.procedure.description}
+                                  </p>
+                                )}
+                                <div className="flex items-center flex-wrap gap-4 pt-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></div>
+                                    <span className="text-sm font-medium whitespace-nowrap">Duração:</span>
+                                    <span className="text-sm text-muted-foreground">{item.procedure.duration}min</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></div>
+                                    <span className="text-sm font-medium whitespace-nowrap">Valor:</span>
+                                    <span className="text-sm text-primary font-bold">{currency(item.procedure.price || 0)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {/* Especificações (se necessário) */}
+                      {item.procedure?.requires_specifications && (
+                        <div className="space-y-3">
+                          <ProcedureSpecificationSelector
+                            procedureId={item.procedure.id}
+                            onSelectionChange={(data) => {
+                              const newProcedures = [...selectedProcedures];
+                              newProcedures[index] = { 
+                                ...item, 
+                                specifications: data.selectedSpecifications,
+                                specificationsTotal: data.totalPrice // Salvar o preço total com desconto
+                              };
+                              setSelectedProcedures(newProcedures);
+                            }}
+                            initialSelections={item.specifications?.map(s => s.id) || []}
+                            bodySelectionType={item.procedure.body_selection_type ?? null}
+                            bodyImageUrl={item.procedure.body_image_url ?? null}
+                            bodyImageUrlMale={item.procedure.body_image_url_male ?? null}
+                          />
+                        </div>
+                      )}
+
+                      {/* Link/Botão para adicionar mais procedimentos */}
+                      {index === selectedProcedures.length - 1 && item.procedure && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedProcedures([...selectedProcedures, { 
+                              id: `proc-${Date.now()}`, 
+                              procedure: null,
+                              specifications: [],
+                              specificationsTotal: 0
+                            }]);
+                          }}
+                          className="text-sm text-primary hover:text-primary/80 font-medium flex items-center gap-1 transition-colors"
+                        >
+                          <Plus className="h-4 w-4" />
+                          Adicionar mais um procedimento
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
 
-                {/* Box de Descrição do Procedimento Selecionado */}
-                {selectedProcedure && (
-                  <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent shadow-lg">
-                    <CardContent className="p-6">
-                      <div className="flex items-start gap-4 min-w-0">
-                        <div className="p-3 bg-gradient-to-br from-primary to-primary/80 rounded-full shadow-md flex-shrink-0">
-                          <Sparkles className="h-6 w-6 text-primary-foreground" />
-                        </div>
-                        <div className="flex-1 min-w-0 space-y-3">
-                          <h3 className="text-xl font-bold text-foreground">{selectedProcedure.name}</h3>
-                          {selectedProcedure.description && (
-                            <p className="text-sm text-muted-foreground leading-relaxed overflow-hidden break-words [overflow-wrap:anywhere] line-clamp-4">
-                              {selectedProcedure.description}
-                            </p>
-                          )}
-                          <div className="flex items-center flex-wrap gap-4 pt-2">
-                            <div className="flex items-center gap-2">
-                              <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></div>
-                              <span className="text-sm font-medium whitespace-nowrap">Duração:</span>
-                              <span className="text-sm text-muted-foreground">{selectedProcedure.duration}min</span>
+                {/* Box de Resumo - Síntese dos Procedimentos */}
+                {selectedProcedures.filter(p => p.procedure).length > 0 && (
+                  <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+                    <CardHeader>
+                      <CardTitle className="text-lg font-semibold">Resumo do Agendamento</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="space-y-2">
+                        {selectedProcedures.filter(p => p.procedure).map((item, index) => {
+                          // Se tem especificações, usar APENAS o preço das especificações (com desconto)
+                          // Se não tem, usar o preço base do procedimento
+                          const hasSpecifications = item.specifications && item.specifications.length > 0;
+                          const totalPrice = hasSpecifications 
+                            ? (item.specificationsTotal || 0)  // Só áreas (com desconto)
+                            : (item.procedure!.price || 0);    // Preço base
+                          
+                          return (
+                            <div key={item.id} className="flex justify-between items-start py-2 border-b border-border/50 last:border-0">
+                              <div className="flex-1">
+                                <span className="font-medium">{item.procedure!.name}</span>
+                                {item.specifications && item.specifications.length > 0 && (
+                                  <span className="text-muted-foreground text-sm">
+                                    {' '}({item.specifications.map(s => s.name).join(', ')})
+                                  </span>
+                                )}
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {item.procedure!.duration}min
+                                </div>
+                              </div>
+                              <div className="text-sm font-semibold text-right">
+                                {currency(totalPrice)}
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></div>
-                              <span className="text-sm font-medium whitespace-nowrap">Valor:</span>
-                              <span className="text-sm text-primary font-bold">{currency(selectedProcedure.price || 0)}</span>
-                            </div>
+                          );
+                        })}
+                      </div>
+                      
+                      {/* Totais */}
+                      {selectedProcedures.filter(p => p.procedure).length > 1 && (
+                        <div className="pt-3 border-t-2 border-primary/20 space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="font-semibold">Duração Total:</span>
+                            <span className="font-bold">
+                              {selectedProcedures
+                                .filter(p => p.procedure)
+                                .reduce((sum, p) => sum + (p.procedure?.duration || 0), 0)} minutos
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-bold">Valor Total:</span>
+                            <span className="text-lg font-bold text-primary">
+                              {currency(
+                                selectedProcedures
+                                  .filter(p => p.procedure)
+                                  .reduce((sum, p) => {
+                                    // Se tem especificações, usar APENAS o preço das áreas
+                                    // Se não tem, usar o preço base
+                                    const hasSpecifications = p.specifications && p.specifications.length > 0;
+                                    const price = hasSpecifications 
+                                      ? (p.specificationsTotal || 0)  // Só áreas
+                                      : (p.procedure?.price || 0);    // Preço base
+                                    return sum + price;
+                                  }, 0)
+                              )}
+                            </span>
                           </div>
                         </div>
-                      </div>
+                      )}
                     </CardContent>
                   </Card>
-                )}
-
-                {/* Especificações */}
-                {showSpecifications && (
-                  <div className="space-y-3">
-                    <ProcedureSpecificationSelector
-                      procedureId={formData.procedure_id}
-                      onSelectionChange={(data) => setSelectedSpecifications(data.selectedSpecifications)}
-                      initialSelections={selectedSpecifications.map(s => s.id)}
-                      bodySelectionType={selectedProcedure?.body_selection_type ?? null}
-                      bodyImageUrl={selectedProcedure?.body_image_url ?? null}
-                      bodyImageUrlMale={selectedProcedure?.body_image_url_male ?? null}
-                    />
-                  </div>
                 )}
 
                 {/* Cidade */}

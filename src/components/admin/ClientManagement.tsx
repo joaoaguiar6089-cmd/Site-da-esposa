@@ -4,14 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, Plus, ArrowLeft, Users, Filter } from "lucide-react";
+import { Search, Plus, ArrowLeft, Users, Filter, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatCPF } from "@/utils/cpfValidator";
 import ClientsList from "./ClientsList";
 import ClientDetail from "./ClientDetail";
 import NewClientDialog from "./NewClientDialog";
+import ActivePackagesTab from "./ActivePackagesTab";
 
 interface Client {
   id: string;
@@ -30,6 +32,11 @@ interface Appointment {
   appointment_time: string;
   status: string;
   notes?: string;
+  session_number?: number;
+  total_sessions?: number;
+  payment_status?: string;
+  payment_method?: string;
+  payment_value?: number;
   procedure: {
     name: string;
     duration: number;
@@ -60,6 +67,7 @@ const ClientManagement = () => {
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [loading, setLoading] = useState(false);
   const [showNewClientDialog, setShowNewClientDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("todos");
 
   const { toast } = useToast();
 
@@ -103,7 +111,7 @@ const ClientManagement = () => {
         .order("appointment_date", { ascending: false });
 
       if (error) throw error;
-      setAppointments(data || []);
+      setAppointments(data as any || []);
     } catch (error) {
       console.error("Erro ao carregar agendamentos:", error);
     }
@@ -227,57 +235,90 @@ const ClientManagement = () => {
         </Button>
       </div>
 
-      {/* Filtros e Busca */}
-      <Card className="border-0 shadow-md">
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por cliente, CPF, telefone ou procedimento..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Filtrar por status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os status</SelectItem>
-                  <SelectItem value="agendado">Agendados</SelectItem>
-                  <SelectItem value="confirmado">Confirmados</SelectItem>
-                  <SelectItem value="realizado">Realizados</SelectItem>
-                  <SelectItem value="cancelado">Cancelados</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Abas */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="todos" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Todos os Clientes
+          </TabsTrigger>
+          <TabsTrigger value="pacotes" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            Pacotes em Andamento
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Lista de Clientes */}
-      <Card className="border-0 shadow-md">
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center justify-between">
-            <span>Clientes</span>
-            <Badge variant="secondary" className="ml-2">
-              {filteredClients.length} {filteredClients.length === 1 ? 'cliente' : 'clientes'}
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ClientsList
-            clients={filteredClients}
-            appointments={appointments}
-            onClientSelect={setSelectedClient}
-            loading={loading}
-          />
-        </CardContent>
-      </Card>
+        <TabsContent value="todos" className="space-y-6 mt-6">
+          {/* Filtros e Busca */}
+          <Card className="border-0 shadow-md">
+            <CardContent className="p-6">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por cliente, CPF, telefone ou procedimento..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Filtrar por status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os status</SelectItem>
+                      <SelectItem value="agendado">Agendados</SelectItem>
+                      <SelectItem value="confirmado">Confirmados</SelectItem>
+                      <SelectItem value="realizado">Realizados</SelectItem>
+                      <SelectItem value="cancelado">Cancelados</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Lista de Clientes */}
+          <Card className="border-0 shadow-md">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center justify-between">
+                <span>Clientes</span>
+                <Badge variant="secondary" className="ml-2">
+                  {filteredClients.length} {filteredClients.length === 1 ? 'cliente' : 'clientes'}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ClientsList
+                clients={filteredClients}
+                appointments={appointments}
+                onClientSelect={setSelectedClient}
+                loading={loading}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="pacotes" className="mt-6">
+          <Card className="border-0 shadow-md">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Clientes com Pacotes em Andamento
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ActivePackagesTab onClientSelect={(clientId) => {
+                const client = clients.find(c => c.id === clientId);
+                if (client) setSelectedClient(client);
+              }} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Dialog para Novo Cliente */}
       <NewClientDialog

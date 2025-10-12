@@ -10,7 +10,7 @@ import { ArrowLeft, Calendar, Plus, Phone, Edit2, Download, X, Eye, FileText } f
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
-import AgendamentoForm from "@/components/agendamento/AgendamentoForm";
+import NewBookingFlow from "@/components/agendamento/NewBookingFlow";
 import ClientDocuments from "./ClientDocuments";
 import type { Client, Appointment, ProcedureResult } from "@/types/client";
 import { getPackageInfo, formatSessionProgress } from "@/utils/packageUtils";
@@ -264,22 +264,25 @@ const AreaCliente = ({
 
   if (showNewAppointment) {
     return (
-      <AgendamentoForm
-        client={localClient}
-        onAppointmentCreated={handleAppointmentCreated}
+      <NewBookingFlow
         onBack={() => setShowNewAppointment(false)}
+        onSuccess={handleAppointmentCreated}
         preSelectedProcedureId={preSelectedProcedureId || undefined}
+        adminMode={false}
+        initialClient={localClient}
+        sendNotification={true}
       />
     );
   }
 
   if (editingAppointment) {
     return (
-      <AgendamentoForm
-        client={localClient}
-        onAppointmentCreated={handleAppointmentCreated}
+      <NewBookingFlow
         onBack={() => setEditingAppointment(null)}
-        editingId={editingAppointment}
+        onSuccess={handleAppointmentCreated}
+        adminMode={false}
+        initialClient={localClient}
+        sendNotification={true}
       />
     );
   }

@@ -14,7 +14,7 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatDateToBrazil } from '@/utils/dateUtils';
 import { getPackageInfo, formatSessionProgress } from "@/utils/packageUtils";
-import AgendamentoForm from "@/components/agendamento/AgendamentoForm";
+import NewBookingFlow from "@/components/agendamento/NewBookingFlow";
 import NewAppointmentForm from "@/components/admin/NewAppointmentForm";
 
 interface Appointment {
@@ -936,11 +936,12 @@ Aguardamos você!`;
         </div>
         
         <div className="max-w-5xl mx-auto w-full">
-          <AgendamentoForm
-            client={selectedAppointment.clients}
-            onAppointmentCreated={handleAppointmentUpdated}
+          <NewBookingFlow
             onBack={handleCloseEditForm}
-            editingId={editingAppointment || undefined}
+            onSuccess={handleAppointmentUpdated}
+            adminMode={true}
+            initialClient={selectedAppointment.clients}
+            sendNotification={true}
           />
         </div>
       </div>

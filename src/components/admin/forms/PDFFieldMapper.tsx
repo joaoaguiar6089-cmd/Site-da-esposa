@@ -35,6 +35,15 @@ export default function PDFFieldMapper({ templateId, pdfUrl, onClose }: PDFField
   const { toast } = useToast();
   const { fields } = useFormFields(templateId);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const dragStateRef = useRef<{
+    index: number;
+    startClientX: number;
+    startClientY: number;
+    initialX: number;
+    initialY: number;
+    rectWidth: number;
+    rectHeight: number;
+  } | null>(null);
   
   const [numPages, setNumPages] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -119,7 +128,15 @@ export default function PDFFieldMapper({ templateId, pdfUrl, onClose }: PDFField
     });
   };
 
+  const getPageRect = () => {
+    if (!canvasRef.current) return null;
+    const pageCanvas = canvasRef.current.querySelector('.react-pdf__Page__canvas') as HTMLCanvasElement | null;
+    return (pageCanvas ?? canvasRef.current).getBoundingClientRect();
+  };
+
   const handleCanvasClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (isDragging) return;
+
     if (!selectedFieldKey) {
       toast({
         title: "Selecione um campo",
@@ -129,9 +146,11 @@ export default function PDFFieldMapper({ templateId, pdfUrl, onClose }: PDFField
       return;
     }
 
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / scale) / rect.width * 100;
-    const y = ((event.clientY - rect.top) / scale) / rect.height * 100;
+    const rect = getPageRect();
+    if (!rect) return;
+
+    const x = ((event.clientX - rect.left) / rect.width) * 100;
+    const y = ((event.clientY - rect.top) / rect.height) * 100;
 
     // Verificar se já existe posição para este campo na página atual
     const existingIndex = fieldPositions.findIndex(
@@ -151,21 +170,92 @@ export default function PDFFieldMapper({ templateId, pdfUrl, onClose }: PDFField
       }
     };
 
+    let targetIndex = existingIndex;
     if (existingIndex >= 0) {
-      // Atualizar posição existente
       const newPositions = [...fieldPositions];
       newPositions[existingIndex] = newPosition;
       setFieldPositions(newPositions);
     } else {
-      // Adicionar nova posição
+      targetIndex = fieldPositions.length;
       setFieldPositions([...fieldPositions, newPosition]);
     }
+
+    setSelectedPositionIndex(targetIndex);
 
     toast({
       title: "Campo posicionado",
       description: `Campo "${selectedFieldKey}" foi posicionado`,
     });
   };
+
+  const handleFieldPointerDown = (event: React.PointerEvent<HTMLDivElement>, globalIndex: number) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const target = fieldPositions[globalIndex];
+    const coords = target?.coordinates;
+    if (!coords) return;
+
+    const rect = getPageRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return;
+
+    dragStateRef.current = {
+      index: globalIndex,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      initialX: coords.x,
+      initialY: coords.y,
+      rectWidth: rect.width,
+      rectHeight: rect.height,
+    };
+
+    setSelectedPositionIndex(globalIndex);
+    setIsDragging(true);
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!dragStateRef.current) return;
+
+      const { index, startClientX, startClientY, initialX, initialY, rectWidth, rectHeight } = dragStateRef.current;
+      if (!rectWidth || !rectHeight) return;
+
+      const deltaXPercent = ((event.clientX - startClientX) / rectWidth) * 100;
+      const deltaYPercent = ((event.clientY - startClientY) / rectHeight) * 100;
+
+      setFieldPositions(prev => {
+        const next = [...prev];
+        const target = next[index];
+        if (!target?.coordinates) return prev;
+
+        next[index] = {
+          ...target,
+          coordinates: {
+            ...target.coordinates,
+            x: Math.max(0, Math.min(100, initialX + deltaXPercent)),
+            y: Math.max(0, Math.min(100, initialY + deltaYPercent)),
+          },
+        };
+
+        return next;
+      });
+    };
+
+    const handlePointerUp = () => {
+      dragStateRef.current = null;
+      setIsDragging(false);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [isDragging]);
 
   const handleRemovePosition = (fieldKey: string, page: number) => {
     setFieldPositions(
@@ -435,25 +525,22 @@ export default function PDFFieldMapper({ templateId, pdfUrl, onClose }: PDFField
                 return (
                   <div
                     key={`${position.field_key}-${index}`}
-                    className={`absolute rounded flex items-start px-2 py-1 group transition-all overflow-hidden ${
-                      isSelected 
-                        ? 'bg-primary/30 border-4 border-primary ring-2 ring-primary/50' 
-                        : 'bg-blue-500/20 border-2 border-blue-500 hover:bg-blue-500/30'
-                    }`}
+                    className={`absolute transition-all select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                     style={{
                       left: `${coords.x}%`,
                       top: `${coords.y}%`,
                       width: `${coords.width}%`,
-                      height: `${coords.height}%`,
+                      minHeight: `${Math.max(coords.height, 2)}%`,
                     }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedPositionIndex(isSelected ? null : globalIndex);
-                    }}
+                    onPointerDown={(e) => handleFieldPointerDown(e, globalIndex)}
+                    title={position.field_key}
                   >
-                    {/* Preview do texto com fonte real */}
-                    <div 
-                      className="flex-1 text-gray-700 leading-tight"
+                    <span
+                      className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs md:text-sm shadow-sm backdrop-blur-sm transition-colors ${
+                        isSelected
+                          ? 'bg-primary/15 border border-primary/60 text-primary'
+                          : 'bg-white/75 border border-primary/30 text-slate-700 hover:bg-white/90'
+                      }`}
                       style={{
                         fontSize: `${fontSize * scale * 0.75}px`,
                         fontWeight: isBold ? 'bold' : 'normal',
@@ -461,29 +548,7 @@ export default function PDFFieldMapper({ templateId, pdfUrl, onClose }: PDFField
                       }}
                     >
                       {field?.label || position.field_key}
-                    </div>
-                    
-                    {/* Badge do campo (aparece no hover) */}
-                    <span className={`absolute top-0 right-0 text-[10px] px-1.5 py-0.5 rounded-bl transition-opacity ${
-                      isSelected 
-                        ? 'opacity-100 bg-primary text-primary-foreground' 
-                        : 'opacity-0 group-hover:opacity-100 bg-blue-600 text-white'
-                    }`}>
-                      {fontSize}pt {isBold ? 'B' : ''}
                     </span>
-
-                    {/* Botão remover */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemovePosition(position.field_key, coords.page);
-                      }}
-                      className={`absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 transition-opacity ${
-                        isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                      }`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
                   </div>
                 );
               })}

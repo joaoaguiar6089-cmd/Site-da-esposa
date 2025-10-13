@@ -13,7 +13,8 @@ import {
   CheckCircle2,
   Clock,
   FileCheck,
-  Trash2
+  Trash2,
+  FileSignature
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -32,6 +33,7 @@ import { useFormResponses } from "@/hooks/forms/useFormResponses";
 import { useToast } from "@/hooks/use-toast";
 import FormFillerDialog from "./FormFillerDialog";
 import { TemplateSelector } from "./TemplateSelector";
+import { FormSignatureDialog } from "./FormSignatureDialog";
 
 interface ClientFormsAreaProps {
   clientId: string;
@@ -47,6 +49,7 @@ export function ClientFormsArea({ clientId, clientName }: ClientFormsAreaProps) 
   const [editMode, setEditMode] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [responseToDelete, setResponseToDelete] = useState<string | null>(null);
+  const [signatureResponseId, setSignatureResponseId] = useState<string | null>(null);
 
   const { responses = [], isLoading, deleteResponse, isDeleting } = useFormResponses({ clientId });
 
@@ -106,6 +109,14 @@ export function ClientFormsArea({ clientId, clientName }: ClientFormsAreaProps) 
         variant: "destructive",
       });
     }
+  };
+
+  const handleOpenSignature = (responseId: string) => {
+    setSignatureResponseId(responseId);
+  };
+
+  const handleCloseSignature = () => {
+    setSignatureResponseId(null);
   };
 
   const getStatusInfo = (status: string) => {
@@ -249,6 +260,14 @@ export function ClientFormsArea({ clientId, clientName }: ClientFormsAreaProps) 
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => handleOpenSignature(response.id)}
+                      title="Assinar ficha"
+                    >
+                      <FileSignature className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => handleDeleteClick(response.id)}
                       disabled={isDeleting}
                     >
@@ -290,6 +309,26 @@ export function ClientFormsArea({ clientId, clientName }: ClientFormsAreaProps) 
             onSuccess={handleFormClose}
             onCancel={handleFormClose}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Assinatura */}
+      <Dialog open={!!signatureResponseId} onOpenChange={(open) => {
+        if (!open) {
+          handleCloseSignature();
+        }
+      }}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Assinar ficha</DialogTitle>
+          </DialogHeader>
+          {signatureResponseId && (
+            <FormSignatureDialog
+              responseId={signatureResponseId}
+              onClose={handleCloseSignature}
+              onSigned={handleCloseSignature}
+            />
+          )}
         </DialogContent>
       </Dialog>
 

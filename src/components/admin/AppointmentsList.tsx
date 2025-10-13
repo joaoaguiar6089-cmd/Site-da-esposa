@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Clock, User, Phone, Edit, Trash2, Search, MessageSquare, Filter, Plus, DollarSign } from "lucide-react";
+import { Calendar, Clock, User, Phone, Edit, Trash2, Search, MessageSquare, Filter, Plus, DollarSign, Check, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import { formatLocationBlock } from "@/utils/location";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -785,12 +786,19 @@ Aguardamos você!`;
   };
 
   // Abrir dialog de pagamento
-  const handleOpenPaymentDialog = (appointment: Appointment) => {
+  const handleOpenPaymentDialog = (appointment: Appointment, statusOverride?: string) => {
     setSelectedAppointment(appointment);
-    setPaymentStatus(appointment.payment_status || 'aguardando');
-    setPaymentMethod(appointment.payment_method || '');
-    setPaymentValue(appointment.payment_value?.toString() || '');
-    setPaymentInstallments(appointment.payment_installments?.toString() || '1');
+    const resolvedStatus = statusOverride || appointment.payment_status || 'aguardando';
+    setPaymentStatus(resolvedStatus);
+    if (statusOverride === 'nao_pago') {
+      setPaymentMethod('');
+      setPaymentValue('');
+      setPaymentInstallments('1');
+    } else {
+      setPaymentMethod(appointment.payment_method || '');
+      setPaymentValue(appointment.payment_value?.toString() || '');
+      setPaymentInstallments(appointment.payment_installments?.toString() || '1');
+    }
     setPaymentNotes(appointment.payment_notes || '');
     setHasReturn(false);
     setReturnDate('');
@@ -881,6 +889,32 @@ Aguardamos você!`;
     return (
       <Badge className={`text-xs ${config.className}`}>
         {config.label}
+      </Badge>
+    );
+  };
+
+  const renderStatusBadgeForList = (appointment: Appointment) => {
+    if (appointment.status === 'realizado') {
+      return (
+        <Badge className="text-xs bg-green-600 text-white border-0 flex items-center gap-1">
+          <Check className="h-3 w-3" />
+          Realizado
+        </Badge>
+      );
+    }
+
+    if (appointment.status === 'cancelado') {
+      return (
+        <Badge className="text-xs bg-red-600 text-white border-0 flex items-center gap-1">
+          <X className="h-3 w-3" />
+          N�o realizado
+        </Badge>
+      );
+    }
+
+    return (
+      <Badge className="text-xs bg-gray-200 text-gray-700 border-0">
+        ...
       </Badge>
     );
   };
@@ -1064,7 +1098,7 @@ Aguardamos você!`;
                       <span className="font-medium">
                         {appointment.clients.nome} {appointment.clients.sobrenome}
                       </span>
-                      {getStatusBadge(appointment.status)}
+                      {renderStatusBadgeForList(appointment)}
                     </div>
                     
                     <div className="space-y-1 text-sm">
@@ -1228,18 +1262,118 @@ Aguardamos você!`;
 
               <div>
                 <strong>Status:</strong>
-                <div className="mt-1">
-                  {getStatusBadge(selectedAppointment.status)}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {[
+                    {
+                      value: 'realizado',
+                      label: 'Realizado',
+                      icon: Check,
+                      activeClasses: 'bg-green-600 text-white border-green-600 hover:bg-green-600',
+                      inactiveClasses: 'text-green-700 border-green-500 hover:bg-green-50'
+                    },
+                    {
+                      value: 'cancelado',
+                      label: 'N�o realizado',
+                      icon: X,
+                      activeClasses: 'bg-red-600 text-white border-red-600 hover:bg-red-600',
+                      inactiveClasses: 'text-red-600 border-red-500 hover:bg-red-50'
+                    }
+                  ].map((option) => {
+                    const isActive = selectedAppointment.status === option.value;
+                    return (
+                      <Button
+                        key={option.value}
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (!isActive) {
+                            updateAppointmentStatus(selectedAppointment.id, option.value);
+                          }
+                        }}
+                        className={cn(
+                          "flex items-center gap-1",
+                          isActive ? option.activeClasses : option.inactiveClasses
+                        )}
+                      >
+                        <option.icon className="h-3 w-3" />
+                        {option.label}
+                      </Button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Ações */}
+              <div className="border-t pt-4 space-y-3">
+                <div>
+                  <strong>Status do Pagamento:</strong>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {[
+                      {
+                        value: 'pago',
+                        label: 'Pago',
+                        activeClasses: 'bg-green-600 text-white border-green-600 hover:bg-green-600',
+                        inactiveClasses: 'text-green-700 border-green-500 hover:bg-green-50'
+                      },
+                      {
+                        value: 'pago_parcialmente',
+                        label: 'Pago parcialmente',
+                        activeClasses: 'bg-amber-500 text-white border-amber-500 hover:bg-amber-500',
+                        inactiveClasses: 'text-amber-600 border-amber-500 hover:bg-amber-50'
+                      },
+                      {
+                        value: 'nao_pago',
+                        label: 'N�o pago',
+                        activeClasses: 'bg-red-600 text-white border-red-600 hover:bg-red-600',
+                        inactiveClasses: 'text-red-600 border-red-500 hover:bg-red-50'
+                      }
+                    ].map((option) => {
+                      const isActive = (selectedAppointment.payment_status || 'aguardando') === option.value;
+                      return (
+                        <Button
+                          key={option.value}
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleOpenPaymentDialog(selectedAppointment, option.value)}
+                          className={cn(
+                            "flex items-center gap-1",
+                            isActive ? option.activeClasses : option.inactiveClasses
+                          )}
+                        >
+                          {option.label}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {selectedAppointment.payment_status && selectedAppointment.payment_status !== 'aguardando' && (
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    {selectedAppointment.payment_value && (
+                      <p>Valor: R$ {selectedAppointment.payment_value?.toFixed(2)}</p>
+                    )}
+                    {selectedAppointment.payment_method && (
+                      <p>Forma: {
+                        selectedAppointment.payment_method === 'pix' ? 'PIX' :
+                        selectedAppointment.payment_method === 'cartao' ? 'Cart�o' :
+                        'Dinheiro'
+                      }</p>
+                    )}
+                    {selectedAppointment.payment_method === 'cartao' && selectedAppointment.payment_installments && (
+                      <p>Parcelas: {selectedAppointment.payment_installments}x</p>
+                    )}
+                    {selectedAppointment.payment_notes && (
+                      <p>Obs: {selectedAppointment.payment_notes}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="flex flex-wrap gap-2 pt-4 border-t">
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => sendWhatsApp(selectedAppointment.clients.celular, selectedAppointment)}
-                  className="flex items-center gap-1"
+                  className="flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white border-green-500"
                 >
                   <MessageSquare className="h-3 w-3" />
                   WhatsApp
@@ -1254,36 +1388,6 @@ Aguardamos você!`;
                   <Edit className="h-3 w-3" />
                   Editar
                 </Button>
-
-                {selectedAppointment.status !== 'confirmado' && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => startConfirmationProcess(selectedAppointment)}
-                  >
-                    Confirmar
-                  </Button>
-                )}
-
-                {selectedAppointment.status !== 'realizado' && (
-                  <Button
-                    size="sm"
-                    variant="default"
-                    onClick={() => updateAppointmentStatus(selectedAppointment.id, 'realizado')}
-                  >
-                    Marcar como Realizado
-                  </Button>
-                )}
-
-                {selectedAppointment.status !== 'cancelado' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => updateAppointmentStatus(selectedAppointment.id, 'cancelado')}
-                  >
-                    Cancelar
-                  </Button>
-                )}
 
                 <Button
                   size="sm"

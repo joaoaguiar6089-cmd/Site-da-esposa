@@ -10,7 +10,7 @@ import ClientHeader from "./ClientHeader";
 import ProcedureHistory from "./ProcedureHistory";
 import PhotoGallery from "./PhotoGallery";
 import DocumentsManager from "./DocumentsManager";
-import ClientFormsManager from "./ClientFormsManager";
+import { ClientFormsArea } from "./forms/ClientFormsArea";
 
 interface Client {
   id: string;
@@ -148,7 +148,7 @@ const ClientDetail = ({
           </TabsContent>
 
           <TabsContent value="fichas" className="mt-6">
-            <ClientFormsManager
+            <ClientFormsArea
               clientId={client.id}
               clientName={`${client.nome} ${client.sobrenome}`}
             />

@@ -12,7 +12,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import NewBookingFlow from "@/components/agendamento/NewBookingFlow";
 import ClientDocuments from "./ClientDocuments";
-import { ClientFormsArea } from "@/components/admin/forms/ClientFormsArea";
 import type { Client, Appointment, ProcedureResult } from "@/types/client";
 import { getPackageInfo, formatSessionProgress } from "@/utils/packageUtils";
 import { formatDateToBrazil } from "@/utils/dateUtils";
@@ -514,10 +513,16 @@ const AreaCliente = ({
         </TabsContent>
 
         <TabsContent value="fichas" className="mt-6">
-          <ClientFormsArea 
-            clientId={localClient.id}
-            clientName={`${localClient.nome} ${localClient.sobrenome}`}
-          />
+          <Card>
+            <CardHeader>
+              <CardTitle>Minhas Fichas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Suas fichas de anamnese e avaliação estarão disponíveis aqui em breve.
+              </p>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="documentos" className="mt-6">

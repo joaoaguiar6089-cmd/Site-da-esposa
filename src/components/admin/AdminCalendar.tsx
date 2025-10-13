@@ -1180,7 +1180,7 @@ Aguardamos você!`;
                     )}
                     
                     {/* Informações de Pagamento */}
-                    {appointment.payment_value && appointment.payment_value > 0 && (
+                    {appointment.payment_value > 0 && (
                       <div className="mt-2 pt-2 border-t text-xs space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="font-medium">Pagamento:</span>

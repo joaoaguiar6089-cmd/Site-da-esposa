@@ -4,10 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Calendar as CalendarIcon, Clock, User, Phone, Edit, Trash2, MessageSquare, Plus, CheckCircle, DollarSign } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, User, Phone, Edit, Trash2, MessageSquare, Plus, CheckCircle, DollarSign, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -86,6 +87,8 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
   const [paymentValue, setPaymentValue] = useState("");
   const [paymentInstallments, setPaymentInstallments] = useState("1");
   const [paymentNotes, setPaymentNotes] = useState("");
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [appointmentToReturn, setAppointmentToReturn] = useState<Appointment | null>(null);
   const { toast } = useToast();
 
   // Carregar todos os agendamentos
@@ -267,7 +270,7 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
   // Calcular resumo financeiro do dia
   const getDayFinancialSummary = () => {
     const planned = dayAppointments
-      .filter(apt => apt.status !== 'cancelado')
+      .filter(apt => apt.status !== 'cancelado' && !apt.return_of_appointment_id)
       .reduce((sum, apt) => sum + getPackageValue(apt), 0);
     
     const received = {
@@ -330,6 +333,47 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
   const handleNewAppointmentSuccess = () => {
     setShowNewAppointmentForm(false);
     loadAppointments();
+  };
+
+  // Marcar agendamento como retorno
+  const handleMarkAsReturn = async () => {
+    if (!appointmentToReturn) return;
+
+    try {
+      // Atualizar o agendamento para marcar como retorno
+      const { error } = await supabase
+        .from('appointments')
+        .update({
+          return_of_appointment_id: appointmentToReturn.id, // Marca como retorno
+          payment_value: 0, // Zera o valor
+        })
+        .eq('id', appointmentToReturn.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Procedimento marcado como retorno",
+        description: "O valor foi zerado e não será contabilizado no planejado.",
+      });
+
+      setReturnDialogOpen(false);
+      setAppointmentToReturn(null);
+      loadAppointments();
+    } catch (error) {
+      console.error('Erro ao marcar como retorno:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao marcar procedimento como retorno.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Abrir dialog de confirmação para marcar como retorno
+  const handleOpenReturnDialog = (appointment: Appointment, event: React.MouseEvent) => {
+    event.stopPropagation(); // Impedir que abra o dialog de detalhes
+    setAppointmentToReturn(appointment);
+    setReturnDialogOpen(true);
   };
 
   // Atualizar status do agendamento
@@ -1113,7 +1157,7 @@ Aguardamos você!`;
                       </div>
                     ) : (
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-xs">
+                        <p className="text-xs flex-1">
                           {getPackageInfo(appointment).displayName} - R$ {getPackageValue(appointment).toFixed(2)}
                         </p>
                         {getPackageInfo(appointment).isPackage && (
@@ -1128,6 +1172,19 @@ Aguardamos você!`;
                           >
                             Retorno
                           </Badge>
+                        )}
+                        {/* Botão para marcar como retorno */}
+                        {!appointment.return_of_appointment_id && 
+                         !getPackageInfo(appointment).displayName.toLowerCase().includes('retorno') && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={(e) => handleOpenReturnDialog(appointment, e)}
+                            title="Marcar como retorno"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                          </Button>
                         )}
                       </div>
                     )}
@@ -1614,6 +1671,22 @@ Aguardamos você!`;
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de confirmação para marcar como retorno */}
+      <AlertDialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Marcar como retorno?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja marcar o procedimento como um retorno? O valor será zerado (R$ 0,00) e não será contabilizado no planejado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Não</AlertDialogCancel>
+            <AlertDialogAction onClick={handleMarkAsReturn}>Sim</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

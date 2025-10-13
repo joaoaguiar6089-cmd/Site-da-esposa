@@ -23,8 +23,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import FormFiller from "../cliente/forms/FormFiller";
-import FormViewer from "../cliente/forms/FormViewer";
+import FormFillerDialog from "./forms/FormFillerDialog";
+import FormViewerDialog from "./forms/FormViewerDialog";
 
 interface ClientFormsManagerProps {
   clientId: string;
@@ -252,12 +252,18 @@ export default function ClientFormsManager({ clientId, clientName }: ClientForms
             </DialogDescription>
           </DialogHeader>
           {selectedTemplateId && (
-            <div className="mt-4">
-              {/* TODO: Passar props corretas para FormFiller */}
-              <p className="text-sm text-muted-foreground">
-                Componente FormFiller será integrado aqui
-              </p>
-            </div>
+            <FormFillerDialog
+              templateId={selectedTemplateId}
+              clientId={clientId}
+              onSuccess={() => {
+                setShowFillDialog(false);
+                setSelectedTemplateId(null);
+              }}
+              onCancel={() => {
+                setShowFillDialog(false);
+                setSelectedTemplateId(null);
+              }}
+            />
           )}
         </DialogContent>
       </Dialog>
@@ -272,12 +278,10 @@ export default function ClientFormsManager({ clientId, clientName }: ClientForms
             </DialogDescription>
           </DialogHeader>
           {selectedResponseId && (
-            <div className="mt-4">
-              {/* TODO: Passar props corretas para FormViewer */}
-              <p className="text-sm text-muted-foreground">
-                Componente FormViewer será integrado aqui
-              </p>
-            </div>
+            <FormViewerDialog
+              responseId={selectedResponseId}
+              onDownloadPDF={() => handleDownloadPDF(selectedResponseId)}
+            />
           )}
         </DialogContent>
       </Dialog>

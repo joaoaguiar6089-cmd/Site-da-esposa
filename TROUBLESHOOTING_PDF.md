@@ -1,5 +1,36 @@
 # 🔧 GUIA DE TROUBLESHOOTING - Upload de PDF
 
+## ❌ Erro: "Could not find the 'pdf_template_path' column"
+
+### Causa
+A coluna `pdf_template_path` não existe na tabela `form_templates`.
+
+### Solução
+Execute a migration **20251013000002_add_pdf_template_path.sql** no Supabase Dashboard:
+
+```sql
+ALTER TABLE public.form_templates 
+ADD COLUMN IF NOT EXISTS pdf_template_path TEXT;
+```
+
+---
+
+## ❌ Erro: "The API version does not match the Worker version"
+
+### Causa
+Incompatibilidade entre a versão do `react-pdf` e o arquivo `pdf.worker.min.js`.
+
+### Solução
+✅ **JÁ CORRIGIDO!** O sistema agora usa automaticamente o worker correto:
+```typescript
+pdfjs.GlobalWorkerOptions.workerSrc = 
+  `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+```
+
+**Não é mais necessário** ter o `pdf.worker.min.js` na pasta `public/`.
+
+---
+
 ## ❌ Erro: "Failed to load PDF"
 
 ### Causa
@@ -10,16 +41,52 @@ O erro acontece porque:
 
 ### Solução
 
-#### 1. Executar Migration do Bucket
+#### 1. Executar Migrations Necessárias
 
-**No Supabase Dashboard:**
-1. Vá para **SQL Editor**
-2. Cole o conteúdo do arquivo:
-   ```
-   supabase/migrations/20251013000001_create_form_pdfs_bucket.sql
-   ```
-3. Execute o SQL
-4. Verifique se bucket foi criado em **Storage**
+**No Supabase Dashboard → SQL Editor:**
+
+**Migration 1 - Criar Bucket:**
+```sql
+-- Cole e execute o conteúdo de:
+-- supabase/migrations/20251013000001_create_form_pdfs_bucket.sql
+
+-- Criar bucket
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('form-pdfs', 'form-pdfs', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Policies (admin pode fazer tudo, público pode ler)
+CREATE POLICY "Admins can upload PDFs"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'form-pdfs' AND
+  EXISTS (SELECT 1 FROM admin_users WHERE user_id = auth.uid() AND is_active = true)
+);
+
+CREATE POLICY "Public can view PDFs"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'form-pdfs');
+
+-- Outras policies...
+```
+
+**Migration 2 - Adicionar Coluna pdf_template_path:**
+```sql
+-- Cole e execute o conteúdo de:
+-- supabase/migrations/20251013000002_add_pdf_template_path.sql
+
+ALTER TABLE public.form_templates 
+ADD COLUMN IF NOT EXISTS pdf_template_path TEXT;
+
+COMMENT ON COLUMN public.form_templates.pdf_template_path IS 
+'Path do arquivo PDF no Storage (ex: form-templates/uuid/filename.pdf)';
+```
+
+**Após executar, verifique:**
+- Bucket `form-pdfs` aparece em **Storage**
+- Coluna `pdf_template_path` existe na tabela `form_templates`
 
 #### 2. Verificar se Bucket Existe
 

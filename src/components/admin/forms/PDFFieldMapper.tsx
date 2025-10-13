@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,8 +21,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useFormFields } from "@/hooks/forms/useFormFields";
 import type { PDFMapping, PDFFieldMapping, PDFCoordinates } from "@/types/forms";
 
-// Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+// Configure PDF.js worker - usar a versão compatível com react-pdf 10.1.0
+// react-pdf 10.1.0 usa pdfjs-dist 5.3.93 internamente
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 interface PDFFieldMapperProps {
   templateId: string;
@@ -43,6 +44,15 @@ export default function PDFFieldMapper({ templateId, pdfUrl, onClose }: PDFField
   const [isDragging, setIsDragging] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [signedPdfUrl, setSignedPdfUrl] = useState<string>("");
+  const [isPdfLoading, setIsPdfLoading] = useState(true);
+  const [selectedPositionIndex, setSelectedPositionIndex] = useState<number | null>(null);
+
+  // Memoizar options para evitar reloads desnecessários
+  const pdfOptions = useMemo(() => ({
+    cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
+    cMapPacked: true,
+    standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
+  }), []);
 
   // Gerar URL assinada para o PDF (melhor para CORS)
   useEffect(() => {
@@ -83,7 +93,6 @@ export default function PDFFieldMapper({ templateId, pdfUrl, onClose }: PDFField
 
   const loadExistingMapping = async () => {
     try {
-      // @ts-expect-error - form_templates table not yet in generated types
       const { data, error } = await supabase
         .from('form_templates')
         .select('pdf_mapping')
@@ -93,7 +102,7 @@ export default function PDFFieldMapper({ templateId, pdfUrl, onClose }: PDFField
       if (error) throw error;
 
       if (data?.pdf_mapping) {
-        const mapping = data.pdf_mapping as PDFMapping;
+        const mapping = data.pdf_mapping as unknown as PDFMapping;
         setFieldPositions(mapping.fields || []);
       }
     } catch (error) {
@@ -103,6 +112,11 @@ export default function PDFFieldMapper({ templateId, pdfUrl, onClose }: PDFField
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
+    setIsPdfLoading(false);
+    toast({
+      title: "PDF carregado",
+      description: `Documento com ${numPages} página(s) pronto para edição`,
+    });
   };
 
   const handleCanvasClick = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -157,6 +171,55 @@ export default function PDFFieldMapper({ templateId, pdfUrl, onClose }: PDFField
     setFieldPositions(
       fieldPositions.filter(fp => !(fp.field_key === fieldKey && fp.coordinates?.page === page))
     );
+    setSelectedPositionIndex(null);
+  };
+
+  const handleUpdateFieldSize = (index: number, width: number, height: number) => {
+    const newPositions = [...fieldPositions];
+    if (newPositions[index]?.coordinates) {
+      newPositions[index].coordinates = {
+        ...newPositions[index].coordinates!,
+        width: Math.max(5, Math.min(100, width)),
+        height: Math.max(1, Math.min(50, height)),
+      };
+      setFieldPositions(newPositions);
+    }
+  };
+
+  const handleUpdateFieldPosition = (index: number, deltaX: number, deltaY: number) => {
+    const newPositions = [...fieldPositions];
+    if (newPositions[index]?.coordinates) {
+      newPositions[index].coordinates = {
+        ...newPositions[index].coordinates!,
+        x: Math.max(0, Math.min(100, newPositions[index].coordinates!.x + deltaX)),
+        y: Math.max(0, Math.min(100, newPositions[index].coordinates!.y + deltaY)),
+      };
+      setFieldPositions(newPositions);
+    }
+  };
+
+  const handleUpdateFontSize = (index: number, fontSize: number) => {
+    const newPositions = [...fieldPositions];
+    if (newPositions[index]?.coordinates) {
+      newPositions[index].coordinates = {
+        ...newPositions[index].coordinates!,
+        fontSize: Math.max(6, Math.min(72, fontSize)),
+      };
+      setFieldPositions(newPositions);
+    }
+  };
+
+  const handleToggleBold = (index: number) => {
+    const newPositions = [...fieldPositions];
+    if (newPositions[index]?.coordinates) {
+      newPositions[index].coordinates = {
+        ...newPositions[index].coordinates!,
+        fontFamily: newPositions[index].coordinates!.fontFamily === 'Helvetica-Bold' 
+          ? 'Helvetica' 
+          : 'Helvetica-Bold',
+      };
+      setFieldPositions(newPositions);
+    }
   };
 
   const handleSave = async () => {
@@ -167,7 +230,6 @@ export default function PDFFieldMapper({ templateId, pdfUrl, onClose }: PDFField
         fields: fieldPositions,
       };
 
-      // @ts-expect-error - form_templates table not yet in generated types
       const { error } = await supabase
         .from('form_templates')
         .update({ pdf_mapping: mapping as any })
@@ -313,66 +375,112 @@ export default function PDFFieldMapper({ templateId, pdfUrl, onClose }: PDFField
               className="relative inline-block border-2 border-dashed border-primary/20 cursor-crosshair"
               onClick={handleCanvasClick}
             >
-              {signedPdfUrl ? (
-                <Document
-                  file={signedPdfUrl}
-                  onLoadSuccess={onDocumentLoadSuccess}
-                  onLoadError={(error) => {
-                    console.error("Erro ao carregar PDF:", error);
-                    toast({
-                      title: "Erro ao carregar PDF",
-                      description: "Não foi possível carregar o documento. Verifique se o arquivo existe no storage.",
-                      variant: "destructive",
-                    });
-                  }}
-                  options={{
-                    cMapUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/cmaps/',
-                    cMapPacked: true,
-                  }}
-                >
-              ) : (
+              {!signedPdfUrl ? (
                 <div className="flex items-center justify-center h-96 w-96">
                   <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                    <p className="text-muted-foreground">Carregando PDF...</p>
+                    <p className="text-muted-foreground">Gerando URL assinada...</p>
                   </div>
                 </div>
-                  <Page
-                    pageNumber={currentPage}
-                    scale={scale}
-                    renderTextLayer={false}
-                    renderAnnotationLayer={false}
-                  />
-                </Document>
-              ) : null}
+              ) : (
+                <>
+                  {isPdfLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                        <p className="text-muted-foreground">Carregando documento...</p>
+                      </div>
+                    </div>
+                  )}
+                  <Document
+                    file={signedPdfUrl}
+                    onLoadSuccess={onDocumentLoadSuccess}
+                    loading={null}
+                    onLoadError={(error) => {
+                      console.error("Erro ao carregar PDF:", error);
+                      setIsPdfLoading(false);
+                      toast({
+                        title: "Erro ao carregar PDF",
+                        description: "Não foi possível carregar o documento. Verifique se o arquivo existe no storage.",
+                        variant: "destructive",
+                      });
+                    }}
+                    options={pdfOptions}
+                  >
+                    <Page
+                      pageNumber={currentPage}
+                      scale={scale}
+                      renderTextLayer={false}
+                      renderAnnotationLayer={false}
+                      loading={null}
+                    />
+                  </Document>
+                </>
+              )}
 
               {/* Overlay com posições dos campos */}
-              {signedPdfUrl && currentPagePositions.map((position, index) => {
+              {signedPdfUrl && !isPdfLoading && currentPagePositions.map((position, index) => {
                 const field = fields.find(f => f.field_key === position.field_key);
                 const coords = position.coordinates;
+                const globalIndex = fieldPositions.findIndex(
+                  fp => fp.field_key === position.field_key && fp.coordinates?.page === currentPage
+                );
+                const isSelected = selectedPositionIndex === globalIndex;
                 
                 if (!coords) return null;
+                
+                const isBold = coords.fontFamily === 'Helvetica-Bold';
+                const fontSize = coords.fontSize || 10;
                 
                 return (
                   <div
                     key={`${position.field_key}-${index}`}
-                    className="absolute bg-blue-500/20 border-2 border-blue-500 rounded flex items-center justify-center group hover:bg-blue-500/30 transition-colors"
+                    className={`absolute rounded flex items-start px-2 py-1 group transition-all overflow-hidden ${
+                      isSelected 
+                        ? 'bg-primary/30 border-4 border-primary ring-2 ring-primary/50' 
+                        : 'bg-blue-500/20 border-2 border-blue-500 hover:bg-blue-500/30'
+                    }`}
                     style={{
                       left: `${coords.x}%`,
                       top: `${coords.y}%`,
                       width: `${coords.width}%`,
                       height: `${coords.height}%`,
                     }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedPositionIndex(isSelected ? null : globalIndex);
+                    }}
                   >
-                    <span className="text-xs font-medium text-blue-900 bg-blue-100/90 px-2 py-1 rounded">
+                    {/* Preview do texto com fonte real */}
+                    <div 
+                      className="flex-1 text-gray-700 leading-tight"
+                      style={{
+                        fontSize: `${fontSize * scale * 0.75}px`,
+                        fontWeight: isBold ? 'bold' : 'normal',
+                        fontFamily: 'Arial, sans-serif',
+                      }}
+                    >
                       {field?.label || position.field_key}
+                    </div>
+                    
+                    {/* Badge do campo (aparece no hover) */}
+                    <span className={`absolute top-0 right-0 text-[10px] px-1.5 py-0.5 rounded-bl transition-opacity ${
+                      isSelected 
+                        ? 'opacity-100 bg-primary text-primary-foreground' 
+                        : 'opacity-0 group-hover:opacity-100 bg-blue-600 text-white'
+                    }`}>
+                      {fontSize}pt {isBold ? 'B' : ''}
                     </span>
+
+                    {/* Botão remover */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleRemovePosition(position.field_key, coords.page);
                       }}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className={`absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 transition-opacity ${
+                        isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                      }`}
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -384,7 +492,7 @@ export default function PDFFieldMapper({ templateId, pdfUrl, onClose }: PDFField
         </ScrollArea>
 
         {/* Legenda */}
-        {selectedFieldKey && (
+        {selectedFieldKey && !selectedPositionIndex && (
           <div className="p-4 border-t bg-blue-50">
             <p className="text-sm text-blue-900">
               <strong>Campo selecionado:</strong> {selectedFieldKey}
@@ -395,6 +503,289 @@ export default function PDFFieldMapper({ templateId, pdfUrl, onClose }: PDFField
           </div>
         )}
       </div>
+
+      {/* Painel Direito: Controles de Edição */}
+      {selectedPositionIndex !== null && fieldPositions[selectedPositionIndex] && (
+        <div className="w-80 border-l">
+          <div className="p-4 border-b bg-muted">
+            <h3 className="font-semibold">Editar Campo</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Ajuste o tamanho e posição
+            </p>
+          </div>
+          
+          <ScrollArea className="h-[calc(80vh-60px)]">
+            <div className="p-4 space-y-4">
+              {(() => {
+                const position = fieldPositions[selectedPositionIndex];
+                const field = fields.find(f => f.field_key === position.field_key);
+                const coords = position.coordinates!;
+
+                return (
+                  <>
+                    {/* Info do Campo */}
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-muted-foreground">CAMPO</Label>
+                      <div className="p-3 bg-muted rounded-lg">
+                        <p className="font-medium">{field?.label || position.field_key}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{position.field_key}</p>
+                      </div>
+                    </div>
+
+                    {/* Posição */}
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-muted-foreground">POSIÇÃO</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-xs">X (%)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.5"
+                            value={coords.x.toFixed(1)}
+                            onChange={(e) => {
+                              const newPositions = [...fieldPositions];
+                              newPositions[selectedPositionIndex].coordinates!.x = parseFloat(e.target.value);
+                              setFieldPositions(newPositions);
+                            }}
+                            className="h-8"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Y (%)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.5"
+                            value={coords.y.toFixed(1)}
+                            onChange={(e) => {
+                              const newPositions = [...fieldPositions];
+                              newPositions[selectedPositionIndex].coordinates!.y = parseFloat(e.target.value);
+                              setFieldPositions(newPositions);
+                            }}
+                            className="h-8"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Botões de ajuste fino */}
+                      <div className="grid grid-cols-3 gap-1 mt-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleUpdateFieldPosition(selectedPositionIndex, 0, -1)}
+                          className="h-8"
+                        >
+                          ↑
+                        </Button>
+                        <div></div>
+                        <div></div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleUpdateFieldPosition(selectedPositionIndex, -1, 0)}
+                          className="h-8"
+                        >
+                          ←
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleUpdateFieldPosition(selectedPositionIndex, 0, 1)}
+                          className="h-8"
+                        >
+                          ↓
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleUpdateFieldPosition(selectedPositionIndex, 1, 0)}
+                          className="h-8"
+                        >
+                          →
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Tamanho */}
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-muted-foreground">TAMANHO</Label>
+                      <div className="space-y-3">
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <Label className="text-xs">Largura (%)</Label>
+                            <span className="text-xs font-mono text-muted-foreground">
+                              {coords.width.toFixed(0)}%
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUpdateFieldSize(selectedPositionIndex, coords.width - 5, coords.height)}
+                              className="h-8"
+                            >
+                              -
+                            </Button>
+                            <Input
+                              type="range"
+                              min="5"
+                              max="100"
+                              step="1"
+                              value={coords.width}
+                              onChange={(e) => handleUpdateFieldSize(selectedPositionIndex, parseFloat(e.target.value), coords.height)}
+                              className="flex-1"
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUpdateFieldSize(selectedPositionIndex, coords.width + 5, coords.height)}
+                              className="h-8"
+                            >
+                              +
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <Label className="text-xs">Altura (%)</Label>
+                            <span className="text-xs font-mono text-muted-foreground">
+                              {coords.height.toFixed(0)}%
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUpdateFieldSize(selectedPositionIndex, coords.width, coords.height - 1)}
+                              className="h-8"
+                            >
+                              -
+                            </Button>
+                            <Input
+                              type="range"
+                              min="1"
+                              max="50"
+                              step="0.5"
+                              value={coords.height}
+                              onChange={(e) => handleUpdateFieldSize(selectedPositionIndex, coords.width, parseFloat(e.target.value))}
+                              className="flex-1"
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUpdateFieldSize(selectedPositionIndex, coords.width, coords.height + 1)}
+                              className="h-8"
+                            >
+                              +
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Fonte */}
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-muted-foreground">FONTE</Label>
+                      <div className="space-y-3">
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <Label className="text-xs">Tamanho (pt)</Label>
+                            <span className="text-xs font-mono text-muted-foreground">
+                              {coords.fontSize || 10}pt
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUpdateFontSize(selectedPositionIndex, (coords.fontSize || 10) - 1)}
+                              className="h-8"
+                            >
+                              -
+                            </Button>
+                            <Input
+                              type="range"
+                              min="6"
+                              max="72"
+                              step="1"
+                              value={coords.fontSize || 10}
+                              onChange={(e) => handleUpdateFontSize(selectedPositionIndex, parseFloat(e.target.value))}
+                              className="flex-1"
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUpdateFontSize(selectedPositionIndex, (coords.fontSize || 10) + 1)}
+                              className="h-8"
+                            >
+                              +
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label className="text-xs mb-2 block">Estilo</Label>
+                          <Button
+                            size="sm"
+                            variant={coords.fontFamily === 'Helvetica-Bold' ? 'default' : 'outline'}
+                            className="w-full h-8 font-bold"
+                            onClick={() => handleToggleBold(selectedPositionIndex)}
+                          >
+                            <span className="font-bold">B</span>
+                            <span className="ml-2 font-normal">
+                              {coords.fontFamily === 'Helvetica-Bold' ? 'Negrito' : 'Normal'}
+                            </span>
+                          </Button>
+                        </div>
+
+                        {/* Preview da fonte */}
+                        <div>
+                          <Label className="text-xs mb-2 block">Preview</Label>
+                          <div 
+                            className="border rounded p-3 bg-white flex items-center justify-center min-h-[60px]"
+                            style={{
+                              fontSize: `${coords.fontSize || 10}pt`,
+                              fontWeight: coords.fontFamily === 'Helvetica-Bold' ? 'bold' : 'normal',
+                            }}
+                          >
+                            {field?.label || 'Texto de Exemplo'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Ações */}
+                    <div className="space-y-2 pt-4 border-t">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => handleRemovePosition(position.field_key, coords.page)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Remover Campo
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => setSelectedPositionIndex(null)}
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Fechar
+                      </Button>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
     </div>
   );
 }

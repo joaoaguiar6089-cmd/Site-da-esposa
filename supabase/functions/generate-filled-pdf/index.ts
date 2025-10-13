@@ -175,13 +175,16 @@ const handler = async (req: Request): Promise<Response> => {
       const page = pages[pageIndex];
       const { width: pageWidth, height: pageHeight } = page.getSize();
 
-      // Converter coordenadas de % para pixels
-      const x = (coords.x / 100) * pageWidth;
-      const y = pageHeight - ((coords.y / 100) * pageHeight); // PDF usa origem no canto inferior esquerdo
       const fontSize = coords.fontSize || 10;
       
       // Escolher fonte
       const font = coords.fontFamily === 'Helvetica-Bold' ? helveticaBoldFont : helveticaFont;
+
+      // Converter coordenadas de % para pixels
+      // coords.y vem como % do TOPO (0% = topo, 100% = fundo)
+      // PDF usa origem no canto inferior esquerdo, então invertemos
+      const x = (coords.x / 100) * pageWidth;
+      const y = pageHeight - ((coords.y / 100) * pageHeight) - fontSize; // Subtrair fontSize para texto ficar na linha
 
       // Calcular largura máxima
       const maxWidth = (coords.width / 100) * pageWidth;

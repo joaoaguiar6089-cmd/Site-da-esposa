@@ -41,6 +41,11 @@ export function getPackageInfo(appointment: any): PackageSession {
  * Apenas a primeira sessão tem valor, retornos são zerados
  */
 export function getPackageValue(appointment: any): number {
+  // Se for marcado como retorno, valor é 0
+  if (appointment.return_of_appointment_id) {
+    return 0;
+  }
+  
   const packageInfo = getPackageInfo(appointment);
   
   // Se for pacote e NÃO for a primeira sessão, valor é 0

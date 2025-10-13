@@ -1134,7 +1134,10 @@ Aguardamos você!`;
                         {appointment.all_procedures.map((proc, idx) => (
                           <div key={idx} className="flex items-center gap-1">
                             <span className="text-muted-foreground">•</span>
-                            <span>{proc.name}</span>
+                            <span>
+                              {proc.name}
+                              {appointment.return_of_appointment_id && ' - Retorno'}
+                            </span>
                             <span className="text-muted-foreground">({proc.duration}min)</span>
                           </div>
                         ))}
@@ -1143,34 +1146,21 @@ Aguardamos você!`;
                           <span>{appointment.total_duration}min</span>
                           <span className="text-muted-foreground">•</span>
                           <span className="font-medium">
-                            R$ {appointment.all_procedures.reduce((sum, p) => sum + p.price, 0).toFixed(2)}
+                            R$ {appointment.return_of_appointment_id ? '0,00' : appointment.all_procedures.reduce((sum, p) => sum + p.price, 0).toFixed(2)}
                           </span>
-                          {appointment.return_of_appointment_id && (
-                            <Badge 
-                              variant="secondary" 
-                              className="ml-2 bg-blue-100 text-blue-800 border-blue-300 text-xs"
-                            >
-                              Retorno
-                            </Badge>
-                          )}
                         </div>
                       </div>
                     ) : (
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-xs flex-1">
-                          {getPackageInfo(appointment).displayName} - R$ {getPackageValue(appointment).toFixed(2)}
+                          {getPackageInfo(appointment).displayName}
+                          {appointment.return_of_appointment_id && ' - Retorno'}
+                          {' - R$ '}
+                          {appointment.return_of_appointment_id ? '0,00' : getPackageValue(appointment).toFixed(2)}
                         </p>
                         {getPackageInfo(appointment).isPackage && (
                           <Badge variant="outline" className="text-xs">
                             {formatSessionProgress(appointment)}
-                          </Badge>
-                        )}
-                        {appointment.return_of_appointment_id && (
-                          <Badge 
-                            variant="secondary" 
-                            className="bg-blue-100 text-blue-800 border-blue-300 text-xs"
-                          >
-                            Retorno
                           </Badge>
                         )}
                         {/* Botão para marcar como retorno */}
@@ -1306,22 +1296,30 @@ Aguardamos você!`;
                     {selectedAppointment.all_procedures.map((proc, idx) => (
                       <div key={idx} className="p-2 bg-muted/30 rounded">
                         <div className="flex items-center justify-between">
-                          <span className="font-medium">{idx + 1}. {proc.name}</span>
+                          <span className="font-medium">
+                            {idx + 1}. {proc.name}
+                            {selectedAppointment.return_of_appointment_id && ' - Retorno'}
+                          </span>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {proc.duration}min • R$ {proc.price.toFixed(2)}
+                          {proc.duration}min • R$ {selectedAppointment.return_of_appointment_id ? '0,00' : proc.price.toFixed(2)}
                         </p>
                       </div>
                     ))}
                     <div className="flex items-center justify-between p-2 bg-primary/10 rounded font-medium">
                       <span>Total:</span>
-                      <span>{selectedAppointment.total_duration}min • R$ {selectedAppointment.all_procedures.reduce((sum, p) => sum + p.price, 0).toFixed(2)}</span>
+                      <span>
+                        {selectedAppointment.total_duration}min • R$ {selectedAppointment.return_of_appointment_id ? '0,00' : selectedAppointment.all_procedures.reduce((sum, p) => sum + p.price, 0).toFixed(2)}
+                      </span>
                     </div>
                   </div>
                 ) : (
                   <div>
                     <div className="flex items-center gap-2">
-                      <p>{getPackageInfo(selectedAppointment).displayName}</p>
+                      <p>
+                        {getPackageInfo(selectedAppointment).displayName}
+                        {selectedAppointment.return_of_appointment_id && ' - Retorno'}
+                      </p>
                       {getPackageInfo(selectedAppointment).isPackage && (
                         <Badge variant="outline">
                           {formatSessionProgress(selectedAppointment)}
@@ -1329,24 +1327,13 @@ Aguardamos você!`;
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {selectedAppointment.procedures.duration}min - R$ {getPackageValue(selectedAppointment).toFixed(2)}
+                      {selectedAppointment.procedures.duration}min - R$ {selectedAppointment.return_of_appointment_id ? '0,00' : getPackageValue(selectedAppointment).toFixed(2)}
                     </p>
                   </div>
                 )}
               </div>
 
-              {selectedAppointment.return_of_appointment_id && (
-                <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="bg-blue-600 text-white">
-                      Retorno
-                    </Badge>
-                    <span className="text-sm text-blue-800 font-medium">
-                      Este é um retorno de outro procedimento
-                    </span>
-                  </div>
-                </div>
-              )}
+              {/* Removido badge de retorno - agora aparece no nome do procedimento */}
 
               {selectedAppointment.professionals && (
                 <div>

@@ -23,6 +23,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import FormFillerDialog from "./forms/FormFillerDialog";
 import FormViewerDialog from "./forms/FormViewerDialog";
 
@@ -32,6 +34,7 @@ interface ClientFormsManagerProps {
 }
 
 export default function ClientFormsManager({ clientId, clientName }: ClientFormsManagerProps) {
+  const { toast } = useToast();
   const { templates, isLoading: loadingTemplates } = useFormTemplates();
   const { responses, isLoading: loadingResponses } = useFormResponses({ 
     clientId 
@@ -41,6 +44,7 @@ export default function ClientFormsManager({ clientId, clientName }: ClientForms
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [selectedResponseId, setSelectedResponseId] = useState<string | null>(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   const handleFillForm = (templateId: string) => {
     setSelectedTemplateId(templateId);
@@ -53,11 +57,38 @@ export default function ClientFormsManager({ clientId, clientName }: ClientForms
   };
 
   const handleDownloadPDF = async (responseId: string) => {
+    setIsGeneratingPDF(true);
+    
     try {
-      // TODO: Implementar download do PDF preenchido
-      console.log("Download PDF:", responseId);
+      const { data, error } = await supabase.functions.invoke('generate-filled-pdf', {
+        body: { response_id: responseId },
+      });
+
+      if (error) {
+        console.error('Erro ao gerar PDF:', error);
+        throw error;
+      }
+
+      if (data?.pdf_url) {
+        // Abrir PDF em nova aba
+        window.open(data.pdf_url, '_blank');
+        
+        toast({
+          title: "PDF gerado com sucesso",
+          description: `${data.fields_filled} campos preenchidos`,
+        });
+      } else {
+        throw new Error('URL do PDF não retornada');
+      }
     } catch (error) {
       console.error("Erro ao baixar PDF:", error);
+      toast({
+        title: "Erro ao gerar PDF",
+        description: "Não foi possível gerar o PDF preenchido. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingPDF(false);
     }
   };
 
@@ -162,8 +193,9 @@ export default function ClientFormsManager({ clientId, clientName }: ClientForms
                               size="sm"
                               variant="outline"
                               onClick={() => handleDownloadPDF(existingResponse.id)}
+                              disabled={isGeneratingPDF}
                             >
-                              <Download className="h-4 w-4 mr-2" />
+                              <Download className={`h-4 w-4 mr-2 ${isGeneratingPDF ? 'animate-bounce' : ''}`} />
                               PDF
                             </Button>
                           )}
@@ -228,8 +260,9 @@ export default function ClientFormsManager({ clientId, clientName }: ClientForms
                             size="sm"
                             variant="outline"
                             onClick={() => handleDownloadPDF(response.id)}
+                            disabled={isGeneratingPDF}
                           >
-                            <Download className="h-4 w-4" />
+                            <Download className={`h-4 w-4 ${isGeneratingPDF ? 'animate-bounce' : ''}`} />
                           </Button>
                         )}
                       </div>

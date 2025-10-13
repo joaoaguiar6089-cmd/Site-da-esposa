@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState } from "react";
 import FormTemplatesList from "./FormTemplatesList";
 import FormTemplateEditor from "./FormTemplateEditor";

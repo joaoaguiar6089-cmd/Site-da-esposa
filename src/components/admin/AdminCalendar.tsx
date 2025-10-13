@@ -4,10 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Calendar as CalendarIcon, Clock, User, Phone, Edit, Trash2, MessageSquare, Plus, CheckCircle, DollarSign } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, User, Phone, Edit, Trash2, MessageSquare, Plus, CheckCircle, DollarSign, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -86,6 +87,8 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
   const [paymentValue, setPaymentValue] = useState("");
   const [paymentInstallments, setPaymentInstallments] = useState("1");
   const [paymentNotes, setPaymentNotes] = useState("");
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [appointmentToReturn, setAppointmentToReturn] = useState<Appointment | null>(null);
   const { toast } = useToast();
 
   // Carregar todos os agendamentos
@@ -267,7 +270,7 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
   // Calcular resumo financeiro do dia
   const getDayFinancialSummary = () => {
     const planned = dayAppointments
-      .filter(apt => apt.status !== 'cancelado')
+      .filter(apt => apt.status !== 'cancelado' && !apt.return_of_appointment_id)
       .reduce((sum, apt) => sum + getPackageValue(apt), 0);
     
     const received = {
@@ -330,6 +333,47 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
   const handleNewAppointmentSuccess = () => {
     setShowNewAppointmentForm(false);
     loadAppointments();
+  };
+
+  // Marcar agendamento como retorno
+  const handleMarkAsReturn = async () => {
+    if (!appointmentToReturn) return;
+
+    try {
+      // Atualizar o agendamento para marcar como retorno
+      const { error } = await supabase
+        .from('appointments')
+        .update({
+          return_of_appointment_id: appointmentToReturn.id, // Marca como retorno
+          payment_value: 0, // Zera o valor
+        })
+        .eq('id', appointmentToReturn.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Procedimento marcado como retorno",
+        description: "O valor foi zerado e não será contabilizado no planejado.",
+      });
+
+      setReturnDialogOpen(false);
+      setAppointmentToReturn(null);
+      loadAppointments();
+    } catch (error) {
+      console.error('Erro ao marcar como retorno:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao marcar procedimento como retorno.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Abrir dialog de confirmação para marcar como retorno
+  const handleOpenReturnDialog = (appointment: Appointment, event: React.MouseEvent) => {
+    event.stopPropagation(); // Impedir que abra o dialog de detalhes
+    setAppointmentToReturn(appointment);
+    setReturnDialogOpen(true);
   };
 
   // Atualizar status do agendamento
@@ -1090,7 +1134,10 @@ Aguardamos você!`;
                         {appointment.all_procedures.map((proc, idx) => (
                           <div key={idx} className="flex items-center gap-1">
                             <span className="text-muted-foreground">•</span>
-                            <span>{proc.name}</span>
+                            <span>
+                              {proc.name}
+                              {appointment.return_of_appointment_id && ' - Retorno'}
+                            </span>
                             <span className="text-muted-foreground">({proc.duration}min)</span>
                           </div>
                         ))}
@@ -1099,41 +1146,41 @@ Aguardamos você!`;
                           <span>{appointment.total_duration}min</span>
                           <span className="text-muted-foreground">•</span>
                           <span className="font-medium">
-                            R$ {appointment.all_procedures.reduce((sum, p) => sum + p.price, 0).toFixed(2)}
+                            R$ {appointment.return_of_appointment_id ? '0,00' : appointment.all_procedures.reduce((sum, p) => sum + p.price, 0).toFixed(2)}
                           </span>
-                          {appointment.return_of_appointment_id && (
-                            <Badge 
-                              variant="secondary" 
-                              className="ml-2 bg-blue-100 text-blue-800 border-blue-300 text-xs"
-                            >
-                              Retorno
-                            </Badge>
-                          )}
                         </div>
                       </div>
                     ) : (
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-xs">
-                          {getPackageInfo(appointment).displayName} - R$ {getPackageValue(appointment).toFixed(2)}
+                        <p className="text-xs flex-1">
+                          {getPackageInfo(appointment).displayName}
+                          {appointment.return_of_appointment_id && ' - Retorno'}
+                          {' - R$ '}
+                          {appointment.return_of_appointment_id ? '0,00' : getPackageValue(appointment).toFixed(2)}
                         </p>
                         {getPackageInfo(appointment).isPackage && (
                           <Badge variant="outline" className="text-xs">
                             {formatSessionProgress(appointment)}
                           </Badge>
                         )}
-                        {appointment.return_of_appointment_id && (
-                          <Badge 
-                            variant="secondary" 
-                            className="bg-blue-100 text-blue-800 border-blue-300 text-xs"
+                        {/* Botão para marcar como retorno */}
+                        {!appointment.return_of_appointment_id && 
+                         !getPackageInfo(appointment).displayName.toLowerCase().includes('retorno') && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={(e) => handleOpenReturnDialog(appointment, e)}
+                            title="Marcar como retorno"
                           >
-                            Retorno
-                          </Badge>
+                            <RotateCcw className="h-3 w-3" />
+                          </Button>
                         )}
                       </div>
                     )}
                     
                     {/* Informações de Pagamento */}
-                    {appointment.payment_value && appointment.payment_value > 0 && (
+                    {appointment.payment_value > 0 && (
                       <div className="mt-2 pt-2 border-t text-xs space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="font-medium">Pagamento:</span>
@@ -1249,22 +1296,30 @@ Aguardamos você!`;
                     {selectedAppointment.all_procedures.map((proc, idx) => (
                       <div key={idx} className="p-2 bg-muted/30 rounded">
                         <div className="flex items-center justify-between">
-                          <span className="font-medium">{idx + 1}. {proc.name}</span>
+                          <span className="font-medium">
+                            {idx + 1}. {proc.name}
+                            {selectedAppointment.return_of_appointment_id && ' - Retorno'}
+                          </span>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {proc.duration}min • R$ {proc.price.toFixed(2)}
+                          {proc.duration}min • R$ {selectedAppointment.return_of_appointment_id ? '0,00' : proc.price.toFixed(2)}
                         </p>
                       </div>
                     ))}
                     <div className="flex items-center justify-between p-2 bg-primary/10 rounded font-medium">
                       <span>Total:</span>
-                      <span>{selectedAppointment.total_duration}min • R$ {selectedAppointment.all_procedures.reduce((sum, p) => sum + p.price, 0).toFixed(2)}</span>
+                      <span>
+                        {selectedAppointment.total_duration}min • R$ {selectedAppointment.return_of_appointment_id ? '0,00' : selectedAppointment.all_procedures.reduce((sum, p) => sum + p.price, 0).toFixed(2)}
+                      </span>
                     </div>
                   </div>
                 ) : (
                   <div>
                     <div className="flex items-center gap-2">
-                      <p>{getPackageInfo(selectedAppointment).displayName}</p>
+                      <p>
+                        {getPackageInfo(selectedAppointment).displayName}
+                        {selectedAppointment.return_of_appointment_id && ' - Retorno'}
+                      </p>
                       {getPackageInfo(selectedAppointment).isPackage && (
                         <Badge variant="outline">
                           {formatSessionProgress(selectedAppointment)}
@@ -1272,24 +1327,13 @@ Aguardamos você!`;
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {selectedAppointment.procedures.duration}min - R$ {getPackageValue(selectedAppointment).toFixed(2)}
+                      {selectedAppointment.procedures.duration}min - R$ {selectedAppointment.return_of_appointment_id ? '0,00' : getPackageValue(selectedAppointment).toFixed(2)}
                     </p>
                   </div>
                 )}
               </div>
 
-              {selectedAppointment.return_of_appointment_id && (
-                <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="bg-blue-600 text-white">
-                      Retorno
-                    </Badge>
-                    <span className="text-sm text-blue-800 font-medium">
-                      Este é um retorno de outro procedimento
-                    </span>
-                  </div>
-                </div>
-              )}
+              {/* Removido badge de retorno - agora aparece no nome do procedimento */}
 
               {selectedAppointment.professionals && (
                 <div>
@@ -1614,6 +1658,22 @@ Aguardamos você!`;
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de confirmação para marcar como retorno */}
+      <AlertDialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Marcar como retorno?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja marcar o procedimento como um retorno? O valor será zerado (R$ 0,00) e não será contabilizado no planejado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Não</AlertDialogCancel>
+            <AlertDialogAction onClick={handleMarkAsReturn}>Sim</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

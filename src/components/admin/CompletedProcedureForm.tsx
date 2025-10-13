@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Camera, Upload, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { recalculatePackageSessions } from "@/utils/packageUtils";
 import { useToast } from "@/hooks/use-toast";
 
 interface Procedure {
@@ -14,6 +15,7 @@ interface Procedure {
   name: string;
   price: number;
   duration: number;
+  sessions?: number | null;
 }
 
 interface Client {
@@ -56,7 +58,7 @@ const CompletedProcedureForm = ({
     try {
       const { data, error } = await supabase
         .from("procedures")
-        .select("id, name, price, duration")
+        .select("id, name, price, duration, sessions")
         .order("name");
 
       if (error) throw error;
@@ -117,6 +119,9 @@ const CompletedProcedureForm = ({
     try {
       setLoading(true);
 
+      const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
+      const totalSessions = selectedProcedure?.sessions ?? 1;
+
       // Create appointment as completed
       const appointmentData = {
         client_id: client.id,
@@ -124,7 +129,9 @@ const CompletedProcedureForm = ({
         appointment_date: formData.appointment_date,
         appointment_time: formData.appointment_time,
         status: 'realizado',
-        notes: formData.notes || 'Procedimento realizado - inserido posteriormente'
+        notes: formData.notes || 'Procedimento realizado - inserido posteriormente',
+        session_number: 1,
+        total_sessions: totalSessions,
       };
 
       const { data: appointment, error: appointmentError } = await supabase
@@ -134,6 +141,10 @@ const CompletedProcedureForm = ({
         .single();
 
       if (appointmentError) throw appointmentError;
+
+      if (totalSessions > 1) {
+        await recalculatePackageSessions(supabase, client.id, formData.procedure_id, totalSessions);
+      }
 
       // Upload photos if any
       if (selectedFiles.length > 0) {

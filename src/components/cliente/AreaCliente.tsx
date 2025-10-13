@@ -291,7 +291,7 @@ const AreaCliente = ({
     <div className="space-y-6">
       {/* Tabs de Navegação */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="dados" className="flex items-center gap-2">
             <Phone className="h-4 w-4" />
             Meus Dados
@@ -299,6 +299,10 @@ const AreaCliente = ({
           <TabsTrigger value="agendamentos" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
             Agendamentos
+          </TabsTrigger>
+          <TabsTrigger value="fichas" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Fichas
           </TabsTrigger>
           <TabsTrigger value="documentos" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
@@ -504,6 +508,26 @@ const AreaCliente = ({
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="fichas" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Minhas Fichas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground mb-4">
+                Preencha os formulários solicitados pela clínica
+              </p>
+              <Button 
+                onClick={() => window.location.href = '/area-cliente/forms'}
+                className="w-full"
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Acessar Fichas
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

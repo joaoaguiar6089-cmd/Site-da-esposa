@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, BarChart3, Calendar, DollarSign, User, UserPlus, Tag, Stethoscope, MessageSquare, Shield, Image, Clock, Badge, MapPin, Package, Table2, Settings } from "lucide-react";
+import { Menu, BarChart3, Calendar, DollarSign, User, UserPlus, Tag, Stethoscope, MessageSquare, Shield, Image, Clock, Badge, MapPin, Package, Table2, Settings, FileText } from "lucide-react";
 import { useState, useCallback } from "react";
 import { useTimezone } from "@/hooks/useTimezone";
 
@@ -32,6 +32,7 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
     { id: "calendar", label: "Calendário", icon: Calendar },
     { id: "appointments", label: "Histórico", icon: DollarSign },
     { id: "clients", label: "Clientes", icon: User },
+    { id: "forms", label: "Fichas Personalizadas", icon: FileText },
     { id: "professionals", label: "Profissionais", icon: UserPlus },
     { id: "categories", label: "Categorias", icon: Tag },
     { id: "procedures", label: "Procedimentos", icon: Stethoscope },

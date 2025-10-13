@@ -12,7 +12,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { getPackageInfo, formatSessionProgress } from "@/utils/packageUtils";
+import { getPackageInfo, formatSessionProgress, recalculatePackageSessions } from "@/utils/packageUtils";
 import NewBookingFlow from "@/components/agendamento/NewBookingFlow";
 import CompletedProcedureForm from "./CompletedProcedureForm";
 
@@ -321,6 +321,14 @@ const ProcedureHistory = ({
 
     try {
       setLoading(true);
+
+      const { data: appointmentInfo, error: fetchError } = await supabase
+        .from('appointments')
+        .select('id, client_id, procedure_id, total_sessions')
+        .eq('id', appointmentId)
+        .single();
+
+      if (fetchError) throw fetchError;
       
       // Primeiro, excluir todos os resultados relacionados ao agendamento
       const { error: resultsError } = await supabase
@@ -353,6 +361,31 @@ const ProcedureHistory = ({
         .eq('id', appointmentId);
 
       if (appointmentError) throw appointmentError;
+
+      let packageSessions = appointmentInfo?.total_sessions || 1;
+
+      if (appointmentInfo?.procedure_id) {
+        const { data: procedureInfo, error: procedureError } = await supabase
+          .from('procedures')
+          .select('sessions')
+          .eq('id', appointmentInfo.procedure_id)
+          .single();
+
+        if (procedureError && procedureError.code !== 'PGRST116') throw procedureError;
+
+        if (procedureInfo?.sessions && procedureInfo.sessions > packageSessions) {
+          packageSessions = procedureInfo.sessions;
+        }
+      }
+
+      if (appointmentInfo?.client_id && appointmentInfo?.procedure_id && packageSessions > 1) {
+        await recalculatePackageSessions(
+          supabase,
+          appointmentInfo.client_id,
+          appointmentInfo.procedure_id,
+          packageSessions
+        );
+      }
 
       toast({
         title: "Agendamento excluído",

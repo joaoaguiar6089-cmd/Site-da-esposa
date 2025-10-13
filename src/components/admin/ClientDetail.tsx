@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Edit, User, Phone, CreditCard, Calendar, MapPin, FileText } from "lucide-react";
+import { ArrowLeft, Edit, User, Phone, CreditCard, Calendar, MapPin, FileText, ClipboardList } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatCPF } from "@/utils/cpfValidator";
@@ -10,6 +10,7 @@ import ClientHeader from "./ClientHeader";
 import ProcedureHistory from "./ProcedureHistory";
 import PhotoGallery from "./PhotoGallery";
 import DocumentsManager from "./DocumentsManager";
+import ClientFormsManager from "./ClientFormsManager";
 
 interface Client {
   id: string;
@@ -100,7 +101,7 @@ const ClientDetail = ({
       {/* Abas de Conteúdo */}
       <Card className="border-0 shadow-md">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="historico" className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               Histórico de Procedimentos
@@ -112,6 +113,10 @@ const ClientDetail = ({
             <TabsTrigger value="documentos" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
               Documentos
+            </TabsTrigger>
+            <TabsTrigger value="fichas" className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4" />
+              Fichas
             </TabsTrigger>
           </TabsList>
           
@@ -139,6 +144,13 @@ const ClientDetail = ({
               clientId={client.id}
               clientName={`${client.nome} ${client.sobrenome}`}
               onDocumentUpdated={onClientUpdated}
+            />
+          </TabsContent>
+
+          <TabsContent value="fichas" className="mt-6">
+            <ClientFormsManager
+              clientId={client.id}
+              clientName={`${client.nome} ${client.sobrenome}`}
             />
           </TabsContent>
         </Tabs>

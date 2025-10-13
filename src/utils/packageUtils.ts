@@ -90,3 +90,59 @@ export function formatSessionProgress(appointment: any): string {
   
   return `${packageInfo.sessionNumber}/${packageInfo.totalSessions} sessões`;
 }
+
+/**
+ * Reordena as sessões de um pacote após inserções ou exclusões manuais.
+ */
+export async function recalculatePackageSessions(
+  supabaseClient: any,
+  clientId: string,
+  procedureId: string,
+  totalSessions: number
+): Promise<void> {
+  if (!totalSessions || totalSessions <= 1) {
+    return;
+  }
+
+  const { data: appointments, error } = await supabaseClient
+    .from('appointments')
+    .select('id, appointment_date, appointment_time, created_at')
+    .eq('client_id', clientId)
+    .eq('procedure_id', procedureId)
+    .neq('status', 'cancelado');
+
+  if (error) throw error;
+  if (!appointments || appointments.length === 0) return;
+
+  const sortedAppointments = [...appointments].sort((a, b) => {
+    const dateA = new Date(`${a.appointment_date}T${a.appointment_time || '00:00'}`);
+    const dateB = new Date(`${b.appointment_date}T${b.appointment_time || '00:00'}`);
+
+    if (dateA.getTime() === dateB.getTime()) {
+      const createdA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const createdB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return createdA - createdB;
+    }
+
+    return dateA.getTime() - dateB.getTime();
+  });
+
+  const packageParentId = sortedAppointments[0].id;
+
+  for (let index = 0; index < sortedAppointments.length; index++) {
+    const appointment = sortedAppointments[index];
+
+    const updates = {
+      session_number: index + 1,
+      total_sessions: totalSessions,
+      package_parent_id: index === 0 ? null : packageParentId,
+    };
+
+    const { error: updateError } = await supabaseClient
+      .from('appointments')
+      .update(updates)
+      .eq('id', appointment.id);
+
+    if (updateError) throw updateError;
+  }
+}

@@ -25,8 +25,8 @@ import { useFormResponse } from "@/hooks/forms/useFormResponses";
 import { useFormTemplate } from "@/hooks/forms/useFormTemplates";
 import { useFormFields } from "@/hooks/forms/useFormFields";
 import { Document, Page, pdfjs } from 'react-pdf';
-import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
-import 'react-pdf/dist/esm/Page/TextLayer.css';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
 
 // Configurar worker do PDF.js
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;

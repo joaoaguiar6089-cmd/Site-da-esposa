@@ -12,12 +12,24 @@ import {
   Loader2,
   CheckCircle2,
   Clock,
-  FileCheck
+  FileCheck,
+  Trash2
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useFormResponses } from "@/hooks/forms/useFormResponses";
+import { useToast } from "@/hooks/use-toast";
 import FormFillerDialog from "./FormFillerDialog";
 import { TemplateSelector } from "./TemplateSelector";
 
@@ -27,13 +39,16 @@ interface ClientFormsAreaProps {
 }
 
 export function ClientFormsArea({ clientId, clientName }: ClientFormsAreaProps) {
+  const { toast } = useToast();
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   const [showFormFiller, setShowFormFiller] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [selectedResponseId, setSelectedResponseId] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [responseToDelete, setResponseToDelete] = useState<string | null>(null);
 
-  const { responses = [], isLoading } = useFormResponses({ clientId });
+  const { responses = [], isLoading, deleteResponse, isDeleting } = useFormResponses({ clientId });
 
   const handleNewForm = () => {
     setShowTemplateSelector(true);
@@ -65,6 +80,32 @@ export function ClientFormsArea({ clientId, clientName }: ClientFormsAreaProps) 
     setSelectedTemplateId(null);
     setSelectedResponseId(null);
     setEditMode(false);
+  };
+
+  const handleDeleteClick = (responseId: string) => {
+    setResponseToDelete(responseId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!responseToDelete) return;
+
+    try {
+      await deleteResponse(responseToDelete);
+      toast({
+        title: "Ficha deletada",
+        description: "A ficha foi removida com sucesso.",
+      });
+      setDeleteDialogOpen(false);
+      setResponseToDelete(null);
+    } catch (error) {
+      console.error('Erro ao deletar ficha:', error);
+      toast({
+        title: "Erro ao deletar",
+        description: "Não foi possível deletar a ficha. Tente novamente.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getStatusInfo = (status: string) => {
@@ -205,6 +246,14 @@ export function ClientFormsArea({ clientId, clientName }: ClientFormsAreaProps) 
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteClick(response.id)}
+                      disabled={isDeleting}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -243,6 +292,38 @@ export function ClientFormsArea({ clientId, clientName }: ClientFormsAreaProps) 
           />
         </DialogContent>
       </Dialog>
+
+      {/* AlertDialog: Confirmar Exclusão */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A ficha será permanentemente deletada do sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deletando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Deletar
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

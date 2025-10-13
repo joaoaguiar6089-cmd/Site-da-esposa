@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import NewBookingFlow from "@/components/agendamento/NewBookingFlow";
 import ClientDocuments from "./ClientDocuments";
+import { ClientFormsArea } from "@/components/admin/forms/ClientFormsArea";
 import type { Client, Appointment, ProcedureResult } from "@/types/client";
 import { getPackageInfo, formatSessionProgress } from "@/utils/packageUtils";
 import { formatDateToBrazil } from "@/utils/dateUtils";
@@ -513,23 +514,10 @@ const AreaCliente = ({
         </TabsContent>
 
         <TabsContent value="fichas" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Minhas Fichas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-4">
-                Preencha os formulários solicitados pela clínica
-              </p>
-              <Button 
-                onClick={() => window.location.href = '/area-cliente/forms'}
-                className="w-full"
-              >
-                <FileText className="mr-2 h-4 w-4" />
-                Acessar Fichas
-              </Button>
-            </CardContent>
-          </Card>
+          <ClientFormsArea 
+            clientId={localClient.id}
+            clientName={`${localClient.nome} ${localClient.sobrenome}`}
+          />
         </TabsContent>
 
         <TabsContent value="documentos" className="mt-6">

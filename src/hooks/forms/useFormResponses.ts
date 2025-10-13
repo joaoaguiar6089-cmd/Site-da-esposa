@@ -21,9 +21,11 @@ export const formResponsesKeys = {
 
 export interface FormResponseCreate {
   template_id: string;
-  client_id?: string;
+  template_version: number;
+  client_id: string;
   response_data: Record<string, any>;
   status?: FormResponseStatus;
+  appointment_id?: string;
   filled_by?: string;
 }
 

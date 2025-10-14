@@ -1290,13 +1290,13 @@ Aguardamos você!`;
 
       {/* Dialog de detalhes do agendamento */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Detalhes do Agendamento</DialogTitle>
+        <DialogContent className="max-w-md max-h-[90vh] sm:max-h-[85vh] flex flex-col p-4 sm:p-6">
+          <DialogHeader className="flex-shrink-0 pb-2">
+            <DialogTitle className="text-lg sm:text-xl">Detalhes do Agendamento</DialogTitle>
           </DialogHeader>
           
           {selectedAppointment && (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4 overflow-y-auto pr-2 -mr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <strong>Data:</strong>

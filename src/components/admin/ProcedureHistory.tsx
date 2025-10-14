@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,22 +21,54 @@ interface Appointment {
   appointment_date: string;
   appointment_time: string;
   status: string;
+  city_id?: string | null;
   notes?: string;
   session_number?: number;
   total_sessions?: number;
   payment_status?: string;
   payment_method?: string;
   payment_value?: number;
+  payment_installments?: number | null;
+  payment_notes?: string | null;
   procedure: {
+    id?: string;
     name: string;
     duration: number;
     price: number;
+    sessions?: number | null;
+    requires_specifications?: boolean;
+    body_selection_type?: string | null;
+    body_image_url?: string | null;
+    body_image_url_male?: string | null;
+    description?: string | null;
   };
   client: {
     id: string;
     nome: string;
     sobrenome: string;
   };
+  city_settings?: {
+    city_name?: string | null;
+  } | null;
+  appointments_procedures?: Array<{
+    order_index?: number | null;
+    procedure?: {
+      id?: string;
+      name: string;
+      duration: number;
+      price: number;
+      requires_specifications?: boolean;
+      body_selection_type?: string | null;
+      body_image_url?: string | null;
+      body_image_url_male?: string | null;
+      description?: string | null;
+    } | null;
+  }>;
+  appointment_specifications?: {
+    specification_id: string;
+    specification_name: string;
+    specification_price: number;
+  }[];
 }
 
 interface ProcedureResult {
@@ -71,20 +103,16 @@ const ProcedureHistory = ({
   onAppointmentUpdated,
   onResultUploaded
 }: ProcedureHistoryProps) => {
-  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
   const [showResultDialog, setShowResultDialog] = useState(false);
   const [showNewAppointmentForm, setShowNewAppointmentForm] = useState(false);
   const [showCompletedProcedureForm, setShowCompletedProcedureForm] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [appointmentBeingEdited, setAppointmentBeingEdited] = useState<Appointment | null>(null);
   const [resultDescription, setResultDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [appointmentFormData, setAppointmentFormData] = useState({
-    appointment_date: "",
-    appointment_time: "",
-    notes: ""
-  });
 
   const { toast } = useToast();
 
@@ -94,11 +122,11 @@ const ProcedureHistory = ({
     const dateB = new Date(`${b.appointment_date}T${b.appointment_time}`);
     const now = new Date();
     
-    // Futuros primeiro (ordenação crescente)
+    // Futuros primeiro (ordenaÃ§Ã£o crescente)
     if (dateA >= now && dateB >= now) {
       return dateA.getTime() - dateB.getTime();
     }
-    // Passados depois (ordenação decrescente)
+    // Passados depois (ordenaÃ§Ã£o decrescente)
     if (dateA < now && dateB < now) {
       return dateB.getTime() - dateA.getTime();
     }
@@ -131,51 +159,23 @@ const ProcedureHistory = ({
 
   const handleEditAppointment = (appointment: Appointment) => {
     setSelectedAppointment(appointment);
-    setAppointmentFormData({
-      appointment_date: appointment.appointment_date,
-      appointment_time: appointment.appointment_time,
-      notes: appointment.notes || ""
-    });
-    setShowEditDialog(true);
+    setAppointmentBeingEdited(appointment);
+    setShowEditForm(true);
   };
 
-  const handleUpdateAppointment = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const closeEditForm = () => {
+    setShowEditForm(false);
+    setAppointmentBeingEdited(null);
+    setSelectedAppointment(null);
+  };
 
-    if (!selectedAppointment) return;
-
-    try {
-      setLoading(true);
-      const { error } = await supabase
-        .from('appointments')
-        .update({
-          appointment_date: appointmentFormData.appointment_date,
-          appointment_time: appointmentFormData.appointment_time,
-          notes: appointmentFormData.notes
-        })
-        .eq('id', selectedAppointment.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Sucesso",
-        description: "Agendamento atualizado com sucesso!",
-      });
-
-      setShowEditDialog(false);
-      setSelectedAppointment(null);
-      setAppointmentFormData({ appointment_date: "", appointment_time: "", notes: "" });
-      onAppointmentUpdated();
-    } catch (error: any) {
-      console.error("Erro ao atualizar agendamento:", error);
-      toast({
-        title: "Erro",
-        description: error.message || "Erro ao atualizar agendamento.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+  const handleEditSuccess = () => {
+    toast({
+      title: "Agendamento atualizado",
+      description: "O agendamento foi atualizado com sucesso.",
+    });
+    closeEditForm();
+    onAppointmentUpdated();
   };
 
   const handleStatusChange = async (appointmentId: string, newStatus: string) => {
@@ -235,7 +235,7 @@ const ProcedureHistory = ({
 
       if (insertError) throw insertError;
 
-      // Atualizar status do agendamento para "realizado" apenas se não foi um upload adicional
+      // Atualizar status do agendamento para "realizado" apenas se nÃ£o foi um upload adicional
       if (selectedAppointment.status !== 'realizado') {
         await supabase
           .from('appointments')
@@ -301,8 +301,8 @@ const ProcedureHistory = ({
       if (error) throw error;
 
       toast({
-        title: "Resultado excluído",
-        description: "O resultado do procedimento foi excluído com sucesso.",
+        title: "Resultado excluÃ­do",
+        description: "O resultado do procedimento foi excluÃ­do com sucesso.",
       });
 
       onResultUploaded();
@@ -317,7 +317,7 @@ const ProcedureHistory = ({
   };
 
   const handleDeleteAppointment = async (appointmentId: string) => {
-    if (!confirm('Tem certeza que deseja excluir este agendamento? Esta ação não pode ser desfeita.')) return;
+    if (!confirm('Tem certeza que deseja excluir este agendamento? Esta aÃ§Ã£o nÃ£o pode ser desfeita.')) return;
 
     try {
       setLoading(true);
@@ -338,7 +338,7 @@ const ProcedureHistory = ({
 
       if (resultsError) throw resultsError;
 
-      // Excluir especificações do agendamento
+      // Excluir especificaÃ§Ãµes do agendamento
       const { error: specsError } = await supabase
         .from('appointment_specifications')
         .delete()
@@ -346,7 +346,7 @@ const ProcedureHistory = ({
 
       if (specsError) throw specsError;
 
-      // Excluir seleções de área do corpo
+      // Excluir seleÃ§Ãµes de Ã¡rea do corpo
       const { error: bodyError } = await supabase
         .from('appointment_body_selections')
         .delete()
@@ -354,7 +354,7 @@ const ProcedureHistory = ({
 
       if (bodyError) throw bodyError;
 
-      // Por último, excluir o agendamento
+      // Por Ãºltimo, excluir o agendamento
       const { error: appointmentError } = await supabase
         .from('appointments')
         .delete()
@@ -388,8 +388,8 @@ const ProcedureHistory = ({
       }
 
       toast({
-        title: "Agendamento excluído",
-        description: "O agendamento foi excluído com sucesso.",
+        title: "Agendamento excluÃ­do",
+        description: "O agendamento foi excluÃ­do com sucesso.",
       });
 
       onAppointmentUpdated();
@@ -435,7 +435,7 @@ const ProcedureHistory = ({
 
   return (
     <div className="space-y-4">
-      {/* Botões para novo agendamento e procedimento realizado */}
+      {/* BotÃµes para novo agendamento e procedimento realizado */}
       <div className="flex justify-end gap-3">
         <Button 
           onClick={() => setShowCompletedProcedureForm(true)} 
@@ -459,7 +459,7 @@ const ProcedureHistory = ({
             Nenhum procedimento encontrado
           </h3>
           <p className="text-muted-foreground mb-4">
-            Este cliente ainda não possui procedimentos agendados.
+            Este cliente ainda nÃ£o possui procedimentos agendados.
           </p>
           <div className="flex gap-3 justify-center">
             <Button 
@@ -561,12 +561,12 @@ const ProcedureHistory = ({
                     </div>
                   </div>
 
-                  {/* Informações de Pagamento */}
+                  {/* InformaÃ§Ãµes de Pagamento */}
                   {(appointment.payment_status || appointment.payment_method || appointment.payment_value) && (
                     <div className="mb-4 p-3 bg-muted/30 rounded-lg border border-muted">
                       <div className="flex items-center gap-2 mb-2">
                         <DollarSign className="h-4 w-4 text-primary" />
-                        <span className="text-sm font-semibold">Informações de Pagamento</span>
+                        <span className="text-sm font-semibold">InformaÃ§Ãµes de Pagamento</span>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
                         {appointment.payment_status && (
@@ -579,7 +579,7 @@ const ProcedureHistory = ({
                         )}
                         {appointment.payment_method && (
                           <div>
-                            <span className="text-muted-foreground">Método: </span>
+                            <span className="text-muted-foreground">MÃ©todo: </span>
                             <span className="font-medium">{appointment.payment_method}</span>
                           </div>
                         )}
@@ -598,7 +598,7 @@ const ProcedureHistory = ({
                     </div>
                   )}
 
-                  {/* Botão para anexar fotos - apenas para realizados */}
+                  {/* BotÃ£o para anexar fotos - apenas para realizados */}
                   {appointment.status === 'realizado' && (
                     <div className="mb-4">
                       <Button 
@@ -686,54 +686,48 @@ const ProcedureHistory = ({
       )}
 
       {/* Dialog para Editar Agendamento */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog
+        open={showEditForm}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeEditForm();
+          }
+        }}
+      >
+        <DialogContent className="max-w-5xl w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Agendamento</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleUpdateAppointment} className="space-y-4">
-            <div>
-              <Label htmlFor="appointment-date">Data</Label>
-              <Input
-                id="appointment-date"
-                type="date"
-                value={appointmentFormData.appointment_date}
-                onChange={(e) => setAppointmentFormData({...appointmentFormData, appointment_date: e.target.value})}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="appointment-time">Horário</Label>
-              <Input
-                id="appointment-time"
-                type="time"
-                value={appointmentFormData.appointment_time}
-                onChange={(e) => setAppointmentFormData({...appointmentFormData, appointment_time: e.target.value})}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="appointment-notes">Observações</Label>
-              <Textarea
-                id="appointment-notes"
-                value={appointmentFormData.notes}
-                onChange={(e) => setAppointmentFormData({...appointmentFormData, notes: e.target.value})}
-                placeholder="Observações do agendamento..."
-              />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => setShowEditDialog(false)}
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? "Salvando..." : "Salvar Alterações"}
-              </Button>
-            </div>
-          </form>
+          {appointmentBeingEdited ? (
+            <NewBookingFlow
+              onBack={closeEditForm}
+              onSuccess={handleEditSuccess}
+              adminMode={true}
+              initialClient={{
+                id: client.id,
+                cpf: client.cpf,
+                nome: client.nome,
+                sobrenome: client.sobrenome,
+                celular: client.celular,
+              }}
+              sendNotification={true}
+              editingAppointmentId={appointmentBeingEdited.id}
+              allowPastDates={true}
+              initialAppointment={{
+                id: appointmentBeingEdited.id,
+                appointment_date: appointmentBeingEdited.appointment_date,
+                appointment_time: appointmentBeingEdited.appointment_time,
+                city_id: appointmentBeingEdited.city_id,
+                notes: appointmentBeingEdited.notes ?? null,
+                procedures: appointmentBeingEdited.procedure,
+                appointments_procedures: appointmentBeingEdited.appointments_procedures,\n                appointment_specifications: appointmentBeingEdited.appointment_specifications || null,\n                city_settings: appointmentBeingEdited.city_settings,
+              }}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Selecione um agendamento para editar.
+            </p>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -754,7 +748,7 @@ const ProcedureHistory = ({
               />
             </div>
             <div>
-              <Label htmlFor="description">Descrição (opcional)</Label>
+              <Label htmlFor="description">DescriÃ§Ã£o (opcional)</Label>
               <Textarea
                 id="description"
                 value={resultDescription}
@@ -774,7 +768,7 @@ const ProcedureHistory = ({
         </DialogContent>
       </Dialog>
 
-      {/* Modal de pré-visualização de imagem */}
+      {/* Modal de prÃ©-visualizaÃ§Ã£o de imagem */}
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -784,7 +778,7 @@ const ProcedureHistory = ({
             <div className="flex justify-center">
               <img
                 src={previewImage}
-                alt="Visualização do resultado"
+                alt="VisualizaÃ§Ã£o do resultado"
                 className="max-w-full max-h-96 object-contain rounded border"
               />
             </div>
@@ -796,3 +790,5 @@ const ProcedureHistory = ({
 };
 
 export default ProcedureHistory;
+
+

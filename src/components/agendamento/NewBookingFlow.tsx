@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,7 +17,6 @@ import CadastroCliente from "./CadastroCliente";
 import { format, parseISO, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { useRef } from "react";
 
 interface Procedure {
   id: string;
@@ -62,6 +61,18 @@ interface NewBookingFlowProps {
       duration: number;
       price: number;
     };
+    appointments_procedures?: Array<{
+      order_index?: number | null;
+      procedure?: Procedure | null;
+    }> | null;
+    appointment_specifications?: {
+      specification_id: string;
+      specification_name: string;
+      specification_price: number;
+    }[] | null;
+    city_settings?: {
+      city_name?: string | null;
+    } | null;
   } | null;
 }
 
@@ -136,9 +147,30 @@ const NewBookingFlow = ({
   const [originalSnapshot, setOriginalSnapshot] = useState<FormSnapshot | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [prefilledFromInitial, setPrefilledFromInitial] = useState(false);
+  const [procedureSearch, setProcedureSearch] = useState("");
+  const [procedureSelectOpen, setProcedureSelectOpen] = useState(false);
   const { toast } = useToast();
 
   const sanitizeNotes = (value: string) => (value || "").trim();
+
+  const ensureCityPresent = (cityId?: string | null, fallbackName?: string | null) => {
+    if (!cityId) return;
+    setCities(prev => {
+      if (prev.some(city => city.id === cityId)) {
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          id: cityId,
+          city_name: fallbackName || "Cidade selecionada",
+          clinic_name: null,
+          address: null,
+          map_url: null,
+        },
+      ];
+    });
+  };
 
   const areArraysEqual = (a: string[], b: string[]) =>
     a.length === b.length && a.every((value, index) => value === b[index]);
@@ -172,6 +204,14 @@ const NewBookingFlow = ({
       specsByProcedure,
     };
   };
+
+  const filteredProcedures = useMemo(() => {
+    if (!procedureSearch) return procedures;
+    const searchTerm = procedureSearch.toLowerCase();
+    return procedures.filter((proc) =>
+      proc.name.toLowerCase().includes(searchTerm)
+    );
+  }, [procedures, procedureSearch]);
 
   useEffect(() => {
     loadData();
@@ -216,53 +256,90 @@ const NewBookingFlow = ({
       return;
     }
 
-    const baseProcedureId =
-      initialAppointment.procedures?.id || initialAppointment.procedures?.id;
+    const proceduresFromInitial = (initialAppointment.appointments_procedures && initialAppointment.appointments_procedures.length > 0)
+      ? initialAppointment.appointments_procedures
+          .slice()
+          .sort((a, b) => (a?.order_index ?? 0) - (b?.order_index ?? 0))
+          .map((entry, index) => {
+            const procedure = entry?.procedure || null;
+            if (!procedure) return null;
+            const matched = procedure.id ? procedures.find((proc) => proc.id === procedure.id) : null;
+            return {
+              id: `initial-${index + 1}`,
+              procedure: (matched || procedure) as Procedure,
+              specifications: [] as ProcedureSpecification[],
+              specificationsTotal: 0,
+            };
+          })
+          .filter((item): item is {
+            id: string;
+            procedure: Procedure;
+            specifications: ProcedureSpecification[];
+            specificationsTotal: number;
+          } => item !== null)
+      : (() => {
+          const baseProc = initialAppointment.procedures;
+          if (!baseProc) return [];
+          const matched = baseProc.id ? procedures.find((proc) => proc.id === baseProc.id) : null;
+          const finalProcedure = matched || {
+            id: baseProc.id || "",
+            name: baseProc.name,
+            duration: baseProc.duration,
+            price: baseProc.price,
+          };
+          return [
+            {
+              id: 'initial-1',
+              procedure: finalProcedure as Procedure,
+              specifications: [] as ProcedureSpecification[],
+              specificationsTotal: 0,
+            },
+          ];
+        })();
 
-    const matchedProcedure = baseProcedureId
-      ? procedures.find((proc) => proc.id === baseProcedureId)
-      : undefined;
+    const updatedFormData = {
+      procedure_id: proceduresFromInitial[0]?.procedure?.id || initialAppointment.procedures?.id || "",
+      appointment_date: initialAppointment.appointment_date || "",
+      appointment_time: initialAppointment.appointment_time || "",
+      city_id: initialAppointment.city_id || "",
+      notes: sanitizeNotes(initialAppointment.notes || ""),
+    };
 
-    const fallbackProcedure =
-      matchedProcedure ||
-      (initialAppointment.procedures
-        ? {
-            id: initialAppointment.procedures.id || "",
-            name: initialAppointment.procedures.name,
-            duration: initialAppointment.procedures.duration,
-            price: initialAppointment.procedures.price,
-          }
-        : null);
+    ensureCityPresent(updatedFormData.city_id, initialAppointment.city_settings?.city_name ?? null);
 
-    if (fallbackProcedure) {
-      setSelectedProcedures([
-        {
-          id: 'proc-1',
-          procedure: fallbackProcedure as Procedure,
-          specifications: [],
-          specificationsTotal: 0,
-        },
-      ]);
-      setFormData((prev) => ({
-        ...prev,
-        procedure_id: fallbackProcedure.id || "",
-        appointment_date: initialAppointment.appointment_date || "",
-        appointment_time: initialAppointment.appointment_time || "",
-        city_id: initialAppointment.city_id || "",
-        notes: sanitizeNotes(initialAppointment.notes || ""),
-      }));
+    if (proceduresFromInitial.length > 0) {
+      const missingProcedures = proceduresFromInitial
+        .map((entry) => entry.procedure)
+        .filter(
+          (proc): proc is Procedure =>
+            Boolean(proc && proc.id && !procedures.some(existing => existing.id === proc.id))
+        );
+      if (missingProcedures.length > 0) {
+        setProcedures(prev => {
+          const existingIds = new Set(prev.map(proc => proc.id));
+          const merged = [
+            ...prev,
+            ...missingProcedures.filter(proc => proc.id && !existingIds.has(proc.id)),
+          ];
+          return merged.sort((a, b) => a.name.localeCompare(b.name));
+        });
+      }
+      setSelectedProcedures(proceduresFromInitial);
+      setFormData(updatedFormData);
+      if (!originalSnapshot) {
+        setOriginalSnapshot(createSnapshot(updatedFormData, proceduresFromInitial));
+      }
     } else {
-      setFormData((prev) => ({
-        ...prev,
-        appointment_date: initialAppointment.appointment_date || "",
-        appointment_time: initialAppointment.appointment_time || "",
-        city_id: initialAppointment.city_id || "",
-        notes: sanitizeNotes(initialAppointment.notes || ""),
-      }));
+      setFormData(updatedFormData);
+      if (!originalSnapshot) {
+        setOriginalSnapshot(createSnapshot(updatedFormData, selectedProcedures));
+      }
     }
 
     setPrefilledFromInitial(true);
-  }, [isEditing, initialAppointment, prefilledFromInitial, procedures]);
+    setProcedureSelectOpen(false);
+    setProcedureSearch("");
+  }, [isEditing, initialAppointment, prefilledFromInitial, procedures, originalSnapshot, selectedProcedures]);
 
   useEffect(() => {
     if (!isEditing) {
@@ -429,7 +506,23 @@ const NewBookingFlow = ({
         .order('name');
 
       if (proceduresError) throw proceduresError;
-      setProcedures(proceduresData || []);
+      const fetchedProcedures = proceduresData || [];
+      setProcedures(prev => {
+        if (prev.length === 0) {
+          return fetchedProcedures;
+        }
+        const fetchedMap = new Map<string, Procedure>();
+        fetchedProcedures.forEach(proc => {
+          if (proc.id) {
+            fetchedMap.set(proc.id, proc);
+          }
+        });
+        const combined = [
+          ...fetchedProcedures,
+          ...prev.filter(proc => !proc.id || !fetchedMap.has(proc.id)),
+        ];
+        return combined.sort((a, b) => a.name.localeCompare(b.name));
+      });
 
       // Carregar cidades ativas
       const { data: citiesData, error: citiesError } = await supabase
@@ -605,6 +698,12 @@ const NewBookingFlow = ({
           appointment_time,
           notes,
           city_id,
+          city_settings:city_settings (
+            city_name,
+            clinic_name,
+            address,
+            map_url
+          ),
           clients (*),
           procedures (*),
           appointments_procedures (
@@ -685,6 +784,8 @@ const NewBookingFlow = ({
         notes: data.notes || '',
         city_id: data.city_id || '',
       };
+
+      ensureCityPresent(newFormState.city_id, (data as any)?.city_settings?.city_name ?? null);
 
       setSelectedProcedures(normalizedProcedures);
       setFormData(newFormState);
@@ -1461,22 +1562,43 @@ Olá {clientName}!
                               specificationsTotal: 0
                             };
                             setSelectedProcedures(newProcedures);
+                            setProcedureSelectOpen(false);
+                            setProcedureSearch("");
+                          }}
+                          open={procedureSelectOpen}
+                          onOpenChange={(open) => {
+                            setProcedureSelectOpen(open);
+                            setProcedureSearch(open ? "" : "");
                           }}
                         >
                           <SelectTrigger className="h-14 border-2 hover:border-primary/50 transition-all duration-200 bg-background">
                             <SelectValue placeholder="Selecione um procedimento" />
                           </SelectTrigger>
-                          <SelectContent className="max-h-[300px]">
-                            {procedures.map((procedure) => (
-                              <SelectItem key={procedure.id} value={procedure.id} className="py-3">
-                                <div className="flex flex-col items-start">
-                                  <span className="font-medium">{procedure.name}</span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {procedure.duration}min • {currency(procedure.price || 0)}
-                                  </span>
-                                </div>
-                              </SelectItem>
-                            ))}
+                          <SelectContent className="max-h-[320px]">
+                            <div className="p-2 sticky top-0 bg-background z-10">
+                              <Input
+                                placeholder="Buscar procedimento..."
+                                value={procedureSearch}
+                                onChange={(e) => setProcedureSearch(e.target.value)}
+                                onKeyDown={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            {filteredProcedures.length === 0 ? (
+                              <div className="py-4 text-center text-sm text-muted-foreground">
+                                Nenhum procedimento encontrado.
+                              </div>
+                            ) : (
+                              filteredProcedures.map((procedure) => (
+                                <SelectItem key={procedure.id} value={procedure.id} className="py-3">
+                                  <div className="flex flex-col items-start">
+                                    <span className="font-medium">{procedure.name}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {procedure.duration}min • {currency(procedure.price || 0)}
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
@@ -1817,5 +1939,6 @@ Olá {clientName}!
 };
 
 export default NewBookingFlow;
+
 
 

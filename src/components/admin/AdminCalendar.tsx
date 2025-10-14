@@ -48,19 +48,49 @@ interface Appointment {
     cpf: string;
   };
   procedures: {
+    id?: string;
     name: string;
     duration: number;
     price: number;
     sessions?: number | null;
+    requires_specifications?: boolean;
+    body_selection_type?: string | null;
+    body_image_url?: string | null;
+    body_image_url_male?: string | null;
+    description?: string | null;
   };
   professionals?: {
     name: string;
   } | null;
+  appointments_procedures?: Array<{
+    order_index?: number | null;
+    procedure?: {
+      id?: string;
+      name: string;
+      duration: number;
+      price: number;
+      requires_specifications?: boolean;
+      body_selection_type?: string | null;
+      body_image_url?: string | null;
+      body_image_url_male?: string | null;
+      description?: string | null;
+    } | null;
+  }>;
+  appointment_specifications?: {
+    specification_id: string;
+    specification_name: string;
+    specification_price: number;
+  }[];
   all_procedures?: Array<{
-    id: string;
+    id?: string;
     name: string;
     duration: number;
     price: number;
+    requires_specifications?: boolean;
+    body_selection_type?: string | null;
+    body_image_url?: string | null;
+    body_image_url_male?: string | null;
+    description?: string | null;
   }>;
   total_duration?: number;
 }
@@ -76,7 +106,7 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
   const [loading, setLoading] = useState(true);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingAppointment, setEditingAppointment] = useState<string | null>(null);
+  const [appointmentBeingEdited, setAppointmentBeingEdited] = useState<Appointment | null>(null);
   const [showEditForm, setShowEditForm] = useState(false);
   const [showNewAppointmentForm, setShowNewAppointmentForm] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -123,10 +153,16 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
             cpf
           ),
           procedures (
+            id,
             name,
             duration,
             price,
-            sessions
+            sessions,
+            requires_specifications,
+            body_selection_type,
+            body_image_url,
+            body_image_url_male,
+            description
           ),
           professionals (
             name
@@ -137,8 +173,18 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
               id,
               name,
               duration,
-              price
+              price,
+              requires_specifications,
+              body_selection_type,
+              body_image_url,
+              body_image_url_male,
+              description
             )
+          ),
+          appointment_specifications (
+            specification_id,
+            specification_name,
+            specification_price
           )
         `)
         .order('appointment_date')
@@ -306,7 +352,7 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
   // Abrir formulário de edição
   const handleEditAppointment = () => {
     if (selectedAppointment) {
-      setEditingAppointment(selectedAppointment.id);
+      setAppointmentBeingEdited(selectedAppointment);
       setShowEditForm(true);
       setDialogOpen(false);
     }
@@ -315,7 +361,7 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
   // Fechar formulário de edição e voltar ao calendário
   const handleCloseEditForm = () => {
     setShowEditForm(false);
-    setEditingAppointment(null);
+    setAppointmentBeingEdited(null);
     setSelectedAppointment(null);
     loadAppointments(); // Recarregar dados após edição
   };
@@ -1038,7 +1084,7 @@ Aguardamos você!`;
   }
 
   // Se estiver no modo de edição, mostrar o formulário
-  if (showEditForm && selectedAppointment) {
+  if (showEditForm && appointmentBeingEdited) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-2">
@@ -1051,8 +1097,21 @@ Aguardamos você!`;
             onBack={handleCloseEditForm}
             onSuccess={handleAppointmentUpdated}
             adminMode={true}
-            initialClient={selectedAppointment.clients}
+            initialClient={appointmentBeingEdited.clients}
             sendNotification={true}
+            editingAppointmentId={appointmentBeingEdited.id}
+            allowPastDates={true}
+            initialAppointment={{
+              id: appointmentBeingEdited.id,
+              appointment_date: appointmentBeingEdited.appointment_date,
+              appointment_time: appointmentBeingEdited.appointment_time,
+              city_id: appointmentBeingEdited.city_id,
+              notes: appointmentBeingEdited.notes ?? null,
+              procedures: appointmentBeingEdited.procedures,
+              appointments_procedures: appointmentBeingEdited.appointments_procedures,
+              appointment_specifications: appointmentBeingEdited.appointment_specifications || null,
+              city_settings: appointmentBeingEdited.city_settings,
+            }}
           />
         </div>
       </div>
@@ -1757,5 +1816,7 @@ Aguardamos você!`;
 };
 
 export default AdminCalendar;
+
+
 
 

@@ -53,6 +53,11 @@ interface Appointment {
     duration: number;
     price: number;
     sessions?: number;
+    requires_specifications?: boolean;
+    body_selection_type?: string | null;
+    body_image_url?: string | null;
+    body_image_url_male?: string | null;
+    description?: string | null;
   };
   professionals?: {
     name: string;
@@ -60,6 +65,20 @@ interface Appointment {
   appointment_specifications?: {
     specification_name: string;
     specification_price: number;
+  }[];
+  appointments_procedures?: {
+    order_index?: number | null;
+    procedure?: {
+      id?: string;
+      name: string;
+      duration: number;
+      price: number;
+      requires_specifications?: boolean;
+      body_selection_type?: string | null;
+      body_image_url?: string | null;
+      body_image_url_male?: string | null;
+      description?: string | null;
+    } | null;
   }[];
 }
 
@@ -103,6 +122,7 @@ const AppointmentsList = ({
   const [hasReturn, setHasReturn] = useState(false);
   const [returnDate, setReturnDate] = useState("");
   const [returnTime, setReturnTime] = useState("");
+  const [appointmentBeingEdited, setAppointmentBeingEdited] = useState<Appointment | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -157,6 +177,20 @@ const AppointmentsList = ({
           ),
           professionals (
             name
+          ),
+          appointments_procedures (
+            order_index,
+            procedure:procedures (
+              id,
+              name,
+              duration,
+              price,
+              requires_specifications,
+              body_selection_type,
+              body_image_url,
+              body_image_url_male,
+              description
+            )
           ),
           appointment_specifications (
             specification_name,
@@ -276,6 +310,7 @@ const AppointmentsList = ({
   // Abrir formulário de edição
   const handleEditAppointment = () => {
     if (selectedAppointment) {
+      setAppointmentBeingEdited(selectedAppointment);
       setShowEditForm(true);
       setDialogOpen(false);
     }
@@ -284,6 +319,7 @@ const AppointmentsList = ({
   // Fechar formulário de edição e voltar à lista
   const handleCloseEditForm = () => {
     setShowEditForm(false);
+    setAppointmentBeingEdited(null);
     setSelectedAppointment(null);
     loadAppointments(); // Recarregar dados após edição
   };
@@ -982,7 +1018,7 @@ Aguardamos você!`;
   }
 
   // Se estiver no modo de edição, mostrar o formulário
-  if (showEditForm && selectedAppointment) {
+  if (showEditForm && appointmentBeingEdited) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-2">
@@ -995,17 +1031,18 @@ Aguardamos você!`;
             onBack={handleCloseEditForm}
             onSuccess={handleAppointmentUpdated}
             adminMode={true}
-            initialClient={selectedAppointment.clients}
+            initialClient={appointmentBeingEdited.clients}
             sendNotification={true}
-            editingAppointmentId={selectedAppointment.id}
+            editingAppointmentId={appointmentBeingEdited.id}
             allowPastDates={true}
             initialAppointment={{
-              id: selectedAppointment.id,
-              appointment_date: selectedAppointment.appointment_date,
-              appointment_time: selectedAppointment.appointment_time,
-              city_id: selectedAppointment.city_id,
-              notes: selectedAppointment.notes ?? null,
-              procedures: selectedAppointment.procedures,
+              id: appointmentBeingEdited.id,
+              appointment_date: appointmentBeingEdited.appointment_date,
+              appointment_time: appointmentBeingEdited.appointment_time,
+              city_id: appointmentBeingEdited.city_id,
+              notes: appointmentBeingEdited.notes ?? null,
+              procedures: appointmentBeingEdited.procedures,
+              appointments_procedures: appointmentBeingEdited.appointments_procedures,\n              appointment_specifications: appointmentBeingEdited.appointment_specifications || null,\n              city_settings: appointmentBeingEdited.city_settings,
             }}
           />
         </div>
@@ -1675,5 +1712,6 @@ Aguardamos você!`;
 };
 
 export default AppointmentsList;
+
 
 

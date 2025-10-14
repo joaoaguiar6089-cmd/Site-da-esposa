@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,7 @@ interface Appointment {
   appointment_date: string;
   appointment_time: string;
   status: string;
+  city_id?: string | null;
   notes?: string;
   session_number?: number;
   total_sessions?: number;
@@ -39,16 +40,46 @@ interface Appointment {
   payment_method?: string;
   payment_value?: number;
   payment_notes?: string | null;
+  payment_installments?: number | null;
   procedure: {
+    id?: string;
     name: string;
     duration: number;
     price: number;
+    sessions?: number | null;
+    requires_specifications?: boolean;
+    body_selection_type?: string | null;
+    body_image_url?: string | null;
+    body_image_url_male?: string | null;
+    description?: string | null;
   };
   client: {
     id: string;
     nome: string;
     sobrenome: string;
   };
+  city_settings?: {
+    city_name?: string | null;
+  } | null;
+  appointments_procedures?: Array<{
+    order_index?: number | null;
+    procedure?: {
+      id?: string;
+      name: string;
+      duration: number;
+      price: number;
+      requires_specifications?: boolean;
+      body_selection_type?: string | null;
+      body_image_url?: string | null;
+      body_image_url_male?: string | null;
+      description?: string | null;
+    } | null;
+  }>;
+  appointment_specifications?: {
+    specification_id: string;
+    specification_name: string;
+    specification_price: number;
+  }[];
 }
 
 interface ProcedureResult {
@@ -107,8 +138,41 @@ const ClientManagement = () => {
         .from("appointments")
         .select(`
           *,
-          procedure:procedures(name, duration, price),
-          client:clients(id, nome, sobrenome)
+          procedure:procedures(
+            id,
+            name,
+            duration,
+            price,
+            sessions,
+            requires_specifications,
+            body_selection_type,
+            body_image_url,
+            body_image_url_male,
+            description
+          ),
+          client:clients(id, nome, sobrenome),
+          city_settings:city_settings (
+            city_name
+          ),
+          appointments_procedures (
+            order_index,
+            procedure:procedures (
+              id,
+              name,
+              duration,
+              price,
+              requires_specifications,
+              body_selection_type,
+              body_image_url,
+              body_image_url_male,
+              description
+            )
+          ),
+          appointment_specifications (
+            specification_id,
+            specification_name,
+            specification_price
+          )
         `)
         .order("appointment_date", { ascending: false });
 
@@ -182,7 +246,7 @@ const ClientManagement = () => {
 
   const renderPaymentStatusBadge = (status?: string | null) => {
     const config = {
-      nao_pago: { label: 'Não pago', className: 'bg-red-100 text-red-700' },
+      nao_pago: { label: 'NÃ£o pago', className: 'bg-red-100 text-red-700' },
       pago_parcialmente: { label: 'Pago parcialmente', className: 'bg-yellow-100 text-yellow-700' },
       pago: { label: 'Pago', className: 'bg-green-100 text-green-700' },
       aguardando: { label: 'Aguardando', className: 'bg-gray-200 text-gray-700' },
@@ -232,7 +296,7 @@ const ClientManagement = () => {
     loadProcedureResults();
   };
 
-  // Se um cliente está selecionado, mostrar a ficha detalhada
+  // Se um cliente estÃ¡ selecionado, mostrar a ficha detalhada
   if (selectedClient) {
     return (
       <ClientDetail
@@ -249,13 +313,13 @@ const ClientManagement = () => {
 
   return (
     <div className="space-y-6">
-      {/* Cabeçalho */}
+      {/* CabeÃ§alho */}
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-3">
           <Users className="h-8 w-8 text-primary" />
           <div>
-            <h2 className="text-3xl font-bold text-foreground">Gestão de Clientes</h2>
-            <p className="text-muted-foreground">Gerencie seus clientes e visualize seus históricos</p>
+            <h2 className="text-3xl font-bold text-foreground">GestÃ£o de Clientes</h2>
+            <p className="text-muted-foreground">Gerencie seus clientes e visualize seus histÃ³ricos</p>
           </div>
         </div>
         <Button 
@@ -412,7 +476,7 @@ const ClientManagement = () => {
                               <div>
                                 <p className="font-medium">{apt.procedure.name}</p>
                                 <p className="text-xs text-muted-foreground">
-                                  {formatDateToBrazil(apt.appointment_date)} às {apt.appointment_time}
+                                  {formatDateToBrazil(apt.appointment_date)} Ã s {apt.appointment_time}
                                 </p>
                               </div>
                               {renderPaymentStatusBadge(apt.payment_status)}
@@ -456,3 +520,6 @@ const ClientManagement = () => {
 };
 
 export default ClientManagement;
+
+
+

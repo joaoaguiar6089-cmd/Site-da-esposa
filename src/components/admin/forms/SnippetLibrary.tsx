@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Plus, ChevronDown, ChevronRight } from "lucide-react";
 import { useFormSnippets } from "@/hooks/forms/useFormSnippets";
 import { Button } from "@/components/ui/button";
@@ -63,7 +63,7 @@ export default function SnippetLibrary({ onAddFields }: SnippetLibraryProps) {
         description: newSnippet.description,
         category: newSnippet.category,
         icon: newSnippet.icon,
-        fields: [], // Snippet começa vazio, admin adiciona campos depois
+        fields: [], // Snippet comeÃ§a vazio, admin adiciona campos depois
       });
 
       // Reset form e fecha dialog
@@ -167,13 +167,13 @@ export default function SnippetLibrary({ onAddFields }: SnippetLibraryProps) {
         </Button>
       </div>
 
-      {/* Dialog de Criação */}
+      {/* Dialog de CriaÃ§Ã£o */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Criar Novo Snippet</DialogTitle>
             <DialogDescription>
-              Crie um snippet customizado para reutilizar campos em múltiplas fichas.
+              Crie um snippet customizado para reutilizar campos em multiplas fichas.
             </DialogDescription>
           </DialogHeader>
 
@@ -189,10 +189,10 @@ export default function SnippetLibrary({ onAddFields }: SnippetLibraryProps) {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="description">Descrição</Label>
+              <Label htmlFor="description">DescriÃ§Ã£o</Label>
               <Textarea
                 id="description"
-                placeholder="Descreva o propósito deste snippet..."
+                placeholder="Descreva o propÃ³sito deste snippet..."
                 value={newSnippet.description}
                 onChange={(e) => setNewSnippet({ ...newSnippet, description: e.target.value })}
               />
@@ -209,15 +209,15 @@ export default function SnippetLibrary({ onAddFields }: SnippetLibraryProps) {
                 <option value="geral">Geral</option>
                 <option value="personal_data">Dados Pessoais</option>
                 <option value="contact">Contato</option>
-                <option value="address">Endereço</option>
-                <option value="medical">Médico</option>
-                <option value="aesthetic">Estético</option>
+                <option value="address">EndereÃ§o</option>
+                <option value="medical">MÃ©dico</option>
+                <option value="aesthetic">EstÃ©tico</option>
                 <option value="consent">Consentimento</option>
               </select>
             </div>
 
             <div className="text-sm text-muted-foreground">
-              💡 <strong>Dica:</strong> Após criar o snippet, você poderá adicionar campos a ele ao editar uma ficha.
+              Dica: Após criar o snippet, abra uma ficha, passe o mouse sobre o campo desejado e clique no ícone de cópia para salvá-lo dentro do snippet.
             </div>
           </div>
 
@@ -290,11 +290,16 @@ function getCategoryLabel(category: string): string {
   const labels: Record<string, string> = {
     personal_data: "Dados Pessoais",
     contact: "Contato",
-    address: "Endereço",
-    medical: "Médico",
+    address: "EndereÃ§o",
+    medical: "MÃ©dico",
     consent: "Consentimento",
-    evaluation: "Avaliação",
+    evaluation: "AvaliaÃ§Ã£o",
     other: "Outros",
   };
   return labels[category] || category;
 }
+
+
+
+
+

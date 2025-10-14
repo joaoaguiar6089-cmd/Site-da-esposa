@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { FileText, Upload, Settings, Trash2, Loader2 } from "lucide-react";
@@ -29,6 +29,11 @@ export default function PDFTemplateUploader({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showMapper, setShowMapper] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(currentPdfUrl || null);
+
+  useEffect(() => {
+    setPdfUrl(currentPdfUrl || null);
+  }, [currentPdfUrl]);
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -84,6 +89,8 @@ export default function PDFTemplateUploader({
         description: "Agora você pode configurar os campos no PDF.",
       });
 
+      setPdfUrl(urlData.publicUrl);
+      setShowMapper(true);
       onUploadComplete();
     } catch (error: any) {
       console.error("Erro ao fazer upload do PDF:", error);
@@ -101,11 +108,11 @@ export default function PDFTemplateUploader({
   };
 
   const handleDeletePDF = async () => {
-    if (!currentPdfUrl) return;
+    if (!pdfUrl) return;
 
     try {
       // Extrair caminho do arquivo da URL
-      const urlParts = currentPdfUrl.split('/form-pdfs/');
+      const urlParts = pdfUrl.split('/form-pdfs/');
       if (urlParts.length < 2) throw new Error("URL inválida");
       
       const filePath = urlParts[1];
@@ -134,6 +141,8 @@ export default function PDFTemplateUploader({
         description: "O template PDF foi removido com sucesso.",
       });
 
+      setPdfUrl(null);
+      setShowMapper(false);
       onUploadComplete();
     } catch (error: any) {
       console.error("Erro ao deletar PDF:", error);
@@ -153,7 +162,7 @@ export default function PDFTemplateUploader({
           Template PDF (Opcional)
         </Label>
 
-        {currentPdfUrl ? (
+        {pdfUrl ? (
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-xs text-muted-foreground bg-green-50 p-2 rounded border border-green-200">
               <FileText className="h-4 w-4 text-green-600" />
@@ -226,10 +235,10 @@ export default function PDFTemplateUploader({
               Clique no PDF para posicionar cada campo onde ele deve aparecer no documento final
             </DialogDescription>
           </DialogHeader>
-          {currentPdfUrl && (
+          {pdfUrl && (
             <PDFFieldMapper
               templateId={templateId}
-              pdfUrl={currentPdfUrl}
+              pdfUrl={pdfUrl}
               onClose={() => setShowMapper(false)}
             />
           )}

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -89,7 +90,6 @@ const AppointmentsList = ({
   const [paymentStatusFilters, setPaymentStatusFilters] = useState<string[]>(initialPaymentFilters || []);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingAppointment, setEditingAppointment] = useState<string | null>(null);
   const [showEditForm, setShowEditForm] = useState(false);
   const [showNewAppointmentForm, setShowNewAppointmentForm] = useState(false);
   const [confirmingAppointment, setConfirmingAppointment] = useState<Appointment | null>(null);
@@ -104,6 +104,14 @@ const AppointmentsList = ({
   const [returnDate, setReturnDate] = useState("");
   const [returnTime, setReturnTime] = useState("");
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (paymentDialogOpen && paymentStatus === 'nao_pago') {
+      setPaymentMethod('');
+      setPaymentValue('');
+      setPaymentInstallments('1');
+    }
+  }, [paymentDialogOpen, paymentStatus]);
 
   // Carregar todos os agendamentos (apenas de hoje em diante)
   const loadAppointments = async () => {
@@ -268,7 +276,6 @@ const AppointmentsList = ({
   // Abrir formulário de edição
   const handleEditAppointment = () => {
     if (selectedAppointment) {
-      setEditingAppointment(selectedAppointment.id);
       setShowEditForm(true);
       setDialogOpen(false);
     }
@@ -277,7 +284,6 @@ const AppointmentsList = ({
   // Fechar formulário de edição e voltar à lista
   const handleCloseEditForm = () => {
     setShowEditForm(false);
-    setEditingAppointment(null);
     setSelectedAppointment(null);
     loadAppointments(); // Recarregar dados após edição
   };
@@ -814,12 +820,27 @@ Aguardamos você!`;
       const paymentData: Record<string, any> = {
         payment_status: paymentStatus,
       };
+      const trimmedNotes = paymentNotes.trim();
 
-      if (paymentStatus !== 'aguardando') {
+      if (paymentStatus === 'nao_pago') {
+        if (!trimmedNotes) {
+          toast({
+            title: "Observações obrigatórias",
+            description: "Informe o motivo do não pagamento.",
+            variant: "destructive",
+          });
+          return;
+        }
+        paymentData.payment_method = null;
+        paymentData.payment_value = null;
+        paymentData.payment_installments = null;
+        paymentData.payment_notes = trimmedNotes;
+      } else if (paymentStatus !== 'aguardando') {
         paymentData.payment_method = paymentMethod || null;
         paymentData.payment_value = paymentValue ? parseFloat(paymentValue) : null;
-        paymentData.payment_installments = paymentMethod === 'cartao' && paymentInstallments ? parseInt(paymentInstallments) : null;
-        paymentData.payment_notes = paymentNotes || null;
+        paymentData.payment_installments =
+          paymentMethod === 'cartao' && paymentInstallments ? parseInt(paymentInstallments) : null;
+        paymentData.payment_notes = trimmedNotes || null;
       } else {
         // Se voltou para aguardando, limpar todos os campos
         paymentData.payment_method = null;
@@ -976,6 +997,16 @@ Aguardamos você!`;
             adminMode={true}
             initialClient={selectedAppointment.clients}
             sendNotification={true}
+            editingAppointmentId={selectedAppointment.id}
+            allowPastDates={true}
+            initialAppointment={{
+              id: selectedAppointment.id,
+              appointment_date: selectedAppointment.appointment_date,
+              appointment_time: selectedAppointment.appointment_time,
+              city_id: selectedAppointment.city_id,
+              notes: selectedAppointment.notes ?? null,
+              procedures: selectedAppointment.procedures,
+            }}
           />
         </div>
       </div>
@@ -1158,7 +1189,14 @@ Aguardamos você!`;
                           <p><strong>Parcelas:</strong> {appointment.payment_installments}x</p>
                         )}
                         {appointment.payment_notes && (
-                          <p className="text-muted-foreground"><strong>Obs:</strong> {appointment.payment_notes}</p>
+                          <p
+                            className={cn(
+                              "text-muted-foreground",
+                              appointment.payment_status === 'nao_pago' && "text-red-600 font-semibold"
+                            )}
+                          >
+                            <strong>{appointment.payment_status === 'nao_pago' ? 'Motivo:' : 'Obs:'}</strong> {appointment.payment_notes}
+                          </p>
                         )}
                       </div>
                     ) : (
@@ -1362,7 +1400,13 @@ Aguardamos você!`;
                       <p>Parcelas: {selectedAppointment.payment_installments}x</p>
                     )}
                     {selectedAppointment.payment_notes && (
-                      <p>Obs: {selectedAppointment.payment_notes}</p>
+                      <p
+                        className={cn(
+                          selectedAppointment.payment_status === 'nao_pago' ? 'text-red-600 font-semibold' : 'text-muted-foreground'
+                        )}
+                      >
+                        {selectedAppointment.payment_status === 'nao_pago' ? 'Motivo' : 'Obs'}: {selectedAppointment.payment_notes}
+                      </p>
                     )}
                   </div>
                 )}
@@ -1434,7 +1478,7 @@ Aguardamos você!`;
                 </Select>
               </div>
 
-              {paymentStatus !== 'aguardando' && (
+              {paymentStatus !== 'aguardando' && paymentStatus !== 'nao_pago' && (
                 <>
                   <div>
                     <label className="text-sm font-medium">Forma de Pagamento</label>
@@ -1492,6 +1536,24 @@ Aguardamos você!`;
                 </>
               )}
 
+              {paymentStatus !== 'aguardando' && (
+                <div>
+                  <label className="text-sm font-medium">
+                    Observações {paymentStatus === 'nao_pago' ? '*' : '(opcional)'}
+                  </label>
+                  <Textarea
+                    value={paymentNotes}
+                    onChange={(e) => setPaymentNotes(e.target.value)}
+                    placeholder={
+                      paymentStatus === 'nao_pago'
+                        ? 'Descreva o motivo do não pagamento...'
+                        : 'Observações sobre o pagamento...'
+                    }
+                    className="mt-2"
+                  />
+                </div>
+              )}
+
               {/* Seção de Retorno */}
               <div className="border-t pt-4">
                 <div className="flex items-center space-x-2 mb-4">
@@ -1543,6 +1605,7 @@ Aguardamos você!`;
                 <Button
                   onClick={handleSavePayment}
                   className="flex-1"
+                  disabled={paymentStatus === 'nao_pago' && paymentNotes.trim().length === 0}
                 >
                   Concluir
                 </Button>
@@ -1612,3 +1675,5 @@ Aguardamos você!`;
 };
 
 export default AppointmentsList;
+
+

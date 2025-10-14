@@ -11,6 +11,7 @@ interface SortableFieldItemProps {
   isSelected: boolean;
   onSelect: () => void;
   onDelete: () => void;
+  onSaveToSnippet?: () => void;
 }
 
 export default function SortableFieldItem({
@@ -18,6 +19,7 @@ export default function SortableFieldItem({
   isSelected,
   onSelect,
   onDelete,
+  onSaveToSnippet,
 }: SortableFieldItemProps) {
   const {
     attributes,
@@ -117,6 +119,19 @@ export default function SortableFieldItem({
 
         {/* Ações */}
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {onSaveToSnippet && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSaveToSnippet();
+              }}
+              title="Adicionar ao snippet"
+            >
+              <Copy className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"

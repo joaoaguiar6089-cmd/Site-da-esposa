@@ -17,6 +17,7 @@ import CadastroCliente from "./CadastroCliente";
 import { format, parseISO, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { useRef } from "react";
 
 interface Procedure {
   id: string;
@@ -48,9 +49,35 @@ interface NewBookingFlowProps {
   sendNotification?: boolean;
   selectedDate?: Date;
   allowPastDates?: boolean;
+  editingAppointmentId?: string;
+  initialAppointment?: {
+    id: string;
+    appointment_date: string;
+    appointment_time: string;
+    city_id?: string | null;
+    notes?: string | null;
+    procedures: {
+      id?: string;
+      name: string;
+      duration: number;
+      price: number;
+    };
+  } | null;
 }
 
 type ViewMode = 'form' | 'phone' | 'cadastro' | 'confirmation';
+
+type FormSnapshot = {
+  formData: {
+    procedure_id: string;
+    appointment_date: string;
+    appointment_time: string;
+    city_id: string;
+    notes: string;
+  };
+  procedureIds: string[];
+  specsByProcedure: Record<string, string[]>;
+};
 
 const currency = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0);
@@ -63,7 +90,9 @@ const NewBookingFlow = ({
   initialClient = null,
   sendNotification = true,
   selectedDate,
-  allowPastDates = false
+  allowPastDates = false,
+  editingAppointmentId,
+  initialAppointment = null,
 }: NewBookingFlowProps) => {
   const [currentView, setCurrentView] = useState<ViewMode>('form');
   const [procedures, setProcedures] = useState<Procedure[]>([]);
@@ -102,7 +131,47 @@ const NewBookingFlow = ({
   const [availabilityWarning, setAvailabilityWarning] = useState<string>('');
   const [logoUrl, setLogoUrl] = useState<string>('');
   const [whatsappNumber, setWhatsappNumber] = useState<string>('');
+  const isEditing = Boolean(editingAppointmentId);
+  const hasLoadedEditingData = useRef(false);
+  const [originalSnapshot, setOriginalSnapshot] = useState<FormSnapshot | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const [prefilledFromInitial, setPrefilledFromInitial] = useState(false);
   const { toast } = useToast();
+
+  const sanitizeNotes = (value: string) => (value || "").trim();
+
+  const areArraysEqual = (a: string[], b: string[]) =>
+    a.length === b.length && a.every((value, index) => value === b[index]);
+
+  const createSnapshot = (
+    formState: typeof formData,
+    proceduresState: typeof selectedProcedures
+  ): FormSnapshot => {
+    const procedureIds = proceduresState
+      .filter((sp) => sp.procedure)
+      .map((sp) => sp.procedure!.id);
+
+    const specsByProcedure = proceduresState.reduce<Record<string, string[]>>((acc, item) => {
+      if (item.procedure) {
+        acc[item.procedure.id] = (item.specifications || [])
+          .map((spec) => spec.id)
+          .sort();
+      }
+      return acc;
+    }, {});
+
+    return {
+      formData: {
+        procedure_id: formState.procedure_id,
+        appointment_date: formState.appointment_date,
+        appointment_time: formState.appointment_time,
+        city_id: formState.city_id,
+        notes: sanitizeNotes(formState.notes),
+      },
+      procedureIds,
+      specsByProcedure,
+    };
+  };
 
   useEffect(() => {
     loadData();
@@ -114,10 +183,125 @@ const NewBookingFlow = ({
   }, [adminMode, initialClient]);
 
   useEffect(() => {
+    hasLoadedEditingData.current = false;
+    if (!editingAppointmentId) {
+      setOriginalSnapshot(null);
+      setIsDirty(false);
+      setPrefilledFromInitial(false);
+    }
+  }, [editingAppointmentId]);
+
+  useEffect(() => {
     if (formData.city_id) {
       loadCityAvailability();
     }
   }, [formData.city_id]);
+
+  useEffect(() => {
+    if (!isEditing || !editingAppointmentId) {
+      return;
+    }
+    if (loadingProcedures || procedures.length === 0) {
+      return;
+    }
+    if (hasLoadedEditingData.current) {
+      return;
+    }
+
+    loadAppointmentForEdit(editingAppointmentId);
+  }, [isEditing, editingAppointmentId, loadingProcedures, procedures.length]);
+
+  useEffect(() => {
+    if (!isEditing || !initialAppointment || prefilledFromInitial) {
+      return;
+    }
+
+    const baseProcedureId =
+      initialAppointment.procedures?.id || initialAppointment.procedures?.id;
+
+    const matchedProcedure = baseProcedureId
+      ? procedures.find((proc) => proc.id === baseProcedureId)
+      : undefined;
+
+    const fallbackProcedure =
+      matchedProcedure ||
+      (initialAppointment.procedures
+        ? {
+            id: initialAppointment.procedures.id || "",
+            name: initialAppointment.procedures.name,
+            duration: initialAppointment.procedures.duration,
+            price: initialAppointment.procedures.price,
+          }
+        : null);
+
+    if (fallbackProcedure) {
+      setSelectedProcedures([
+        {
+          id: 'proc-1',
+          procedure: fallbackProcedure as Procedure,
+          specifications: [],
+          specificationsTotal: 0,
+        },
+      ]);
+      setFormData((prev) => ({
+        ...prev,
+        procedure_id: fallbackProcedure.id || "",
+        appointment_date: initialAppointment.appointment_date || "",
+        appointment_time: initialAppointment.appointment_time || "",
+        city_id: initialAppointment.city_id || "",
+        notes: sanitizeNotes(initialAppointment.notes || ""),
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        appointment_date: initialAppointment.appointment_date || "",
+        appointment_time: initialAppointment.appointment_time || "",
+        city_id: initialAppointment.city_id || "",
+        notes: sanitizeNotes(initialAppointment.notes || ""),
+      }));
+    }
+
+    setPrefilledFromInitial(true);
+  }, [isEditing, initialAppointment, prefilledFromInitial, procedures]);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setIsDirty(false);
+      return;
+    }
+    if (!originalSnapshot) {
+      setIsDirty(false);
+      return;
+    }
+
+    const currentSnapshot = createSnapshot(formData, selectedProcedures);
+
+    const sameFormData =
+      originalSnapshot.formData.procedure_id === currentSnapshot.formData.procedure_id &&
+      originalSnapshot.formData.appointment_date === currentSnapshot.formData.appointment_date &&
+      originalSnapshot.formData.appointment_time === currentSnapshot.formData.appointment_time &&
+      originalSnapshot.formData.city_id === currentSnapshot.formData.city_id &&
+      originalSnapshot.formData.notes === currentSnapshot.formData.notes;
+
+    const sameProcedures = areArraysEqual(
+      originalSnapshot.procedureIds,
+      currentSnapshot.procedureIds
+    );
+
+    const originalSpecKeys = Object.keys(originalSnapshot.specsByProcedure).sort();
+    const currentSpecKeys = Object.keys(currentSnapshot.specsByProcedure).sort();
+    const sameSpecKeys = areArraysEqual(originalSpecKeys, currentSpecKeys);
+    const sameSpecs = sameSpecKeys
+      ? originalSpecKeys.every((procedureId) =>
+          areArraysEqual(
+            originalSnapshot.specsByProcedure[procedureId] || [],
+            currentSnapshot.specsByProcedure[procedureId] || []
+          )
+        )
+      : false;
+
+    setIsDirty(!(sameFormData && sameProcedures && sameSpecs));
+  }, [isEditing, originalSnapshot, formData, selectedProcedures]);
 
   useEffect(() => {
     if (formData.appointment_date && formData.city_id) {
@@ -338,12 +522,15 @@ const NewBookingFlow = ({
 
       const { data: appointments } = await supabase
         .from('appointments')
-        .select('appointment_time, procedures(duration)')
+        .select('id, appointment_time, procedures(duration)')
         .eq('appointment_date', selectedDate)
         .neq('status', 'cancelado');
 
       const occupiedSlots = new Set<string>();
       appointments?.forEach(apt => {
+        if (isEditing && editingAppointmentId && apt.id === editingAppointmentId) {
+          return;
+        }
         const [aptHour, aptMinute] = apt.appointment_time.split(':').map(Number);
         const aptStartMinutes = aptHour * 60 + aptMinute;
         const aptDuration = apt.procedures?.duration || 60;
@@ -386,12 +573,139 @@ const NewBookingFlow = ({
         return true;
       });
 
-      setAvailableTimes(available);
+      const enrichedAvailable = [...available];
+      if (
+        isEditing &&
+        formData.appointment_date === selectedDate &&
+        formData.appointment_time &&
+        !enrichedAvailable.includes(formData.appointment_time)
+      ) {
+        enrichedAvailable.push(formData.appointment_time);
+        enrichedAvailable.sort();
+      }
+
+      setAvailableTimes(enrichedAvailable);
     } catch (error) {
       console.error('Erro ao carregar horários:', error);
       setAvailableTimes([]);
     } finally {
       setLoadingTimes(false);
+    }
+  };
+
+  const loadAppointmentForEdit = async (appointmentId: string) => {
+    try {
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          id,
+          appointment_date,
+          appointment_time,
+          notes,
+          city_id,
+          clients (*),
+          procedures (*),
+          appointments_procedures (
+            order_index,
+            procedure:procedures (*)
+          ),
+          appointment_specifications (
+            specification_id,
+            specification_name,
+            specification_price,
+            specification:procedure_specifications (*)
+          )
+        `)
+        .eq('id', appointmentId)
+        .single();
+
+      if (error) throw error;
+      if (!data) throw new Error('Agendamento n?o encontrado.');
+
+      const proceduresFromAppointment = (data.appointments_procedures && data.appointments_procedures.length > 0
+        ? data.appointments_procedures
+            .sort((a: any, b: any) => (a?.order_index || 0) - (b?.order_index || 0))
+            .map((item: any) => item?.procedure)
+        : [data.procedures]
+      ).filter(Boolean);
+
+      const hasSingleProcedure = proceduresFromAppointment.length <= 1;
+
+      const normalizedProcedures = proceduresFromAppointment.length > 0
+        ? proceduresFromAppointment.map((procedure: any, index: number) => {
+            const specsForProcedure = (data.appointment_specifications || [])
+              .filter((spec: any) => {
+                const procedureIdFromSpec = spec?.specification?.procedure_id;
+                if (procedureIdFromSpec) {
+                  return procedureIdFromSpec === procedure.id;
+                }
+                return hasSingleProcedure;
+              })
+              .map((spec: any) => ({
+                id: spec?.specification?.id || spec?.specification_id,
+                name: spec?.specification?.name || spec?.specification_name,
+                description: spec?.specification?.description ?? null,
+                price: spec?.specification_price ?? spec?.specification?.price ?? 0,
+                display_order: spec?.specification?.display_order ?? 0,
+                is_active: spec?.specification?.is_active ?? true,
+                has_area_selection: spec?.specification?.has_area_selection ?? false,
+                gender: spec?.specification?.gender ?? null,
+                area_shapes: spec?.specification?.area_shapes ?? null,
+              }));
+
+            const specificationsTotal = specsForProcedure.reduce(
+              (sum: number, spec: ProcedureSpecification) => sum + (spec.price || 0),
+              0
+            );
+
+            return {
+              id: `proc-${index + 1}`,
+              procedure: procedure as Procedure,
+              specifications: specsForProcedure,
+              specificationsTotal,
+            };
+          })
+        : [];
+
+      if (normalizedProcedures.length === 0) {
+        normalizedProcedures.push({
+          id: 'proc-1',
+          procedure: null,
+          specifications: [],
+          specificationsTotal: 0,
+        });
+      }
+
+      const newFormState = {
+        procedure_id: normalizedProcedures[0]?.procedure?.id || '',
+        appointment_date: data.appointment_date || '',
+        appointment_time: data.appointment_time || '',
+        notes: data.notes || '',
+        city_id: data.city_id || '',
+      };
+
+      setSelectedProcedures(normalizedProcedures);
+      setFormData(newFormState);
+      if (data.clients) {
+        setSelectedClient(data.clients);
+      }
+
+      const snapshot = createSnapshot(newFormState, normalizedProcedures);
+      setOriginalSnapshot(snapshot);
+      setIsDirty(false);
+      hasLoadedEditingData.current = true;
+    } catch (error) {
+      console.error('Erro ao carregar agendamento para edi??o:', error);
+      toast({
+        title: "Erro ao carregar agendamento",
+        description: "N?o foi poss?vel carregar os dados do agendamento para edi??o.",
+        variant: "destructive",
+      });
+      hasLoadedEditingData.current = true;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -520,7 +834,7 @@ const NewBookingFlow = ({
       console.log('Procedure:', procedure);
       console.log('City:', city);
 
-      const notes = appointment.notes ? `\n📝 Observações: ${appointment.notes}` : '';
+      const notes = appointment.notes ? `\n?? Observações: ${appointment.notes}` : '';
       console.log('Notes formatadas:', notes);
 
       // Buscar dados da cidade
@@ -536,7 +850,7 @@ const NewBookingFlow = ({
 
       // Formatação simples do local da clínica usando dados disponíveis
       const cityName = cityData?.city_name || city?.city_name || '';
-      const clinicLocation = `📍 Clínica Dra. Karoline Ferreira — ${cityName}`;
+      const clinicLocation = `?? Clínica Dra. Karoline Ferreira — ${cityName}`;
       
       console.log('Clinic location formatada:', clinicLocation);
 
@@ -573,17 +887,17 @@ const NewBookingFlow = ({
       console.log('Variáveis preparadas:', variables);
 
       // Processar template ou usar fallback
-      let message = templateData?.template_content || `🩺 *Agendamento Confirmado*
+      let message = templateData?.template_content || `?? *Agendamento Confirmado*
 
 Olá {clientName}!
 
-📅 Data: {appointmentDate}
-⏰ Horário: {appointmentTime}
-💉 Procedimento: {procedureName}{notes}
+?? Data: {appointmentDate}
+? Horário: {appointmentTime}
+?? Procedimento: {procedureName}{notes}
 
 {clinicLocation}
 
-✨ Aguardamos você!`;
+? Aguardamos você!`;
 
       console.log('Template inicial:', message);
 
@@ -695,32 +1009,30 @@ Olá {clientName}!
     }
   };
 
-  const handleBookingSubmit = async () => {
+  const handleBookingSubmit = async (proceduresOverride?: typeof selectedProcedures) => {
     if (!selectedClient) return;
 
     try {
       setLoading(true);
 
-      const selectedProcedure = procedures.find(p => p.id === formData.procedure_id);
+      const proceduresToSave = proceduresOverride ?? selectedProcedures.filter(sp => sp.procedure !== null);
+      const hasMultipleProcedures = proceduresToSave.length > 1;
+      const primaryProcedureId = proceduresToSave[0]?.procedure?.id || formData.procedure_id;
+      const primaryProcedure =
+        procedures.find(p => p.id === primaryProcedureId) ||
+        proceduresToSave[0]?.procedure ||
+        null;
       const selectedCity = cities.find(c => c.id === formData.city_id);
 
-      // Filtrar apenas procedimentos válidos
-      const proceduresToSave = selectedProcedures.filter(sp => sp.procedure !== null);
-      const hasMultipleProcedures = proceduresToSave.length > 1;
-
-      // Calcular duração total
-      const totalDuration = proceduresToSave.reduce((sum, sp) => sum + (sp.procedure?.duration || 0), 0);
-
-      // Criar agendamento
       const { data: appointment, error: appointmentError } = await supabase
         .from('appointments')
         .insert({
           client_id: selectedClient.id,
-          procedure_id: formData.procedure_id,
+          procedure_id: primaryProcedureId,
           professional_id: null,
           appointment_date: formData.appointment_date,
           appointment_time: formData.appointment_time,
-          notes: formData.notes.trim() || null,
+          notes: sanitizeNotes(formData.notes) || null,
           status: 'agendado',
           city_id: formData.city_id || null,
         })
@@ -729,38 +1041,31 @@ Olá {clientName}!
 
       if (appointmentError) throw appointmentError;
 
-      // Salvar procedimentos na tabela appointments_procedures
-      const proceduresData = proceduresToSave.map((sp, index) => ({
-        appointment_id: appointment.id,
-        procedure_id: sp.procedure!.id,
-        order_index: index
-      }));
+      if (proceduresToSave.length > 0) {
+        const proceduresData = proceduresToSave.map((sp, index) => ({
+          appointment_id: appointment.id,
+          procedure_id: sp.procedure!.id,
+          order_index: index,
+        }));
 
-      const { error: proceduresError } = await (supabase as any)
-        .from('appointments_procedures')
-        .insert(proceduresData);
+        const { error: proceduresError } = await (supabase as any)
+          .from('appointments_procedures')
+          .insert(proceduresData);
 
-      if (proceduresError) {
-        console.error('Erro ao salvar procedimentos:', proceduresError);
-        throw proceduresError;
+        if (proceduresError) {
+          console.error('Erro ao salvar procedimentos:', proceduresError);
+          throw proceduresError;
+        }
       }
 
-      console.log(`${proceduresData.length} procedimento(s) salvo(s) para o agendamento ${appointment.id}`);
-
-      // Salvar especificações de cada procedimento se houver
-      const allSpecifications: any[] = [];
-      proceduresToSave.forEach(sp => {
-        if (sp.specifications && sp.specifications.length > 0) {
-          sp.specifications.forEach(spec => {
-            allSpecifications.push({
-              appointment_id: appointment.id,
-              specification_id: spec.id,
-              specification_name: spec.name,
-              specification_price: spec.price || 0
-            });
-          });
-        }
-      });
+      const allSpecifications = proceduresToSave.flatMap((sp) =>
+        (sp.specifications || []).map((spec) => ({
+          appointment_id: appointment.id,
+          specification_id: spec.id,
+          specification_name: spec.name,
+          specification_price: spec.price || 0,
+        }))
+      );
 
       if (allSpecifications.length > 0) {
         const { error: specificationsError } = await supabase
@@ -770,11 +1075,31 @@ Olá {clientName}!
         if (specificationsError) throw specificationsError;
       }
 
-      // Notificar se necessário
       if (sendNotification) {
-        await sendWhatsAppNotification(selectedClient, appointment, selectedProcedure, selectedCity, hasMultipleProcedures, proceduresToSave);
-        await sendOwnerNotification(selectedClient, appointment, selectedProcedure, selectedCity, hasMultipleProcedures, proceduresToSave);
-        await sendAdminNotification(selectedClient, appointment, selectedProcedure, selectedCity, hasMultipleProcedures, proceduresToSave);
+        await sendWhatsAppNotification(
+          selectedClient,
+          appointment,
+          primaryProcedure,
+          selectedCity,
+          hasMultipleProcedures,
+          proceduresToSave
+        );
+        await sendOwnerNotification(
+          selectedClient,
+          appointment,
+          primaryProcedure,
+          selectedCity,
+          hasMultipleProcedures,
+          proceduresToSave
+        );
+        await sendAdminNotification(
+          selectedClient,
+          appointment,
+          primaryProcedure,
+          selectedCity,
+          hasMultipleProcedures,
+          proceduresToSave
+        );
       }
 
       setAppointmentDetails(appointment);
@@ -791,14 +1116,88 @@ Olá {clientName}!
     }
   };
 
+  const handleUpdateAppointment = async (proceduresToPersist: typeof selectedProcedures) => {
+    if (!editingAppointmentId) return;
+
+    try {
+      setLoading(true);
+
+      const updateData = {
+        procedure_id: proceduresToPersist[0]?.procedure?.id || formData.procedure_id,
+        appointment_date: formData.appointment_date,
+        appointment_time: formData.appointment_time,
+        notes: sanitizeNotes(formData.notes) || null,
+        city_id: formData.city_id || null,
+      };
+
+      const { error: updateError } = await supabase
+        .from('appointments')
+        .update(updateData)
+        .eq('id', editingAppointmentId);
+
+      if (updateError) throw updateError;
+
+      await supabase
+        .from('appointments_procedures')
+        .delete()
+        .eq('appointment_id', editingAppointmentId);
+
+      if (proceduresToPersist.length > 0) {
+        const appointmentProcedures = proceduresToPersist.map((sp, index) => ({
+          appointment_id: editingAppointmentId,
+          procedure_id: sp.procedure!.id,
+          order_index: index,
+        }));
+
+        const { error: insertProceduresError } = await (supabase as any)
+          .from('appointments_procedures')
+          .insert(appointmentProcedures);
+
+        if (insertProceduresError) throw insertProceduresError;
+      }
+
+      await supabase
+        .from('appointment_specifications')
+        .delete()
+        .eq('appointment_id', editingAppointmentId);
+
+      const specsPayload = proceduresToPersist.flatMap((sp) =>
+        (sp.specifications || []).map((spec) => ({
+          appointment_id: editingAppointmentId,
+          specification_id: spec.id,
+          specification_name: spec.name,
+          specification_price: spec.price || 0,
+        }))
+      );
+
+      if (specsPayload.length > 0) {
+        const { error: insertSpecsError } = await supabase
+          .from('appointment_specifications')
+          .insert(specsPayload);
+
+        if (insertSpecsError) throw insertSpecsError;
+      }
+
+      onSuccess();
+    } catch (error: any) {
+      console.error('Erro ao atualizar agendamento:', error);
+      toast({
+        title: "Erro ao atualizar agendamento",
+        description: error.message || "Nao foi possivel salvar as alteracoes.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validar se há pelo menos um procedimento selecionado
     const validProcedures = selectedProcedures.filter(sp => sp.procedure !== null);
     if (validProcedures.length === 0) {
       toast({
-        title: "Procedimento obrigatório",
+        title: "Procedimento obrigatorio",
         description: "Selecione pelo menos um procedimento.",
         variant: "destructive",
       });
@@ -807,19 +1206,18 @@ Olá {clientName}!
     
     if (!formData.appointment_date || !formData.appointment_time || !formData.city_id) {
       toast({
-        title: "Campos obrigatórios",
-        description: "Por favor, preencha todos os campos obrigatórios (cidade, data e horário).",
+        title: "Campos obrigatorios",
+        description: "Por favor, preencha todos os campos obrigatorios (cidade, data e horario).",
         variant: "destructive",
       });
       return;
     }
 
-    // Validar especificações obrigatórias
     for (const sp of validProcedures) {
       if (sp.procedure?.requires_specifications && (!sp.specifications || sp.specifications.length === 0)) {
         toast({
-          title: "Especificação obrigatória",
-          description: `Por favor, selecione especificações para ${sp.procedure.name}.`,
+          title: "Especificacao obrigatoria",
+          description: `Por favor, selecione especificacoes para ${sp.procedure.name}.`,
           variant: "destructive",
         });
         return;
@@ -827,12 +1225,23 @@ Olá {clientName}!
     }
 
     if (adminMode && selectedClient) {
-      // No admin mode, bypass phone validation and go straight to booking
-      handleBookingSubmit();
-    } else {
-      // Fluxo normal do cliente: ir para verificação de telefone
-      setCurrentView('phone');
+      if (isEditing) {
+        if (!isDirty) {
+          toast({
+            title: "Sem alteracoes",
+            description: "Altere algum dado antes de salvar.",
+            variant: "destructive",
+          });
+          return;
+        }
+        await handleUpdateAppointment(validProcedures);
+      } else {
+        await handleBookingSubmit(validProcedures);
+      }
+      return;
     }
+    
+    setCurrentView('phone');
   };
 
   const renderCurrentView = () => {
@@ -1383,10 +1792,14 @@ Olá {clientName}!
                   </Button>
                   <Button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || (isEditing && !isDirty)}
                     className="flex-1 h-12 text-base bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 font-semibold"
                   >
-                    {loading ? (<span className='inline-flex items-center gap-2'><Loader2 className='h-4 w-4 animate-spin' /> Processando...</span>) : 'Confirmar Agendamento'}
+                    {loading ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Processando...
+                      </span>
+                    ) : isEditing ? 'Salvar alteracoes' : 'Confirmar Agendamento'}
                   </Button>
                 </div>
               </form>
@@ -1404,3 +1817,5 @@ Olá {clientName}!
 };
 
 export default NewBookingFlow;
+
+

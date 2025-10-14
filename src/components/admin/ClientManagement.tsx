@@ -6,10 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, Plus, ArrowLeft, Users, Filter, Package } from "lucide-react";
+import { Search, Plus, ArrowLeft, Users, Filter, Package, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatCPF } from "@/utils/cpfValidator";
+import { formatDateToBrazil } from "@/utils/dateUtils";
 import ClientsList from "./ClientsList";
 import ClientDetail from "./ClientDetail";
 import NewClientDialog from "./NewClientDialog";
@@ -37,6 +38,7 @@ interface Appointment {
   payment_status?: string;
   payment_method?: string;
   payment_value?: number;
+  payment_notes?: string | null;
   procedure: {
     name: string;
     duration: number;
@@ -161,6 +163,36 @@ const ClientManagement = () => {
     return matchesSearch && hasStatus;
   });
 
+  const pendingPaymentClients = clients
+    .map(client => {
+      const pendingAppointments = appointments
+        .filter(apt =>
+          apt.client.id === client.id &&
+          (apt.payment_status === 'nao_pago' || apt.payment_status === 'pago_parcialmente')
+        )
+        .sort((a, b) =>
+          new Date(`${b.appointment_date}T${b.appointment_time}`).getTime() -
+          new Date(`${a.appointment_date}T${a.appointment_time}`).getTime()
+        );
+
+      if (pendingAppointments.length === 0) return null;
+      return { client, pendingAppointments };
+    })
+    .filter((item): item is { client: Client; pendingAppointments: Appointment[] } => item !== null);
+
+  const renderPaymentStatusBadge = (status?: string | null) => {
+    const config = {
+      nao_pago: { label: 'Não pago', className: 'bg-red-100 text-red-700' },
+      pago_parcialmente: { label: 'Pago parcialmente', className: 'bg-yellow-100 text-yellow-700' },
+      pago: { label: 'Pago', className: 'bg-green-100 text-green-700' },
+      aguardando: { label: 'Aguardando', className: 'bg-gray-200 text-gray-700' },
+    } as const;
+
+    const entry = status ? config[status as keyof typeof config] : null;
+    const badge = entry || config.aguardando;
+    return <Badge className={`text-xs ${badge.className}`}>{badge.label}</Badge>;
+  };
+
   const getClientAppointments = (clientId: string) => {
     return appointments.filter(apt => apt.client.id === clientId);
   };
@@ -237,7 +269,7 @@ const ClientManagement = () => {
 
       {/* Abas */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="todos" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Todos os Clientes
@@ -245,6 +277,10 @@ const ClientManagement = () => {
           <TabsTrigger value="pacotes" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             Pacotes em Andamento
+          </TabsTrigger>
+          <TabsTrigger value="pendentes" className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+            Pagamentos Pendentes
           </TabsTrigger>
         </TabsList>
 
@@ -315,6 +351,95 @@ const ClientManagement = () => {
                 const client = clients.find(c => c.id === clientId);
                 if (client) setSelectedClient(client);
               }} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="pendentes" className="mt-6">
+          <Card className="border-0 shadow-md">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-red-600" />
+                  Clientes com Pagamento Pendente
+                </span>
+                <Badge variant={pendingPaymentClients.length > 0 ? "destructive" : "secondary"}>
+                  {pendingPaymentClients.length}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {pendingPaymentClients.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum cliente com pagamento pendente no momento.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {pendingPaymentClients.map(({ client, pendingAppointments }) => (
+                    <div
+                      key={client.id}
+                      className="rounded-lg border border-red-200 bg-red-50 p-4 space-y-3"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                          <h3 className="font-semibold text-red-700">
+                            {client.nome} {client.sobrenome}
+                          </h3>
+                          <div className="text-sm text-muted-foreground flex flex-wrap gap-3">
+                            {client.cpf && !client.cpf.startsWith('temp_') && (
+                              <span>CPF: {formatCPF(client.cpf)}</span>
+                            )}
+                            <span>Tel: {client.celular}</span>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setSelectedClient(client)}
+                          className="border-red-300 text-red-700 hover:bg-red-100"
+                        >
+                          Ver detalhes
+                        </Button>
+                      </div>
+
+                      <div className="space-y-3">
+                        {pendingAppointments.map((apt) => (
+                          <div
+                            key={apt.id}
+                            className="rounded-lg border border-red-200 bg-white p-3 space-y-2"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                              <div>
+                                <p className="font-medium">{apt.procedure.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatDateToBrazil(apt.appointment_date)} às {apt.appointment_time}
+                                </p>
+                              </div>
+                              {renderPaymentStatusBadge(apt.payment_status)}
+                            </div>
+                            {apt.payment_value ? (
+                              <p className="text-xs text-muted-foreground">
+                                Valor informado: R$ {apt.payment_value.toFixed(2)}
+                              </p>
+                            ) : null}
+                            {apt.payment_notes && (
+                              <p
+                                className={`text-sm ${
+                                  apt.payment_status === 'nao_pago'
+                                    ? 'text-red-600 font-semibold'
+                                    : 'text-muted-foreground'
+                                }`}
+                              >
+                                {apt.payment_status === 'nao_pago' ? 'Motivo:' : 'Obs:'} {apt.payment_notes}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

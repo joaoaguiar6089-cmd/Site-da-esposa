@@ -194,6 +194,10 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
 
       if (error) throw error;
 
+      console.log('=== DEBUG ADMIN CALENDAR ===');
+      console.log('Total appointments loaded:', data?.length);
+      console.log('First appointment:', data?.[0]);
+
       // Processar appointments para incluir múltiplos procedimentos
       const processedAppointments = (data as any[])?.map(apt => {
         // Se tem appointments_procedures, usar eles; senão, usar procedure principal
@@ -220,13 +224,23 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
           sum + (proc?.duration || 0), 0
         );
 
-        return {
+        const result = {
           ...apt,
           all_procedures: validProcedures,
           total_duration: totalDuration
         };
+
+        console.log('Processed appointment:', {
+          id: apt.id,
+          date: apt.appointment_date,
+          has_procedures: validProcedures.length > 0,
+          procedures: validProcedures.map((p: any) => p.name)
+        });
+
+        return result;
       }) || [];
 
+      console.log('Total processed appointments:', processedAppointments.length);
       setAppointments(processedAppointments);
     } catch (error) {
       console.error('Erro ao carregar agendamentos:', error);

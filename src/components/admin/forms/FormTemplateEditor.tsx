@@ -312,11 +312,6 @@ export default function FormTemplateEditor() {
       <div className="border-b bg-background px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/admin/forms")}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Voltar
-            </Button>
-            <Separator orientation="vertical" className="h-6" />
             <div className="flex flex-col">
               <Input
                 value={editedTemplate.name || ""}

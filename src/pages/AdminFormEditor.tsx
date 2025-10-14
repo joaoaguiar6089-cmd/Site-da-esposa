@@ -4,7 +4,7 @@ import { LogOut, Home, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/auth/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import FormTemplateEditor from "@/components/admin/forms/FormTemplateEditor";
+import FormTemplateEditorSimple from "@/components/admin/forms/FormTemplateEditorSimple";
 import AdminAuth from "@/components/admin/AdminAuth";
 
 const AdminFormEditor = () => {
@@ -98,7 +98,7 @@ const AdminFormEditor = () => {
 
       {/* Main Content */}
       <main className="h-[calc(100vh-4rem)]">
-        <FormTemplateEditor />
+        <FormTemplateEditorSimple />
       </main>
     </div>
   );

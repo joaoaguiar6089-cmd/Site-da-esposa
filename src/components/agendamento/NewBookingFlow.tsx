@@ -156,7 +156,7 @@ const NewBookingFlow = ({
   const [isDirty, setIsDirty] = useState(false);
   const [prefilledFromInitial, setPrefilledFromInitial] = useState(false);
   const [procedureSearch, setProcedureSearch] = useState("");
-  const [procedureSelectOpen, setProcedureSelectOpen] = useState(false);
+  const [openSelectId, setOpenSelectId] = useState<string | null>(null);
   const [priceEditId, setPriceEditId] = useState<string | null>(null);
   const [priceEditValue, setPriceEditValue] = useState<string>("");
   const { toast } = useToast();
@@ -427,7 +427,7 @@ const NewBookingFlow = ({
     }
 
     setPrefilledFromInitial(true);
-    setProcedureSelectOpen(false);
+    setOpenSelectId(null);
     setProcedureSearch("");
   }, [isEditing, initialAppointment, prefilledFromInitial, procedures, originalSnapshot, selectedProcedures]);
 
@@ -518,7 +518,7 @@ const NewBookingFlow = ({
         setWhatsappNumber(whatsappData.setting_value);
       }
     } catch (error) {
-      console.error('Erro ao carregar configuraÃ§Ãµes:', error);
+      console.error('Erro ao carregar configurações:', error);
     }
   };
 
@@ -782,7 +782,7 @@ const NewBookingFlow = ({
 
       setAvailableTimes(enrichedAvailable);
     } catch (error) {
-      console.error('Erro ao carregar horÃ¡rios:', error);
+      console.error('Erro ao carregar horários:', error);
       setAvailableTimes([]);
     } finally {
       setLoadingTimes(false);
@@ -907,7 +907,7 @@ const NewBookingFlow = ({
       setIsDirty(false);
       hasLoadedEditingData.current = true;
     } catch (error) {
-      console.error('Erro ao carregar agendamento para edi??o:', error);
+      console.error('Erro ao carregar agendamento para edição:', error);
       toast({
         title: "Erro ao carregar agendamento",
         description: "N?o foi poss?vel carregar os dados do agendamento para edi??o.",
@@ -1044,7 +1044,7 @@ const NewBookingFlow = ({
       console.log('Procedure:', procedure);
       console.log('City:', city);
 
-      const notes = appointment.notes ? `\n?? ObservaÃ§Ãµes: ${appointment.notes}` : '';
+      const notes = appointment.notes ? `\n?? Observações: ${appointment.notes}` : '';
       console.log('Notes formatadas:', notes);
 
       // Buscar dados da cidade
@@ -1058,7 +1058,7 @@ const NewBookingFlow = ({
       console.log('City data:', cityData);
       console.log('City error:', cityError);
 
-      // FormataÃ§Ã£o simples do local da clÃ­nica usando dados disponÃ­veis
+      // FormataÃ§Ã£o simples do local da clÃ­nica usando dados disponíveis
       const cityName = cityData?.city_name || city?.city_name || '';
       const clinicLocation = `?? ClÃ­nica Dra. Karoline Ferreira â€” ${cityName}`;
       
@@ -1102,7 +1102,7 @@ const NewBookingFlow = ({
 OlÃ¡ {clientName}!
 
 ?? Data: {appointmentDate}
-? HorÃ¡rio: {appointmentTime}
+? Horário: {appointmentTime}
 ?? Procedimento: {procedureName}{notes}
 
 {clinicLocation}
@@ -1419,7 +1419,7 @@ OlÃ¡ {clientName}!
     if (!formData.appointment_date || !formData.appointment_time || !formData.city_id) {
       toast({
         title: "Campos obrigatorios",
-        description: "Por favor, preencha todos os campos obrigatorios (cidade, data e horario).",
+        description: "Por favor, preencha todos os campos obrigatorios (cidade, data e horário).",
         variant: "destructive",
       });
       return;
@@ -1515,7 +1515,7 @@ OlÃ¡ {clientName}!
                   <div className="flex items-start gap-3">
                     <CalendarIcon className="w-5 h-5 text-primary mt-0.5" />
                     <div>
-                      <p className="text-sm text-muted-foreground">Data e HorÃ¡rio</p>
+                      <p className="text-sm text-muted-foreground">Data e Horário</p>
                       <p className="font-semibold text-lg">
                         {format(parseISO(appointmentDetails.appointment_date), "dd/MM/yyyy", { locale: ptBR })} Ã s {appointmentDetails.appointment_time}
                       </p>
@@ -1661,7 +1661,7 @@ OlÃ¡ {clientName}!
                           <Sparkles className="w-4 h-4 text-primary" />
                           Procedimento {selectedProcedures.length > 1 ? `${index + 1}` : ''} <span className="text-destructive">*</span>
                         </label>
-                        <Select 
+                        <Select
                           value={item.procedure?.id || ""} 
                           onValueChange={(value) => {
                             const procedure = procedures.find(p => p.id === value);
@@ -1673,13 +1673,17 @@ OlÃ¡ {clientName}!
                               specificationsTotal: 0
                             };
                             setSelectedProcedures(newProcedures);
-                            setProcedureSelectOpen(false);
+                            setOpenSelectId(null);
                             setProcedureSearch("");
                           }}
-                          open={procedureSelectOpen}
                           onOpenChange={(open) => {
-                            setProcedureSelectOpen(open);
-                            setProcedureSearch(open ? "" : "");
+                            if (open) {
+                              setOpenSelectId(item.id);
+                              setProcedureSearch("");
+                            } else if (openSelectId === item.id) {
+                              setOpenSelectId(null);
+                              setProcedureSearch("");
+                            }
                           }}
                         >
                           <SelectTrigger className="h-14 border-2 hover:border-primary/50 transition-all duration-200 bg-background">
@@ -1694,25 +1698,33 @@ OlÃ¡ {clientName}!
                                 onKeyDown={(e) => e.stopPropagation()}
                               />
                             </div>
-                            {filteredProcedures.length === 0 ? (
-                              <div className="py-4 text-center text-sm text-muted-foreground">
-                                Nenhum procedimento encontrado.
-                              </div>
-                            ) : (
-                              filteredProcedures.map((procedure) => (
+                            {(() => {
+                              const proceduresToDisplay =
+                                openSelectId === item.id && procedureSearch
+                                  ? filteredProcedures
+                                  : procedures;
+
+                              if (proceduresToDisplay.length === 0) {
+                                return (
+                                  <div className="py-4 text-center text-sm text-muted-foreground">
+                                    Nenhum procedimento encontrado.
+                                  </div>
+                                );
+                              }
+
+                              return proceduresToDisplay.map((procedure) => (
                                 <SelectItem key={procedure.id} value={procedure.id} className="py-3">
                                   <div className="flex flex-col items-start">
                                     <span className="font-medium">{procedure.name}</span>
                                     <span className="text-xs text-muted-foreground">
-                                      {procedure.duration}min â€¢ {currency(procedure.price || 0)}
+                                      {procedure.duration}min • {currency(procedure.price || 0)}
                                     </span>
                                   </div>
                                 </SelectItem>
-                              ))
-                            )}
+                              ));
+                            })()}
                           </SelectContent>
-                        </Select>
-                      </div>
+                        </Select>                      </div>
 
                       {/* Box de DescriÃ§Ã£o do Procedimento */}
                       {item.procedure && (
@@ -1746,34 +1758,27 @@ OlÃ¡ {clientName}!
                                     {item.procedure.description}
                                   </p>
                                 )}
-                                <div className="flex items-center flex-wrap gap-4 pt-2">
+
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <div className="flex items-center gap-2">
-                                    <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></div>
-                                    <span className="text-sm font-medium whitespace-nowrap">Duração:</span>
-                                    <span className="text-sm text-muted-foreground">{item.procedure.duration}min</span>
+                                    <span className="text-sm font-medium whitespace-nowrap">Valor:</span>
+                                    <span className="text-sm text-primary font-bold">{currency(getEffectiveProcedurePrice(item))}</span>
                                   </div>
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <div className="flex items-center gap-2">
-                                      <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></div>
-                                      <span className="text-sm font-medium whitespace-nowrap">Valor:</span>
-                                      <span className="text-sm text-primary font-bold">{currency(getEffectiveProcedurePrice(item))}</span>
-                                    </div>
-                                    {item.customPrice !== null && item.customPrice !== undefined && (
-                                      <Badge variant="outline" className="text-xs text-primary border-primary/60">
-                                        Valor personalizado
-                                      </Badge>
-                                    )}
-                                    {adminMode && (
-                                      <Button
-                                        type="button"
-                                        variant="link"
-                                        className="h-auto p-0 text-sm"
-                                        onClick={() => handleOpenPriceEditor(item.id)}
-                                      >
-                                        Editar valor
-                                      </Button>
-                                    )}
-                                  </div>
+                                  {item.customPrice !== null && item.customPrice !== undefined && (
+                                    <Badge variant="outline" className="text-xs text-primary border-primary/60">
+                                      Valor personalizado
+                                    </Badge>
+                                  )}
+                                  {adminMode && (
+                                    <Button
+                                      type="button"
+                                      variant="link"
+                                      className="h-auto p-0 text-sm"
+                                      onClick={() => handleOpenPriceEditor(item.id)}
+                                    >
+                                      Editar valor
+                                    </Button>
+                                  )}
                                 </div>
                                 {adminMode && priceEditId === item.id && (
                                   <div className="flex flex-col sm:flex-row gap-2 pt-2">
@@ -1806,18 +1811,6 @@ OlÃ¡ {clientName}!
                                     Valor original: {currency(getDefaultProcedurePrice(item))}
                                   </p>
                                 )}
-                                <div className="flex items-center flex-wrap gap-4 pt-2">
-                                  <div className="flex items-center gap-2">
-                                    <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></div>
-                                    <span className="text-sm font-medium whitespace-nowrap">DuraÃ§Ã£o:</span>
-                                    <span className="text-sm text-muted-foreground">{item.procedure.duration}min</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></div>
-                                    <span className="text-sm font-medium whitespace-nowrap">Valor:</span>
-                                    <span className="text-sm text-primary font-bold">{currency(item.procedure.price || 0)}</span>
-                                  </div>
-                                </div>
                               </div>
                             </div>
                           </CardContent>
@@ -1877,13 +1870,7 @@ OlÃ¡ {clientName}!
                     <CardContent className="space-y-3">
                       <div className="space-y-2">
                         {selectedProcedures.filter(p => p.procedure).map((item, index) => {
-                          // Se tem especificaÃ§Ãµes, usar APENAS o preÃ§o das especificaÃ§Ãµes (com desconto)
-                          // Se nÃ£o tem, usar o preÃ§o base do procedimento
-                          const hasSpecifications = item.specifications && item.specifications.length > 0;
-                          const totalPrice = hasSpecifications 
-                            ? (item.specificationsTotal || 0)  // SÃ³ Ã¡reas (com desconto)
-                            : (item.procedure!.price || 0);    // PreÃ§o base
-                          
+                          const totalPrice = getEffectiveProcedurePrice(item);                          
                           return (
                             <div key={item.id} className="flex justify-between items-start py-2 border-b border-border/50 last:border-0">
                               <div className="flex-1">
@@ -1909,7 +1896,7 @@ OlÃ¡ {clientName}!
                       {selectedProcedures.filter(p => p.procedure).length > 1 && (
                         <div className="pt-3 border-t-2 border-primary/20 space-y-2">
                           <div className="flex justify-between text-sm">
-                            <span className="font-semibold">DuraÃ§Ã£o Total:</span>
+                            <span className="font-semibold">Duração Total:</span>
                             <span className="font-bold">
                               {selectedProcedures
                                 .filter(p => p.procedure)
@@ -1922,15 +1909,7 @@ OlÃ¡ {clientName}!
                               {currency(
                                 selectedProcedures
                                   .filter(p => p.procedure)
-                                  .reduce((sum, p) => {
-                                    // Se tem especificaÃ§Ãµes, usar APENAS o preÃ§o das Ã¡reas
-                                    // Se nÃ£o tem, usar o preÃ§o base
-                                    const hasSpecifications = p.specifications && p.specifications.length > 0;
-                                    const price = hasSpecifications 
-                                      ? (p.specificationsTotal || 0)  // SÃ³ Ã¡reas
-                                      : (p.procedure?.price || 0);    // PreÃ§o base
-                                    return sum + price;
-                                  }, 0)
+                                  .reduce((sum, p) => sum + getEffectiveProcedurePrice(p), 0)
                               )}
                             </span>
                           </div>
@@ -2032,10 +2011,10 @@ OlÃ¡ {clientName}!
                   )}
                 </div>
 
-                {/* HorÃ¡rio */}
+                {/* Horário */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground">
-                    HorÃ¡rio <span className="text-destructive">*</span>
+                    Horário <span className="text-destructive">*</span>
                   </label>
                   <Select 
                     value={formData.appointment_time} 
@@ -2044,10 +2023,10 @@ OlÃ¡ {clientName}!
                   >
                     <SelectTrigger className="h-14 border-2 hover:border-primary/50 transition-all duration-200 bg-background">
                       <SelectValue placeholder={
-                        loadingTimes ? "Carregando horÃ¡rios..." : 
+                        loadingTimes ? "Carregando horários..." : 
                         !formData.appointment_date ? "Selecione a data primeiro" : 
-                        availableTimes.length === 0 ? "Sem horÃ¡rios disponÃ­veis" :
-                        "Selecione um horÃ¡rio"
+                        availableTimes.length === 0 ? "Sem horários disponíveis" :
+                        "Selecione um horário"
                       } />
                     </SelectTrigger>
                     <SelectContent>
@@ -2060,10 +2039,10 @@ OlÃ¡ {clientName}!
                   </Select>
                 </div>
 
-                {/* ObservaÃ§Ãµes */}
+                {/* Observações */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground">
-                    ObservaÃ§Ãµes (opcional)
+                    Observações (opcional)
                   </label>
                   <Textarea
                     value={formData.notes}

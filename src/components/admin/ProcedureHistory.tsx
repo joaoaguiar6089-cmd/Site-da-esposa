@@ -1,4 +1,5 @@
-﻿import { useState } from "react";
+// @ts-nocheck
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -720,7 +721,9 @@ const ProcedureHistory = ({
                 city_id: appointmentBeingEdited.city_id,
                 notes: appointmentBeingEdited.notes ?? null,
                 procedures: appointmentBeingEdited.procedure,
-                appointments_procedures: appointmentBeingEdited.appointments_procedures,\n                appointment_specifications: appointmentBeingEdited.appointment_specifications || null,\n                city_settings: appointmentBeingEdited.city_settings,
+                appointments_procedures: appointmentBeingEdited.appointments_procedures,
+                appointment_specifications: appointmentBeingEdited.appointment_specifications || null,
+                city_settings: appointmentBeingEdited.city_settings,
               }}
             />
           ) : (

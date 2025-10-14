@@ -50,8 +50,7 @@ export default function PromotionsSection() {
         .from("promotions")
         .select("id, title, description, image_url, display_order, procedure_id")
         .eq("is_active", true)
-        .order("display_order", { ascending: true })
-        .limit(4);
+        .order("display_order", { ascending: true });
 
       if (error) throw error;
       setPromotions(data || []);

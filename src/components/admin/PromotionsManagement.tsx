@@ -309,10 +309,11 @@ export default function PromotionsManagement() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="1">1º Posição</SelectItem>
-                        <SelectItem value="2">2º Posição</SelectItem>
-                        <SelectItem value="3">3º Posição</SelectItem>
-                        <SelectItem value="4">4º Posição</SelectItem>
+                        {Array.from({ length: promotions.length + 1 }, (_, i) => i + 1).map((position) => (
+                          <SelectItem key={position} value={position.toString()}>
+                            {position}º Posição
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -446,7 +447,7 @@ export default function PromotionsManagement() {
         <CardHeader>
           <CardTitle>Posts</CardTitle>
           <CardDescription>
-            Lista de todos os posts. Máximo de 4 posts ativos por vez.
+            Lista de todos os posts do feed da clínica.
           </CardDescription>
         </CardHeader>
         <CardContent>

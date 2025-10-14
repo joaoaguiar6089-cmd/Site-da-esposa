@@ -11,8 +11,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Edit, Trash2, Upload } from "lucide-react";
+import { Plus, Edit, Trash2, Upload, GripVertical } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface Promotion {
   id: string;
@@ -29,6 +46,102 @@ interface Promotion {
 interface Procedure {
   id: string;
   name: string;
+}
+
+interface SortablePromotionRowProps {
+  promotion: Promotion;
+  procedures: Procedure[];
+  onEdit: (promotion: Promotion) => void;
+  onDelete: (id: string) => void;
+}
+
+function SortablePromotionRow({ promotion, procedures, onEdit, onDelete }: SortablePromotionRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: promotion.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <TableRow ref={setNodeRef} style={style} className={isDragging ? "relative z-50" : ""}>
+      <TableCell>
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
+        >
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </div>
+      </TableCell>
+      <TableCell>
+        <img
+          src={promotion.image_url}
+          alt={promotion.title}
+          className="h-16 w-20 object-cover rounded-md"
+        />
+      </TableCell>
+      <TableCell className="font-medium">
+        <div className="max-w-32 truncate" title={promotion.title}>
+          {promotion.title}
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="max-w-48 text-sm text-muted-foreground" title={promotion.description}>
+          {promotion.description.length > 100 
+            ? `${promotion.description.substring(0, 100)}...` 
+            : promotion.description}
+        </div>
+      </TableCell>
+      <TableCell>
+        <Badge variant={promotion.is_procedure ? "default" : "secondary"} className="text-xs">
+          {promotion.is_procedure ? "Procedimento" : "Informativo"}
+        </Badge>
+      </TableCell>
+      <TableCell>
+        {promotion.is_procedure && promotion.procedure_id ? (
+          <Badge variant="outline" className="text-xs">
+            {procedures.find(p => p.id === promotion.procedure_id)?.name || 'Procedimento'}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground text-sm">-</span>
+        )}
+      </TableCell>
+      <TableCell>
+        <Badge variant={promotion.is_active ? "default" : "secondary"} className="text-xs">
+          {promotion.is_active ? "Ativo" : "Inativo"}
+        </Badge>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onEdit(promotion)}
+            className="h-8 w-8 p-0"
+          >
+            <Edit className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onDelete(promotion.id)}
+            className="h-8 w-8 p-0"
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
 }
 
 export default function PromotionsManagement() {
@@ -243,6 +356,55 @@ export default function PromotionsManagement() {
     setIsDialogOpen(true);
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = promotions.findIndex((p) => p.id === active.id);
+      const newIndex = promotions.findIndex((p) => p.id === over.id);
+
+      const newOrder = arrayMove(promotions, oldIndex, newIndex);
+      setPromotions(newOrder);
+
+      // Update display_order for all affected items
+      try {
+        const updates = newOrder.map((promotion, index) => ({
+          id: promotion.id,
+          display_order: index + 1,
+        }));
+
+        for (const update of updates) {
+          const { error } = await supabase
+            .from('promotions')
+            .update({ display_order: update.display_order })
+            .eq('id', update.id);
+
+          if (error) throw error;
+        }
+
+        toast({
+          title: "Sucesso",
+          description: "Ordem dos posts atualizada!",
+        });
+      } catch (error) {
+        console.error("Erro ao atualizar ordem:", error);
+        toast({
+          title: "Erro",
+          description: "Erro ao atualizar ordem dos posts",
+          variant: "destructive",
+        });
+        fetchPromotions(); // Reload on error
+      }
+    }
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center h-64">
       <div className="text-center">
@@ -452,96 +614,53 @@ export default function PromotionsManagement() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-24">Imagem</TableHead>
-                  <TableHead className="min-w-32">Título</TableHead>
-                  <TableHead className="min-w-48">Descrição</TableHead>
-                  <TableHead className="w-32">Tipo</TableHead>
-                  <TableHead className="w-32">Procedimento</TableHead>
-                  <TableHead className="w-20">Ordem</TableHead>
-                  <TableHead className="w-20">Status</TableHead>
-                  <TableHead className="w-24">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {promotions.map((promotion) => (
-                  <TableRow key={promotion.id}>
-                    <TableCell>
-                      <img
-                        src={promotion.image_url}
-                        alt={promotion.title}
-                        className="h-16 w-20 object-cover rounded-md"
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <div className="max-w-32 truncate" title={promotion.title}>
-                        {promotion.title}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="max-w-48 text-sm text-muted-foreground" title={promotion.description}>
-                        {promotion.description.length > 100 
-                          ? `${promotion.description.substring(0, 100)}...` 
-                          : promotion.description}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={promotion.is_procedure ? "default" : "secondary"} className="text-xs">
-                        {promotion.is_procedure ? "Procedimento" : "Informativo"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {promotion.is_procedure && promotion.procedure_id ? (
-                        <Badge variant="outline" className="text-xs">
-                          {procedures.find(p => p.id === promotion.procedure_id)?.name || 'Procedimento'}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">{promotion.display_order}º</TableCell>
-                    <TableCell>
-                      <Badge variant={promotion.is_active ? "default" : "secondary"} className="text-xs">
-                        {promotion.is_active ? "Ativo" : "Inativo"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(promotion)}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(promotion.id)}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {promotions.length === 0 && (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
-                      <div className="flex flex-col items-center gap-2">
-                        <Upload className="h-8 w-8 opacity-50" />
-                        <p>Nenhum post cadastrado</p>
-                        <p className="text-sm">Clique em "Novo Post" para começar</p>
-                      </div>
-                    </TableCell>
+                    <TableHead className="w-12"></TableHead>
+                    <TableHead className="w-24">Imagem</TableHead>
+                    <TableHead className="min-w-32">Título</TableHead>
+                    <TableHead className="min-w-48">Descrição</TableHead>
+                    <TableHead className="w-32">Tipo</TableHead>
+                    <TableHead className="w-32">Procedimento</TableHead>
+                    <TableHead className="w-20">Status</TableHead>
+                    <TableHead className="w-24">Ações</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  <SortableContext
+                    items={promotions.map((p) => p.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {promotions.map((promotion) => (
+                      <SortablePromotionRow
+                        key={promotion.id}
+                        promotion={promotion}
+                        procedures={procedures}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                      />
+                    ))}
+                  </SortableContext>
+                  {promotions.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                        <div className="flex flex-col items-center gap-2">
+                          <Upload className="h-8 w-8 opacity-50" />
+                          <p>Nenhum post cadastrado</p>
+                          <p className="text-sm">Clique em "Novo Post" para começar</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </DndContext>
           </div>
         </CardContent>
       </Card>

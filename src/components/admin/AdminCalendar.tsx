@@ -64,6 +64,7 @@ interface Appointment {
   } | null;
   appointments_procedures?: Array<{
     order_index?: number | null;
+    custom_price?: number | null;
     procedure?: {
       id?: string;
       name: string;
@@ -169,6 +170,7 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
           ),
           appointments_procedures (
             order_index,
+            custom_price,
             procedure:procedures (
               id,
               name,
@@ -198,7 +200,16 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
         const allProcedures = apt.appointments_procedures && apt.appointments_procedures.length > 0
           ? apt.appointments_procedures
               .sort((a: any, b: any) => a.order_index - b.order_index)
-              .map((ap: any) => ap.procedure)
+              .map((ap: any) => {
+                // Usar custom_price se disponível, senão usar price padrão
+                const proc = ap.procedure;
+                if (!proc) return null;
+                return {
+                  ...proc,
+                  price: ap.custom_price !== null && ap.custom_price !== undefined ? ap.custom_price : proc.price
+                };
+              })
+              .filter((p: any) => p !== null)
           : [apt.procedures];
 
         // Calcular duração total
@@ -1108,7 +1119,7 @@ Aguardamos você!`;
               city_id: appointmentBeingEdited.city_id,
               notes: appointmentBeingEdited.notes ?? null,
               procedures: appointmentBeingEdited.procedures,
-              appointments_procedures: appointmentBeingEdited.appointments_procedures,
+              appointments_procedures: appointmentBeingEdited.appointments_procedures as any,
               appointment_specifications: appointmentBeingEdited.appointment_specifications || null,
               city_settings: appointmentBeingEdited.city_settings,
             }}

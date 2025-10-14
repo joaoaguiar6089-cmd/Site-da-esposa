@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+﻿import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -64,6 +65,7 @@ interface NewBookingFlowProps {
     appointments_procedures?: Array<{
       order_index?: number | null;
       procedure?: Procedure | null;
+      custom_price?: number | null;
     }> | null;
     appointment_specifications?: {
       specification_id: string;
@@ -78,6 +80,14 @@ interface NewBookingFlowProps {
 
 type ViewMode = 'form' | 'phone' | 'cadastro' | 'confirmation';
 
+type SelectedProcedure = {
+  id: string;
+  procedure: Procedure | null;
+  customPrice?: number | null;
+  specifications?: ProcedureSpecification[];
+  specificationsTotal?: number;
+};
+
 type FormSnapshot = {
   formData: {
     procedure_id: string;
@@ -88,6 +98,7 @@ type FormSnapshot = {
   };
   procedureIds: string[];
   specsByProcedure: Record<string, string[]>;
+  customPrices: Record<string, number | null | undefined>;
 };
 
 const currency = (value: number) =>
@@ -122,12 +133,9 @@ const NewBookingFlow = ({
     city_id: "",
   });
   const [selectedSpecifications, setSelectedSpecifications] = useState<ProcedureSpecification[]>([]);
-  const [selectedProcedures, setSelectedProcedures] = useState<Array<{
-    id: string;
-    procedure: Procedure | null;
-    specifications?: ProcedureSpecification[];
-    specificationsTotal?: number; // Preço total das especificações (com desconto)
-  }>>([{ id: 'proc-1', procedure: null, specifications: [], specificationsTotal: 0 }]);
+  const [selectedProcedures, setSelectedProcedures] = useState<SelectedProcedure[]>([
+  { id: 'proc-1', procedure: null, customPrice: null, specifications: [], specificationsTotal: 0 },
+]);
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [loadingTimes, setLoadingTimes] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -149,6 +157,8 @@ const NewBookingFlow = ({
   const [prefilledFromInitial, setPrefilledFromInitial] = useState(false);
   const [procedureSearch, setProcedureSearch] = useState("");
   const [procedureSelectOpen, setProcedureSelectOpen] = useState(false);
+  const [priceEditId, setPriceEditId] = useState<string | null>(null);
+  const [priceEditValue, setPriceEditValue] = useState<string>("");
   const { toast } = useToast();
 
   const sanitizeNotes = (value: string) => (value || "").trim();
@@ -202,6 +212,12 @@ const NewBookingFlow = ({
       },
       procedureIds,
       specsByProcedure,
+      customPrices: proceduresState.reduce<Record<string, number | null | undefined>>((acc, item) => {
+        if (item.procedure) {
+          acc[item.procedure.id] = item.customPrice;
+        }
+        return acc;
+      }, {}),
     };
   };
 
@@ -213,10 +229,79 @@ const NewBookingFlow = ({
     );
   }, [procedures, procedureSearch]);
 
+  const getDefaultProcedurePrice = (item: {
+    procedure: Procedure | null;
+    specifications?: ProcedureSpecification[];
+    specificationsTotal?: number;
+  }) => {
+    if (item.specifications && item.specifications.length > 0) {
+      return item.specificationsTotal || 0;
+    }
+    return item.procedure?.price || 0;
+  };
+
+  const getEffectiveProcedurePrice = (item: typeof selectedProcedures[number]) => {
+    if (item.customPrice !== null && item.customPrice !== undefined) {
+      return item.customPrice;
+    }
+    return getDefaultProcedurePrice(item);
+  };
+
+  const getProceduresTotal = (proceduresList: typeof selectedProcedures) => {
+    return proceduresList
+      .filter(sp => sp.procedure)
+      .reduce((sum, sp) => sum + getEffectiveProcedurePrice(sp), 0);
+  };
+
+  const handleOpenPriceEditor = (procedureId: string) => {
+    const target = selectedProcedures.find(sp => sp.id === procedureId);
+    if (!target) return;
+    const baseValue = target.customPrice ?? getDefaultProcedurePrice(target);
+    setPriceEditId(procedureId);
+    setPriceEditValue(baseValue > 0 ? baseValue.toString() : "");
+  };
+
+  const handleCancelPriceEdit = () => {
+    setPriceEditId(null);
+    setPriceEditValue("");
+  };
+
+  const handleApplyCustomPrice = (procedureId: string) => {
+    const parsed = parseFloat(priceEditValue.replace(",", ".").trim());
+    if (Number.isNaN(parsed) || parsed < 0) {
+      toast({
+        title: "Valor invÃ¡lido",
+        description: "Informe um valor numÃ©rico maior ou igual a zero.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSelectedProcedures(prev =>
+      prev.map(item =>
+        item.id === procedureId
+          ? { ...item, customPrice: parsed }
+          : item
+      )
+    );
+    handleCancelPriceEdit();
+  };
+
+  const handleResetCustomPrice = (procedureId: string) => {
+    setSelectedProcedures(prev =>
+      prev.map(item =>
+        item.id === procedureId
+          ? { ...item, customPrice: null }
+          : item
+      )
+    );
+    handleCancelPriceEdit();
+  };
+
   useEffect(() => {
     loadData();
     loadSiteSettings();
-    // Só definir cliente inicial se estiver em modo admin
+    // SÃ³ definir cliente inicial se estiver em modo admin
     if (adminMode && initialClient) {
       setSelectedClient(initialClient);
     }
@@ -264,9 +349,11 @@ const NewBookingFlow = ({
             const procedure = entry?.procedure || null;
             if (!procedure) return null;
             const matched = procedure.id ? procedures.find((proc) => proc.id === procedure.id) : null;
+            const customPrice = entry?.custom_price;
             return {
               id: `initial-${index + 1}`,
               procedure: (matched || procedure) as Procedure,
+              customPrice: customPrice === null || customPrice === undefined ? null : Number(customPrice),
               specifications: [] as ProcedureSpecification[],
               specificationsTotal: 0,
             };
@@ -274,6 +361,7 @@ const NewBookingFlow = ({
           .filter((item): item is {
             id: string;
             procedure: Procedure;
+            customPrice: number | null;
             specifications: ProcedureSpecification[];
             specificationsTotal: number;
           } => item !== null)
@@ -287,10 +375,12 @@ const NewBookingFlow = ({
             duration: baseProc.duration,
             price: baseProc.price,
           };
+          const fallbackCustomPrice = initialAppointment.appointments_procedures?.[0]?.custom_price ?? null;
           return [
             {
               id: 'initial-1',
               procedure: finalProcedure as Procedure,
+              customPrice: fallbackCustomPrice === null || fallbackCustomPrice === undefined ? null : Number(fallbackCustomPrice),
               specifications: [] as ProcedureSpecification[],
               specificationsTotal: 0,
             },
@@ -377,7 +467,20 @@ const NewBookingFlow = ({
         )
       : false;
 
-    setIsDirty(!(sameFormData && sameProcedures && sameSpecs));
+    const originalCustomKeys = Object.keys(originalSnapshot.customPrices || {}).sort();
+    const currentCustomKeys = Object.keys(currentSnapshot.customPrices || {}).sort();
+    const sameCustomKeys = areArraysEqual(originalCustomKeys, currentCustomKeys);
+    const sameCustomPrices = sameCustomKeys
+      ? originalCustomKeys.every((procedureId) => {
+          const originalValue = originalSnapshot.customPrices[procedureId] ?? null;
+          const currentValue = currentSnapshot.customPrices[procedureId] ?? null;
+          if (originalValue === null && currentValue === null) return true;
+          if (originalValue === null || currentValue === null) return false;
+          return Number(originalValue) === Number(currentValue);
+        })
+      : false;
+
+    setIsDirty(!(sameFormData && sameProcedures && sameSpecs && sameCustomPrices));
   }, [isEditing, originalSnapshot, formData, selectedProcedures]);
 
   useEffect(() => {
@@ -415,7 +518,7 @@ const NewBookingFlow = ({
         setWhatsappNumber(whatsappData.setting_value);
       }
     } catch (error) {
-      console.error('Erro ao carregar configurações:', error);
+      console.error('Erro ao carregar configuraÃ§Ãµes:', error);
     }
   };
 
@@ -423,13 +526,13 @@ const NewBookingFlow = ({
     if (!formData.city_id) return;
 
     try {
-      // Novo sistema flexível: não bloqueamos mais datas
-      // Apenas limpamos as restrições e permitimos todos os dias
+      // Novo sistema flexÃ­vel: nÃ£o bloqueamos mais datas
+      // Apenas limpamos as restriÃ§Ãµes e permitimos todos os dias
       setAvailableDates(new Set());
       setUnavailableDates(new Set());
       
-      // Nota: O sistema de avisos será implementado na função de seleção de data
-      // quando o usuário selecionar uma data onde a Dra. está em outra cidade
+      // Nota: O sistema de avisos serÃ¡ implementado na funÃ§Ã£o de seleÃ§Ã£o de data
+      // quando o usuÃ¡rio selecionar uma data onde a Dra. estÃ¡ em outra cidade
     } catch (error) {
       console.error('Erro ao carregar disponibilidade da cidade:', error);
     }
@@ -437,7 +540,7 @@ const NewBookingFlow = ({
 
   const checkDateAvailability = async (date: string, cityId: string) => {
     try {
-      // Verificar se a doutora estará disponível na cidade selecionada
+      // Verificar se a doutora estarÃ¡ disponÃ­vel na cidade selecionada
       const { data: cityAvailability, error: availabilityError } = await supabase
         .from('city_availability')
         .select('*')
@@ -451,7 +554,7 @@ const NewBookingFlow = ({
       }
 
       if (!cityAvailability || cityAvailability.length === 0) {
-        // Verificar se ela estará em outra cidade
+        // Verificar se ela estarÃ¡ em outra cidade
         const { data: otherCityAvailability, error: otherError } = await supabase
           .from('city_availability')
           .select(`
@@ -465,7 +568,7 @@ const NewBookingFlow = ({
 
         if (otherError) {
           console.error('Erro ao verificar outras cidades:', otherError);
-          setAvailabilityWarning('A Dra. Karoline não estará disponível nesta data.');
+          setAvailabilityWarning('A Dra. Karoline nÃ£o estarÃ¡ disponÃ­vel nesta data.');
           return;
         }
 
@@ -473,20 +576,20 @@ const NewBookingFlow = ({
           const otherCity = otherCityAvailability[0];
           const cityName = (otherCity.city_settings as any)?.city_name || 'outra cidade';
           
-          // Buscar mensagem configurável
+          // Buscar mensagem configurÃ¡vel
           const { data: messageSetting } = await supabase
             .from('site_settings')
             .select('setting_value')
             .eq('setting_key', 'availability_message')
             .single();
 
-          const defaultMessage = 'A Dra. Karoline estará em {cidade} nesta data.';
+          const defaultMessage = 'A Dra. Karoline estarÃ¡ em {cidade} nesta data.';
           const messageTemplate = messageSetting?.setting_value || defaultMessage;
           const finalMessage = messageTemplate.replace('{cidade}', cityName);
           
           setAvailabilityWarning(finalMessage);
         } else {
-          setAvailabilityWarning('A Dra. Karoline não estará disponível nesta data.');
+          setAvailabilityWarning('A Dra. Karoline nÃ£o estarÃ¡ disponÃ­vel nesta data.');
         }
       } else {
         setAvailabilityWarning('');
@@ -679,7 +782,7 @@ const NewBookingFlow = ({
 
       setAvailableTimes(enrichedAvailable);
     } catch (error) {
-      console.error('Erro ao carregar horários:', error);
+      console.error('Erro ao carregar horÃ¡rios:', error);
       setAvailableTimes([]);
     } finally {
       setLoadingTimes(false);
@@ -708,6 +811,7 @@ const NewBookingFlow = ({
           procedures (*),
           appointments_procedures (
             order_index,
+            custom_price,
             procedure:procedures (*)
           ),
           appointment_specifications (
@@ -734,6 +838,9 @@ const NewBookingFlow = ({
 
       const normalizedProcedures = proceduresFromAppointment.length > 0
         ? proceduresFromAppointment.map((procedure: any, index: number) => {
+            // Encontrar o entry correspondente em appointments_procedures para pegar o custom_price
+            const apEntry = data.appointments_procedures?.find((ap: any) => ap.procedure?.id === procedure.id);
+            
             const specsForProcedure = (data.appointment_specifications || [])
               .filter((spec: any) => {
                 const procedureIdFromSpec = spec?.specification?.procedure_id;
@@ -762,6 +869,7 @@ const NewBookingFlow = ({
             return {
               id: `proc-${index + 1}`,
               procedure: procedure as Procedure,
+              customPrice: apEntry?.custom_price !== null && apEntry?.custom_price !== undefined ? Number(apEntry.custom_price) : null,
               specifications: specsForProcedure,
               specificationsTotal,
             };
@@ -772,6 +880,7 @@ const NewBookingFlow = ({
         normalizedProcedures.push({
           id: 'proc-1',
           procedure: null,
+          customPrice: null,
           specifications: [],
           specificationsTotal: 0,
         });
@@ -893,18 +1002,18 @@ const NewBookingFlow = ({
         console.error('Erro ao enviar evento Meta:', metaError);
       }
       
-      // Enviar notificações
+      // Enviar notificaÃ§Ãµes
       try {
         await sendWhatsAppNotification(client, appointment, procedure, city);
         await sendOwnerNotification(client, appointment, procedure, city);
         await sendAdminNotification(client, appointment, procedure, city);
       } catch (notificationError) {
-        console.error('Erro ao enviar notificações:', notificationError);
+        console.error('Erro ao enviar notificaÃ§Ãµes:', notificationError);
       }
 
       toast({
         title: "Agendamento realizado!",
-        description: "Seu agendamento foi criado com sucesso. Uma confirmação será enviada via WhatsApp.",
+        description: "Seu agendamento foi criado com sucesso. Uma confirmaÃ§Ã£o serÃ¡ enviada via WhatsApp.",
       });
 
       setCurrentView('confirmation');
@@ -929,13 +1038,13 @@ const NewBookingFlow = ({
     proceduresToSave?: Array<{id: string, procedure: Procedure | null}>
   ) => {
     try {
-      console.log('=== INÍCIO WHATSAPP NOTIFICATION ===');
+      console.log('=== INÃCIO WHATSAPP NOTIFICATION ===');
       console.log('Client:', client);
       console.log('Appointment:', appointment);
       console.log('Procedure:', procedure);
       console.log('City:', city);
 
-      const notes = appointment.notes ? `\n?? Observações: ${appointment.notes}` : '';
+      const notes = appointment.notes ? `\n?? ObservaÃ§Ãµes: ${appointment.notes}` : '';
       console.log('Notes formatadas:', notes);
 
       // Buscar dados da cidade
@@ -949,9 +1058,9 @@ const NewBookingFlow = ({
       console.log('City data:', cityData);
       console.log('City error:', cityError);
 
-      // Formatação simples do local da clínica usando dados disponíveis
+      // FormataÃ§Ã£o simples do local da clÃ­nica usando dados disponÃ­veis
       const cityName = cityData?.city_name || city?.city_name || '';
-      const clinicLocation = `?? Clínica Dra. Karoline Ferreira — ${cityName}`;
+      const clinicLocation = `?? ClÃ­nica Dra. Karoline Ferreira â€” ${cityName}`;
       
       console.log('Clinic location formatada:', clinicLocation);
 
@@ -971,7 +1080,7 @@ const NewBookingFlow = ({
         ? proceduresToSave.map((sp, idx) => `${idx + 1}. ${sp.procedure!.name}`).join('\n')
         : procedure?.name || '';
 
-      // Preparar variáveis para substituição
+      // Preparar variÃ¡veis para substituiÃ§Ã£o
       const variables = {
         clientName: client.nome,
         appointmentDate: format(parseISO(appointment.appointment_date), "dd/MM/yyyy", { locale: ptBR }),
@@ -980,29 +1089,29 @@ const NewBookingFlow = ({
         notes: notes,
         clinicLocation: clinicLocation,
         cityName: cityName,
-        clinicName: 'Clínica Dra. Karoline Ferreira',
+        clinicName: 'ClÃ­nica Dra. Karoline Ferreira',
         clinicMapUrl: cityData?.map_url || '',
         specifications: appointment.specifications || ''
       };
 
-      console.log('Variáveis preparadas:', variables);
+      console.log('VariÃ¡veis preparadas:', variables);
 
       // Processar template ou usar fallback
       let message = templateData?.template_content || `?? *Agendamento Confirmado*
 
-Olá {clientName}!
+OlÃ¡ {clientName}!
 
 ?? Data: {appointmentDate}
-? Horário: {appointmentTime}
+? HorÃ¡rio: {appointmentTime}
 ?? Procedimento: {procedureName}{notes}
 
 {clinicLocation}
 
-? Aguardamos você!`;
+? Aguardamos vocÃª!`;
 
       console.log('Template inicial:', message);
 
-      // Substituir todas as variáveis
+      // Substituir todas as variÃ¡veis
       Object.entries(variables).forEach(([key, value]) => {
         const regex = new RegExp(`\\{${key}\\}`, 'g');
         const oldMessage = message;
@@ -1069,7 +1178,7 @@ Olá {clientName}!
         }
       });
     } catch (error) {
-      console.error('Erro ao notificar proprietária:', error);
+      console.error('Erro ao notificar proprietÃ¡ria:', error);
     }
   };
 
@@ -1147,6 +1256,7 @@ Olá {clientName}!
           appointment_id: appointment.id,
           procedure_id: sp.procedure!.id,
           order_index: index,
+          custom_price: sp.customPrice !== null && sp.customPrice !== undefined ? sp.customPrice : null,
         }));
 
         const { error: proceduresError } = await (supabase as any)
@@ -1248,6 +1358,7 @@ Olá {clientName}!
           appointment_id: editingAppointmentId,
           procedure_id: sp.procedure!.id,
           order_index: index,
+          custom_price: sp.customPrice !== null && sp.customPrice !== undefined ? sp.customPrice : null,
         }));
 
         const { error: insertProceduresError } = await (supabase as any)
@@ -1404,9 +1515,9 @@ Olá {clientName}!
                   <div className="flex items-start gap-3">
                     <CalendarIcon className="w-5 h-5 text-primary mt-0.5" />
                     <div>
-                      <p className="text-sm text-muted-foreground">Data e Horário</p>
+                      <p className="text-sm text-muted-foreground">Data e HorÃ¡rio</p>
                       <p className="font-semibold text-lg">
-                        {format(parseISO(appointmentDetails.appointment_date), "dd/MM/yyyy", { locale: ptBR })} às {appointmentDetails.appointment_time}
+                        {format(parseISO(appointmentDetails.appointment_date), "dd/MM/yyyy", { locale: ptBR })} Ã s {appointmentDetails.appointment_time}
                       </p>
                     </div>
                   </div>
@@ -1424,7 +1535,7 @@ Olá {clientName}!
                       </div>
                     );
                   })()}
-                  {/* Endereço da clínica conforme cidade do agendamento */}
+                  {/* EndereÃ§o da clÃ­nica conforme cidade do agendamento */}
                   {(() => {
                     const cityRec = cities.find(c => c.id === appointmentDetails?.city_id);
                     const clinicName = cityRec?.clinic_name;
@@ -1442,7 +1553,7 @@ Olá {clientName}!
                               {address}
                               {mapUrl ? (
                                 <>
-                                  {" • "}
+                                  {" â€¢ "}
                                   <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="underline">Ver no mapa</a>
                                 </>
                               ) : null}
@@ -1466,7 +1577,7 @@ Olá {clientName}!
                     onClick={onSuccess}
                     className="w-full h-12 text-base font-medium bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
                   >
-                    Voltar para o Calendário
+                    Voltar para o CalendÃ¡rio
                   </Button>
                 ) : (
                   <>
@@ -1532,7 +1643,7 @@ Olá {clientName}!
                     className="inline-flex items-center gap-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105"
                   >
                     <MessageCircle className="w-5 h-5" />
-                    Tire suas dúvidas no WhatsApp
+                    Tire suas dÃºvidas no WhatsApp
                   </a>
                 </div>
               )}
@@ -1540,7 +1651,7 @@ Olá {clientName}!
             
             <CardContent className="p-8">
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Seção de Procedimentos - Formato Vertical */}
+                {/* SeÃ§Ã£o de Procedimentos - Formato Vertical */}
                 <div className="space-y-6">
                   {selectedProcedures.map((item, index) => (
                     <div key={item.id} className="space-y-4">
@@ -1593,7 +1704,7 @@ Olá {clientName}!
                                   <div className="flex flex-col items-start">
                                     <span className="font-medium">{procedure.name}</span>
                                     <span className="text-xs text-muted-foreground">
-                                      {procedure.duration}min • {currency(procedure.price || 0)}
+                                      {procedure.duration}min â€¢ {currency(procedure.price || 0)}
                                     </span>
                                   </div>
                                 </SelectItem>
@@ -1603,7 +1714,7 @@ Olá {clientName}!
                         </Select>
                       </div>
 
-                      {/* Box de Descrição do Procedimento */}
+                      {/* Box de DescriÃ§Ã£o do Procedimento */}
                       {item.procedure && (
                         <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent shadow-lg">
                           <CardContent className="p-6">
@@ -1641,6 +1752,66 @@ Olá {clientName}!
                                     <span className="text-sm font-medium whitespace-nowrap">Duração:</span>
                                     <span className="text-sm text-muted-foreground">{item.procedure.duration}min</span>
                                   </div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></div>
+                                      <span className="text-sm font-medium whitespace-nowrap">Valor:</span>
+                                      <span className="text-sm text-primary font-bold">{currency(getEffectiveProcedurePrice(item))}</span>
+                                    </div>
+                                    {item.customPrice !== null && item.customPrice !== undefined && (
+                                      <Badge variant="outline" className="text-xs text-primary border-primary/60">
+                                        Valor personalizado
+                                      </Badge>
+                                    )}
+                                    {adminMode && (
+                                      <Button
+                                        type="button"
+                                        variant="link"
+                                        className="h-auto p-0 text-sm"
+                                        onClick={() => handleOpenPriceEditor(item.id)}
+                                      >
+                                        Editar valor
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                                {adminMode && priceEditId === item.id && (
+                                  <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={priceEditValue}
+                                      onChange={(e) => setPriceEditValue(e.target.value)}
+                                      className="sm:w-40"
+                                      placeholder="Novo valor"
+                                    />
+                                    <div className="flex gap-2">
+                                      <Button type="button" onClick={() => handleApplyCustomPrice(item.id)}>
+                                        Aplicar
+                                      </Button>
+                                      <Button type="button" variant="outline" onClick={handleCancelPriceEdit}>
+                                        Cancelar
+                                      </Button>
+                                      {item.customPrice !== null && item.customPrice !== undefined && (
+                                        <Button type="button" variant="ghost" onClick={() => handleResetCustomPrice(item.id)}>
+                                          Restaurar
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                                {adminMode && item.customPrice !== null && item.customPrice !== undefined && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Valor original: {currency(getDefaultProcedurePrice(item))}
+                                  </p>
+                                )}
+                                <div className="flex items-center flex-wrap gap-4 pt-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></div>
+                                    <span className="text-sm font-medium whitespace-nowrap">DuraÃ§Ã£o:</span>
+                                    <span className="text-sm text-muted-foreground">{item.procedure.duration}min</span>
+                                  </div>
                                   <div className="flex items-center gap-2">
                                     <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></div>
                                     <span className="text-sm font-medium whitespace-nowrap">Valor:</span>
@@ -1653,7 +1824,7 @@ Olá {clientName}!
                         </Card>
                       )}
 
-                      {/* Especificações (se necessário) */}
+                      {/* EspecificaÃ§Ãµes (se necessÃ¡rio) */}
                       {item.procedure?.requires_specifications && (
                         <div className="space-y-3">
                           <ProcedureSpecificationSelector
@@ -1663,7 +1834,7 @@ Olá {clientName}!
                               newProcedures[index] = { 
                                 ...item, 
                                 specifications: data.selectedSpecifications,
-                                specificationsTotal: data.totalPrice // Salvar o preço total com desconto
+                                specificationsTotal: data.totalPrice // Salvar o preÃ§o total com desconto
                               };
                               setSelectedProcedures(newProcedures);
                             }}
@@ -1675,7 +1846,7 @@ Olá {clientName}!
                         </div>
                       )}
 
-                      {/* Link/Botão para adicionar mais procedimentos */}
+                      {/* Link/BotÃ£o para adicionar mais procedimentos */}
                       {index === selectedProcedures.length - 1 && item.procedure && (
                         <button
                           type="button"
@@ -1697,7 +1868,7 @@ Olá {clientName}!
                   ))}
                 </div>
 
-                {/* Box de Resumo - Síntese dos Procedimentos */}
+                {/* Box de Resumo - SÃ­ntese dos Procedimentos */}
                 {selectedProcedures.filter(p => p.procedure).length > 0 && (
                   <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
                     <CardHeader>
@@ -1706,12 +1877,12 @@ Olá {clientName}!
                     <CardContent className="space-y-3">
                       <div className="space-y-2">
                         {selectedProcedures.filter(p => p.procedure).map((item, index) => {
-                          // Se tem especificações, usar APENAS o preço das especificações (com desconto)
-                          // Se não tem, usar o preço base do procedimento
+                          // Se tem especificaÃ§Ãµes, usar APENAS o preÃ§o das especificaÃ§Ãµes (com desconto)
+                          // Se nÃ£o tem, usar o preÃ§o base do procedimento
                           const hasSpecifications = item.specifications && item.specifications.length > 0;
                           const totalPrice = hasSpecifications 
-                            ? (item.specificationsTotal || 0)  // Só áreas (com desconto)
-                            : (item.procedure!.price || 0);    // Preço base
+                            ? (item.specificationsTotal || 0)  // SÃ³ Ã¡reas (com desconto)
+                            : (item.procedure!.price || 0);    // PreÃ§o base
                           
                           return (
                             <div key={item.id} className="flex justify-between items-start py-2 border-b border-border/50 last:border-0">
@@ -1738,7 +1909,7 @@ Olá {clientName}!
                       {selectedProcedures.filter(p => p.procedure).length > 1 && (
                         <div className="pt-3 border-t-2 border-primary/20 space-y-2">
                           <div className="flex justify-between text-sm">
-                            <span className="font-semibold">Duração Total:</span>
+                            <span className="font-semibold">DuraÃ§Ã£o Total:</span>
                             <span className="font-bold">
                               {selectedProcedures
                                 .filter(p => p.procedure)
@@ -1752,12 +1923,12 @@ Olá {clientName}!
                                 selectedProcedures
                                   .filter(p => p.procedure)
                                   .reduce((sum, p) => {
-                                    // Se tem especificações, usar APENAS o preço das áreas
-                                    // Se não tem, usar o preço base
+                                    // Se tem especificaÃ§Ãµes, usar APENAS o preÃ§o das Ã¡reas
+                                    // Se nÃ£o tem, usar o preÃ§o base
                                     const hasSpecifications = p.specifications && p.specifications.length > 0;
                                     const price = hasSpecifications 
-                                      ? (p.specificationsTotal || 0)  // Só áreas
-                                      : (p.procedure?.price || 0);    // Preço base
+                                      ? (p.specificationsTotal || 0)  // SÃ³ Ã¡reas
+                                      : (p.procedure?.price || 0);    // PreÃ§o base
                                     return sum + price;
                                   }, 0)
                               )}
@@ -1794,7 +1965,7 @@ Olá {clientName}!
                   </Select>
                 </div>
 
-                {/* Data com Calendário */}
+                {/* Data com CalendÃ¡rio */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <CalendarIcon className="w-4 h-4 text-primary" />
@@ -1836,7 +2007,7 @@ Olá {clientName}!
                           }
                         }}
                         disabled={(date) => {
-                          // Se allowPastDates for true, não desabilitar nenhuma data
+                          // Se allowPastDates for true, nÃ£o desabilitar nenhuma data
                           if (allowPastDates) return false;
                           
                           const today = new Date();
@@ -1855,16 +2026,16 @@ Olá {clientName}!
                   {availabilityWarning && (
                     <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                       <p className="text-sm text-yellow-800">
-                        ⚠️ {availabilityWarning}
+                        âš ï¸ {availabilityWarning}
                       </p>
                     </div>
                   )}
                 </div>
 
-                {/* Horário */}
+                {/* HorÃ¡rio */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground">
-                    Horário <span className="text-destructive">*</span>
+                    HorÃ¡rio <span className="text-destructive">*</span>
                   </label>
                   <Select 
                     value={formData.appointment_time} 
@@ -1873,10 +2044,10 @@ Olá {clientName}!
                   >
                     <SelectTrigger className="h-14 border-2 hover:border-primary/50 transition-all duration-200 bg-background">
                       <SelectValue placeholder={
-                        loadingTimes ? "Carregando horários..." : 
+                        loadingTimes ? "Carregando horÃ¡rios..." : 
                         !formData.appointment_date ? "Selecione a data primeiro" : 
-                        availableTimes.length === 0 ? "Sem horários disponíveis" :
-                        "Selecione um horário"
+                        availableTimes.length === 0 ? "Sem horÃ¡rios disponÃ­veis" :
+                        "Selecione um horÃ¡rio"
                       } />
                     </SelectTrigger>
                     <SelectContent>
@@ -1889,20 +2060,20 @@ Olá {clientName}!
                   </Select>
                 </div>
 
-                {/* Observações */}
+                {/* ObservaÃ§Ãµes */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground">
-                    Observações (opcional)
+                    ObservaÃ§Ãµes (opcional)
                   </label>
                   <Textarea
                     value={formData.notes}
                     onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                    placeholder="Adicione qualquer observação relevante sobre o agendamento..."
+                    placeholder="Adicione qualquer observaÃ§Ã£o relevante sobre o agendamento..."
                     className="min-h-[100px] border-2 hover:border-primary/50 transition-all duration-200"
                   />
                 </div>
 
-                {/* Botões de Ação */}
+                {/* BotÃµes de AÃ§Ã£o */}
                 <div className="flex gap-4 pt-4">
                   <Button
                     type="button"
@@ -1939,6 +2110,19 @@ Olá {clientName}!
 };
 
 export default NewBookingFlow;
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

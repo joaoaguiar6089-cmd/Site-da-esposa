@@ -199,10 +199,10 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
         // Se tem appointments_procedures, usar eles; senão, usar procedure principal
         const allProcedures = apt.appointments_procedures && apt.appointments_procedures.length > 0
           ? apt.appointments_procedures
-              .sort((a: any, b: any) => a.order_index - b.order_index)
+              .sort((a: any, b: any) => (a?.order_index ?? 0) - (b?.order_index ?? 0))
               .map((ap: any) => {
                 // Usar custom_price se disponível, senão usar price padrão
-                const proc = ap.procedure;
+                const proc = ap?.procedure;
                 if (!proc) return null;
                 return {
                   ...proc,
@@ -210,16 +210,19 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
                 };
               })
               .filter((p: any) => p !== null)
-          : [apt.procedures];
+          : apt.procedures ? [apt.procedures] : [];
+
+        // Filtrar procedimentos válidos
+        const validProcedures = allProcedures.filter((p: any) => p && p.name);
 
         // Calcular duração total
-        const totalDuration = allProcedures.reduce((sum: number, proc: any) => 
+        const totalDuration = validProcedures.reduce((sum: number, proc: any) => 
           sum + (proc?.duration || 0), 0
         );
 
         return {
           ...apt,
-          all_procedures: allProcedures,
+          all_procedures: validProcedures,
           total_duration: totalDuration
         };
       }) || [];

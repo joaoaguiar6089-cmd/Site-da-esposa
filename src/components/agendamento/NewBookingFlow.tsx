@@ -34,6 +34,7 @@ interface Procedure {
 interface Professional {
   id: string;
   name: string;
+  is_primary?: boolean | null;
 }
 
 interface BookingData {
@@ -61,6 +62,7 @@ interface NewBookingFlowProps {
     appointment_time: string;
     city_id?: string | null;
     notes?: string | null;
+    status?: string | null;
     procedures: {
       id?: string;
       name: string;
@@ -137,6 +139,7 @@ const NewBookingFlow = ({
     map_url?: string | null
   }[]>([]);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [primaryProfessionalId, setPrimaryProfessionalId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     procedure_id: preSelectedProcedureId || "",
     appointment_date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : "",
@@ -172,7 +175,12 @@ const NewBookingFlow = ({
   const [openSelectId, setOpenSelectId] = useState<string | null>(null);
   const [priceEditId, setPriceEditId] = useState<string | null>(null);
   const [priceEditValue, setPriceEditValue] = useState<string>("");
+  const [editingAppointmentStatus, setEditingAppointmentStatus] = useState<string | null>(initialAppointment?.status ?? null);
   const { toast } = useToast();
+  const isRealizedAppointment = useMemo(
+    () => isEditing && (editingAppointmentStatus || "").toLowerCase() === "realizado",
+    [isEditing, editingAppointmentStatus]
+  );
 
   const sanitizeNotes = (value: string) => (value || "").trim();
 
@@ -372,6 +380,8 @@ const NewBookingFlow = ({
       return;
     }
 
+    setEditingAppointmentStatus(initialAppointment.status ?? null);
+
     const proceduresFromInitial = (initialAppointment.appointments_procedures && initialAppointment.appointments_procedures.length > 0)
       ? initialAppointment.appointments_procedures
           .slice()
@@ -519,16 +529,15 @@ const NewBookingFlow = ({
   useEffect(() => {
     if (!formData.appointment_date || !formData.city_id) return;
 
-    if (adminMode && !formData.professional_id) {
-      setAvailableTimes([]);
-      return;
-    }
+    const effectiveProfessionalId = adminMode
+      ? (formData.professional_id || primaryProfessionalId || null)
+      : formData.professional_id || null;
 
     loadAvailableTimes(
       formData.appointment_date,
-      adminMode ? (formData.professional_id || null) : undefined
+      adminMode ? effectiveProfessionalId : undefined
     );
-  }, [formData.appointment_date, formData.city_id, formData.professional_id, adminMode]);
+  }, [formData.appointment_date, formData.city_id, formData.professional_id, adminMode, primaryProfessionalId]);
 
   // Sincronizar formData.procedure_id com o primeiro procedimento
   useEffect(() => {
@@ -679,15 +688,33 @@ const NewBookingFlow = ({
       setCities(citiesData || []);
 
       if (adminMode) {
-        const { data: professionalsData, error: professionalsError } = await supabase
+        let professionalsData: Professional[] | null = null;
+        let professionalsError: any = null;
+
+        const { data, error } = await supabase
           .from('professionals')
-          .select('id, name')
+          .select('id, name, is_primary')
           .order('name');
+
+        if (error && typeof error.message === 'string' && error.message.includes('is_primary')) {
+          const fallback = await supabase
+            .from('professionals')
+            .select('id, name')
+            .order('name');
+
+          professionalsData = fallback.data as Professional[] | null;
+          professionalsError = fallback.error;
+        } else {
+          professionalsData = data as Professional[] | null;
+          professionalsError = error;
+        }
 
         if (professionalsError) {
           console.error('Erro ao carregar profissionais:', professionalsError);
         } else {
           setProfessionals(professionalsData || []);
+          const primary = professionalsData?.find(pro => pro.is_primary);
+          setPrimaryProfessionalId(prev => primary?.id ?? prev ?? null);
         }
       }
     } catch (error) {
@@ -704,11 +731,6 @@ const NewBookingFlow = ({
 
   const loadAvailableTimes = async (selectedDate: string, professionalId?: string | null) => {
     if (!formData.city_id || !selectedDate) return;
-
-    if (adminMode && !professionalId) {
-      setAvailableTimes([]);
-      return;
-    }
 
     setLoadingTimes(true);
     
@@ -808,6 +830,21 @@ const NewBookingFlow = ({
       const now = new Date();
       const currentDateStr = format(now, 'yyyy-MM-dd');
       const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
+      const selectedIsFutureDate = selectedDate > currentDateStr;
+      const allowPastTimesToday = allowPastDates || isRealizedAppointment;
+
+      if (isRealizedAppointment && selectedIsFutureDate) {
+        if (
+          isEditing &&
+          formData.appointment_date === selectedDate &&
+          formData.appointment_time
+        ) {
+          setAvailableTimes([formData.appointment_time]);
+        } else {
+          setAvailableTimes([]);
+        }
+        return;
+      }
 
       const available = timeSlots.filter(time => {
         if (occupiedSlots.has(time)) return false;
@@ -818,7 +855,11 @@ const NewBookingFlow = ({
         
         if (endTimeMinutes > endMinutes) return false;
         
-        if (selectedDate === currentDateStr && timeMinutes <= currentTimeMinutes) {
+        if (!allowPastTimesToday && selectedDate === currentDateStr && timeMinutes <= currentTimeMinutes) {
+          return false;
+        }
+
+        if (isRealizedAppointment && selectedDate === currentDateStr && timeMinutes > currentTimeMinutes) {
           return false;
         }
 
@@ -865,6 +906,7 @@ const NewBookingFlow = ({
           appointment_date,
           appointment_time,
           notes,
+          status,
           city_id,
           professional_id,
           city_settings:city_settings (
@@ -969,6 +1011,7 @@ const NewBookingFlow = ({
       ensureProfessionalPresent(data.professional_id, (data as any)?.professionals?.name ?? null);
 
       setSelectedProcedures(normalizedProcedures);
+      setEditingAppointmentStatus(data.status ?? null);
       setFormData(newFormState);
       if (data.clients) {
         setSelectedClient(data.clients);
@@ -1306,12 +1349,16 @@ Olá {clientName}!
         null;
       const selectedCity = cities.find(c => c.id === formData.city_id);
 
+      const resolvedProfessionalId = adminMode
+        ? (formData.professional_id || primaryProfessionalId || null)
+        : (formData.professional_id || null);
+
       const { data: appointment, error: appointmentError } = await supabase
         .from('appointments')
         .insert({
           client_id: selectedClient.id,
           procedure_id: primaryProcedureId,
-          professional_id: formData.professional_id || null,
+          professional_id: resolvedProfessionalId,
           appointment_date: formData.appointment_date,
           appointment_time: formData.appointment_time,
           notes: sanitizeNotes(formData.notes) || null,
@@ -1405,13 +1452,17 @@ Olá {clientName}!
     try {
       setLoading(true);
 
+      const resolvedProfessionalId = adminMode
+        ? (formData.professional_id || primaryProfessionalId || null)
+        : (formData.professional_id || null);
+
       const updateData = {
         procedure_id: proceduresToPersist[0]?.procedure?.id || formData.procedure_id,
         appointment_date: formData.appointment_date,
         appointment_time: formData.appointment_time,
         notes: sanitizeNotes(formData.notes) || null,
         city_id: formData.city_id || null,
-        professional_id: formData.professional_id || null,
+        professional_id: resolvedProfessionalId,
       };
 
       const { error: updateError } = await supabase
@@ -1489,15 +1540,38 @@ Olá {clientName}!
       return;
     }
     
-    if (!formData.appointment_date || !formData.appointment_time || !formData.city_id || (adminMode && !formData.professional_id)) {
+    const resolvedProfessionalId = adminMode
+      ? (formData.professional_id || primaryProfessionalId || null)
+      : (formData.professional_id || null);
+
+    if (!formData.appointment_date || !formData.appointment_time || !formData.city_id) {
       toast({
         title: "Campos obrigatorios",
-        description: adminMode
-          ? "Por favor, preencha todos os campos obrigatorios (profissional, cidade, data e horario)."
-          : "Por favor, preencha todos os campos obrigatorios (cidade, data e horario).",
+        description: "Por favor, preencha todos os campos obrigatorios (cidade, data e horario).",
         variant: "destructive",
       });
       return;
+    }
+
+    if (adminMode && !resolvedProfessionalId) {
+      toast({
+        title: "Profissional principal nao definido",
+        description: "Defina um profissional principal na area admin ou selecione um profissional para continuar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isRealizedAppointment) {
+      const selectedDateTime = parseISO(`${formData.appointment_date}T${formData.appointment_time}`);
+      if (selectedDateTime > new Date()) {
+        toast({
+          title: "Horario invalido para realizado",
+          description: "Agendamentos com status realizado so podem ser ajustados para datas e horarios ja passados.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     for (const sp of validProcedures) {
@@ -1997,7 +2071,7 @@ Olá {clientName}!
                 {adminMode && (
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-foreground">
-                      Profissional <span className="text-destructive">*</span>
+                      Profissional (opcional)
                     </label>
                     <Select
                       value={formData.professional_id || ""}
@@ -2009,14 +2083,17 @@ Olá {clientName}!
                           placeholder={
                             professionals.length === 0
                               ? "Nenhum profissional cadastrado"
-                              : "Selecione um profissional"
+                              : "Selecione um profissional (opcional)"
                           }
                         />
                       </SelectTrigger>
                       <SelectContent>
                         {professionals.map((professional) => (
                           <SelectItem key={professional.id} value={professional.id} className="py-3">
-                            <span className="font-medium">{professional.name}</span>
+                            <span className="font-medium">
+                              {professional.name}
+                              {professional.is_primary ? " (Principal)" : ""}
+                            </span>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -2028,7 +2105,12 @@ Olá {clientName}!
                     )}
                     {professionals.length > 0 && !formData.professional_id && (
                       <p className="text-xs text-muted-foreground">
-                        Selecione um profissional para visualizar os horarios disponiveis.
+                        Sem selecionar, usaremos automaticamente o profissional principal configurado.
+                      </p>
+                    )}
+                    {professionals.length > 0 && !primaryProfessionalId && (
+                      <p className="text-xs text-destructive">
+                        Nenhum profissional principal foi definido ainda. Configure um na area admin ou selecione manualmente.
                       </p>
                     )}
                   </div>
@@ -2100,15 +2182,21 @@ Olá {clientName}!
                             setCalendarOpen(false);
                           }
                         }}
+
                         disabled={(date) => {
-                          // Se allowPastDates for true, não desabilitar nenhuma data
-                          if (allowPastDates) return false;
-                          
+                          const day = new Date(date);
+                          day.setHours(0, 0, 0, 0);
                           const today = new Date();
                           today.setHours(0, 0, 0, 0);
-                          
-                          // Apenas desabilitar datas passadas
-                          return date < today;
+
+                          if (isRealizedAppointment) {
+                            // Agendamentos realizados so podem ser ajustados para datas passadas
+                            return day > today;
+                          }
+
+                          if (allowPastDates) return false;
+
+                          return day < today;
                         }}
                         locale={ptBR}
                         className="rounded-md border"
@@ -2120,7 +2208,7 @@ Olá {clientName}!
                   {availabilityWarning && (
                     <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                       <p className="text-sm text-yellow-800">
-                        ⚠️ {availabilityWarning}
+                        Aviso: {availabilityWarning}
                       </p>
                     </div>
                   )}
@@ -2204,4 +2292,3 @@ Olá {clientName}!
 };
 
 export default NewBookingFlow;
-

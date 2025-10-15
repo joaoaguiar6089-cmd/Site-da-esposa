@@ -23,11 +23,15 @@ const ResumoAuth = ({ onAuth }: ResumoAuthProps) => {
     setLoading(true);
 
     try {
+      console.log('Tentando autenticar usuário:', username);
+      
       // Verificar credenciais usando função do banco
       const { data, error } = await supabase.rpc('verify_resumo_credentials', {
         p_username: username,
         p_password: password
       });
+
+      console.log('Resultado da autenticação:', { data, error });
 
       if (error) {
         console.error('Erro ao verificar credenciais:', error);
@@ -36,17 +40,22 @@ const ResumoAuth = ({ onAuth }: ResumoAuthProps) => {
           description: "Erro ao verificar credenciais. Tente novamente.",
           variant: "destructive",
         });
+        setLoading(false);
         return;
       }
 
       if (!data) {
+        console.log('Credenciais inválidas');
         toast({
           title: "Erro de autenticação",
           description: "Usuário ou senha inválidos.",
           variant: "destructive",
         });
+        setLoading(false);
         return;
       }
+
+      console.log('Login bem-sucedido, registrando...');
 
       // Registrar login bem-sucedido
       await supabase.rpc('log_resumo_login', {

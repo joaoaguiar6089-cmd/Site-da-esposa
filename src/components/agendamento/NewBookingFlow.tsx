@@ -2194,6 +2194,7 @@ OlÃ¡ {clientName}!
             </CardContent>
           </Card>
         );
+    }
   };
 
   return (

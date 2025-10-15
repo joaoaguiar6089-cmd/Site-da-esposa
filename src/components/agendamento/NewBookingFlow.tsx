@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -2204,22 +2204,12 @@ OlÃ¡ {clientName}!
   );
 };
 
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 py-8">
+      {renderCurrentView()}
+    </div>
+  );
+};
+
 export default NewBookingFlow;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

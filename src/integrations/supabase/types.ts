@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -256,24 +256,24 @@ export type Database = {
       appointments_procedures: {
         Row: {
           appointment_id: string
-          custom_price: number | null
           created_at: string
+          custom_price: number | null
           id: string
           order_index: number
           procedure_id: string
         }
         Insert: {
           appointment_id: string
-          custom_price?: number | null
           created_at?: string
+          custom_price?: number | null
           id?: string
           order_index?: number
           procedure_id: string
         }
         Update: {
           appointment_id?: string
-          custom_price?: number | null
           created_at?: string
+          custom_price?: number | null
           id?: string
           order_index?: number
           procedure_id?: string
@@ -734,6 +734,7 @@ export type Database = {
           appointment_id: string | null
           client_id: string
           created_at: string | null
+          filled_pdf_path: string | null
           generated_pdf_at: string | null
           generated_pdf_url: string | null
           id: string
@@ -751,6 +752,7 @@ export type Database = {
           appointment_id?: string | null
           client_id: string
           created_at?: string | null
+          filled_pdf_path?: string | null
           generated_pdf_at?: string | null
           generated_pdf_url?: string | null
           id?: string
@@ -768,6 +770,7 @@ export type Database = {
           appointment_id?: string | null
           client_id?: string
           created_at?: string | null
+          filled_pdf_path?: string | null
           generated_pdf_at?: string | null
           generated_pdf_url?: string | null
           id?: string
@@ -863,6 +866,7 @@ export type Database = {
           last_edited_by: string | null
           name: string
           pdf_mapping: Json | null
+          pdf_template_path: string | null
           pdf_template_url: string | null
           updated_at: string | null
           version: number | null
@@ -879,6 +883,7 @@ export type Database = {
           last_edited_by?: string | null
           name: string
           pdf_mapping?: Json | null
+          pdf_template_path?: string | null
           pdf_template_url?: string | null
           updated_at?: string | null
           version?: number | null
@@ -895,6 +900,7 @@ export type Database = {
           last_edited_by?: string | null
           name?: string
           pdf_mapping?: Json | null
+          pdf_template_path?: string | null
           pdf_template_url?: string | null
           updated_at?: string | null
           version?: number | null
@@ -1841,6 +1847,10 @@ export type Database = {
         Args: { user_id: string }
         Returns: boolean
       }
+      check_resumo_access: {
+        Args: { user_id_param: string }
+        Returns: boolean
+      }
       cleanup_old_appointments: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -1893,6 +1903,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      is_resumo_user: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       log_security_event: {
         Args: {
           event_details?: Json
@@ -1915,7 +1929,7 @@ export type Database = {
           | { p_client_id: string; p_cpf: string; p_phone: string }
           | { p_client_id: string; p_phone: string; p_user_id: string }
           | { p_cpf: string; p_phone: string }
-        Returns: Json
+        Returns: undefined
       }
       update_client_phone_simple: {
         Args: { p_client_id: string; p_cpf: string; p_phone: string }
@@ -2057,4 +2071,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

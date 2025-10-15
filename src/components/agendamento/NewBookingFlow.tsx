@@ -34,7 +34,6 @@ interface Procedure {
 interface Professional {
   id: string;
   name: string;
-  is_primary?: boolean | null;
 }
 
 interface BookingData {
@@ -693,28 +692,19 @@ const NewBookingFlow = ({
 
         const { data, error } = await supabase
           .from('professionals')
-          .select('id, name, is_primary')
+          .select('id, name')
           .order('name');
 
-        if (error && typeof error.message === 'string' && error.message.includes('is_primary')) {
-          const fallback = await supabase
-            .from('professionals')
-            .select('id, name')
-            .order('name');
-
-          professionalsData = fallback.data as Professional[] | null;
-          professionalsError = fallback.error;
-        } else {
-          professionalsData = data as Professional[] | null;
-          professionalsError = error;
-        }
+        professionalsData = data as Professional[] | null;
+        professionalsError = error;
 
         if (professionalsError) {
           console.error('Erro ao carregar profissionais:', professionalsError);
         } else {
           setProfessionals(professionalsData || []);
-          const primary = professionalsData?.find(pro => pro.is_primary);
-          setPrimaryProfessionalId(prev => primary?.id ?? prev ?? null);
+          // is_primary column removed from database
+          // const primary = professionalsData?.find(pro => pro.is_primary);
+          // setPrimaryProfessionalId(prev => primary?.id ?? prev ?? null);
         }
       }
     } catch (error) {
@@ -2092,7 +2082,6 @@ Olá {clientName}!
                           <SelectItem key={professional.id} value={professional.id} className="py-3">
                             <span className="font-medium">
                               {professional.name}
-                              {professional.is_primary ? " (Principal)" : ""}
                             </span>
                           </SelectItem>
                         ))}

@@ -9,6 +9,7 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
 import Index from "./pages/Index.tsx";
 import Admin from "./pages/Admin.tsx";
+import Resumo from "./pages/Resumo.tsx";
 import Agendamento from "./pages/Agendamento.tsx";
 import AreaClientePage from "./pages/AreaCliente.tsx";
 import NotFound from "./pages/NotFound.tsx";
@@ -25,6 +26,10 @@ const router = createBrowserRouter([
   {
     path: "/admin",
     element: <Admin />,
+  },
+  {
+    path: "/resumo",
+    element: <Resumo />,
   },
   {
     path: "/agendamento",

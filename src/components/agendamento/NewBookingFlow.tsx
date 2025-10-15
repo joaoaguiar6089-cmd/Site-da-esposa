@@ -2201,7 +2201,7 @@ OlÃ¡ {clientName}!
       {renderCurrentView()}
     </div>
   );
-}
+};
 
 export default NewBookingFlow;
 

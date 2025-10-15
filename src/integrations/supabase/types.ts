@@ -1585,7 +1585,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           last_login: string | null
-          password_hash: string
+          password: string
           username: string
         }
         Insert: {
@@ -1593,7 +1593,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_login?: string | null
-          password_hash: string
+          password: string
           username: string
         }
         Update: {
@@ -1601,7 +1601,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_login?: string | null
-          password_hash?: string
+          password?: string
           username?: string
         }
         Relationships: []

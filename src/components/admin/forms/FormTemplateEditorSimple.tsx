@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import SimpleFieldEditor, { SimpleField } from "./SimpleFieldEditor";
+import PDFUploadSimple from "./PDFUploadSimple";
 
 export default function FormTemplateEditorSimple() {
   const { id: templateId } = useParams();
@@ -25,6 +26,7 @@ export default function FormTemplateEditorSimple() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (templateId) {
@@ -48,6 +50,7 @@ export default function FormTemplateEditorSimple() {
       setName(templateData.name || '');
       setDescription(templateData.description || '');
       setCategory(templateData.category || '');
+      setPdfUrl(templateData.pdf_template_url || null);
 
       // Carregar campos
       const { data: fieldsData, error: fieldsError } = await supabase
@@ -296,37 +299,14 @@ export default function FormTemplateEditorSimple() {
 
         <TabsContent value="pdf">
           {templateId ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Template PDF</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground mb-4">
-                  Para mapear os campos no PDF, acesse a aba "Campos do Formulário" e configure os campos primeiro.
-                  Depois, use a funcionalidade de mapeamento PDF (em desenvolvimento).
-                </p>
-                {template?.pdf_template_url ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Badge className="bg-green-100 text-green-800">PDF Carregado</Badge>
-                      <a 
-                        href={template.pdf_template_url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-sm text-blue-600 hover:underline flex items-center gap-1"
-                      >
-                        <Eye className="h-4 w-4" />
-                        Visualizar PDF
-                      </a>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Nenhum PDF carregado ainda.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+            <PDFUploadSimple
+              templateId={templateId}
+              currentPdfUrl={pdfUrl}
+              onPdfUploaded={(url) => {
+                setPdfUrl(url);
+                setTemplate({ ...template, pdf_template_url: url });
+              }}
+            />
           ) : (
             <Card>
               <CardContent className="py-12 text-center">

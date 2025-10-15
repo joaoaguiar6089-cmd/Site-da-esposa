@@ -60,8 +60,10 @@ interface Appointment {
     description?: string | null;
   };
   professionals?: {
+    id?: string;
     name: string;
   } | null;
+  professional_id?: string | null;
   appointments_procedures?: Array<{
     order_index?: number | null;
     custom_price?: number | null;
@@ -143,6 +145,7 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
           session_number,
           total_sessions,
           return_of_appointment_id,
+          professional_id,
           city_settings:city_settings (
             city_name
           ),
@@ -166,6 +169,7 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
             description
           ),
           professionals (
+            id,
             name
           ),
           appointments_procedures (
@@ -1139,6 +1143,8 @@ Aguardamos você!`;
               appointments_procedures: appointmentBeingEdited.appointments_procedures as any,
               appointment_specifications: appointmentBeingEdited.appointment_specifications || null,
               city_settings: appointmentBeingEdited.city_settings,
+              professional_id: appointmentBeingEdited.professional_id ?? null,
+              professional: appointmentBeingEdited.professionals,
             }}
           />
         </div>

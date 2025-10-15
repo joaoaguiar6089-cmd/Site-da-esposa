@@ -61,8 +61,10 @@ interface Appointment {
     description?: string | null;
   };
   professionals?: {
+    id?: string;
     name: string;
   } | null;
+  professional_id?: string | null;
   appointment_specifications?: {
     specification_name: string;
     specification_price: number;
@@ -159,6 +161,7 @@ const AppointmentsList = ({
           package_parent_id,
           session_number,
           total_sessions,
+          professional_id,
           city_settings:city_settings (
             city_name
           ),
@@ -177,6 +180,7 @@ const AppointmentsList = ({
             sessions
           ),
           professionals (
+            id,
             name
           ),
           appointments_procedures (
@@ -1046,6 +1050,8 @@ Aguardamos você!`;
               appointments_procedures: appointmentBeingEdited.appointments_procedures,
               appointment_specifications: appointmentBeingEdited.appointment_specifications || null,
               city_settings: appointmentBeingEdited.city_settings,
+              professional_id: appointmentBeingEdited.professional_id ?? null,
+              professional: appointmentBeingEdited.professionals,
             }}
           />
         </div>

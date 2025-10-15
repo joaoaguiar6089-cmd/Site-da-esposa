@@ -65,6 +65,11 @@ interface Appointment {
       description?: string | null;
     } | null;
   }>;
+  professionals?: {
+    id?: string;
+    name: string;
+  } | null;
+  professional_id?: string | null;
   appointment_specifications?: {
     specification_id: string;
     specification_name: string;
@@ -724,6 +729,8 @@ const ProcedureHistory = ({
                 appointments_procedures: appointmentBeingEdited.appointments_procedures,
                 appointment_specifications: appointmentBeingEdited.appointment_specifications || null,
                 city_settings: appointmentBeingEdited.city_settings,
+                professional_id: appointmentBeingEdited.professional_id ?? null,
+                professional: appointmentBeingEdited.professionals,
               }}
             />
           ) : (

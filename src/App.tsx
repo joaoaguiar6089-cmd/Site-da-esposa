@@ -36,7 +36,8 @@ const App = () => {
             <Route path="/area-cliente" element={<AreaClientePage />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/admin/forms" element={<AdminFormsTest />} />
-            <Route path="/admin/forms/:id" element={<AdminFormEditor />} />
+            <Route path="/admin/forms/new" element={<AdminFormEditor />} />
+            <Route path="/admin/forms/edit/:id" element={<AdminFormEditor />} />
             <Route path="/area-cliente/forms" element={<ClientFormsList />} />
             <Route path="/area-cliente/forms/fill/:id" element={<FormFiller />} />
             <Route path="/area-cliente/forms/view/:id" element={<FormViewer />} />

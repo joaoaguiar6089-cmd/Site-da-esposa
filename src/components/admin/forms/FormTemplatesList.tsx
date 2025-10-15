@@ -130,7 +130,7 @@ export default function FormTemplatesList() {
               Crie e gerencie formulários personalizados para seus clientes
             </p>
           </div>
-          <Button onClick={() => setShowCreateDialog(true)} size="lg">
+          <Button onClick={() => navigate('/admin/forms/new')} size="lg">
             <Plus className="mr-2 h-5 w-5" />
             Nova Ficha
           </Button>
@@ -197,7 +197,7 @@ export default function FormTemplatesList() {
             <TemplateCard
               key={template.id}
               template={template}
-              onEdit={() => navigate('/admin', { state: { tab: 'forms', editingFormId: template.id } })}
+              onEdit={() => navigate(`/admin/forms/edit/${template.id}`)}
               onClone={() => {
                 setTemplateToClone(template);
                 setCloneName(`${template.name} (cópia)`);

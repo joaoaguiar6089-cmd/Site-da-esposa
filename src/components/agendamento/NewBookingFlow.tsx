@@ -31,6 +31,11 @@ interface Procedure {
   body_selection_type?: string;
 }
 
+interface Professional {
+  id: string;
+  name: string;
+}
+
 interface BookingData {
   procedure_id: string;
   appointment_date: string;
@@ -67,6 +72,11 @@ interface NewBookingFlowProps {
       procedure?: Procedure | null;
       custom_price?: number | null;
     }> | null;
+    professional_id?: string | null;
+    professional?: {
+      id?: string;
+      name: string;
+    } | null;
     appointment_specifications?: {
       specification_id: string;
       specification_name: string;
@@ -93,6 +103,7 @@ type FormSnapshot = {
     procedure_id: string;
     appointment_date: string;
     appointment_time: string;
+    professional_id: string;
     city_id: string;
     notes: string;
   };
@@ -125,12 +136,14 @@ const NewBookingFlow = ({
     address?: string | null,
     map_url?: string | null
   }[]>([]);
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [formData, setFormData] = useState({
     procedure_id: preSelectedProcedureId || "",
     appointment_date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : "",
     appointment_time: "",
     notes: "",
     city_id: "",
+    professional_id: initialAppointment?.professional_id ?? "",
   });
   const [selectedSpecifications, setSelectedSpecifications] = useState<ProcedureSpecification[]>([]);
   const [selectedProcedures, setSelectedProcedures] = useState<SelectedProcedure[]>([
@@ -182,6 +195,23 @@ const NewBookingFlow = ({
     });
   };
 
+  const ensureProfessionalPresent = (professionalId?: string | null, fallbackName?: string | null) => {
+    if (!professionalId) return;
+    setProfessionals(prev => {
+      if (prev.some(pro => pro.id === professionalId)) {
+        return prev;
+      }
+      const next = [
+        ...prev,
+        {
+          id: professionalId,
+          name: fallbackName || "Profissional selecionado",
+        },
+      ];
+      return next.sort((a, b) => a.name.localeCompare(b.name));
+    });
+  };
+
   const areArraysEqual = (a: string[], b: string[]) =>
     a.length === b.length && a.every((value, index) => value === b[index]);
 
@@ -207,6 +237,7 @@ const NewBookingFlow = ({
         procedure_id: formState.procedure_id,
         appointment_date: formState.appointment_date,
         appointment_time: formState.appointment_time,
+        professional_id: formState.professional_id || "",
         city_id: formState.city_id,
         notes: sanitizeNotes(formState.notes),
       },
@@ -270,8 +301,8 @@ const NewBookingFlow = ({
     const parsed = parseFloat(priceEditValue.replace(",", ".").trim());
     if (Number.isNaN(parsed) || parsed < 0) {
       toast({
-        title: "Valor inválido",
-        description: "Informe um valor numérico maior ou igual a zero.",
+        title: "Valor invalido",
+        description: "Informe um valor numerico maior ou igual a zero.",
         variant: "destructive",
       });
       return;
@@ -301,7 +332,7 @@ const NewBookingFlow = ({
   useEffect(() => {
     loadData();
     loadSiteSettings();
-    // Só definir cliente inicial se estiver em modo admin
+    // SÃ³ definir cliente inicial se estiver em modo admin
     if (adminMode && initialClient) {
       setSelectedClient(initialClient);
     }
@@ -392,10 +423,12 @@ const NewBookingFlow = ({
       appointment_date: initialAppointment.appointment_date || "",
       appointment_time: initialAppointment.appointment_time || "",
       city_id: initialAppointment.city_id || "",
+      professional_id: initialAppointment.professional_id || "",
       notes: sanitizeNotes(initialAppointment.notes || ""),
     };
 
     ensureCityPresent(updatedFormData.city_id, initialAppointment.city_settings?.city_name ?? null);
+    ensureProfessionalPresent(initialAppointment.professional_id, initialAppointment.professional?.name ?? null);
 
     if (proceduresFromInitial.length > 0) {
       const missingProcedures = proceduresFromInitial
@@ -484,10 +517,18 @@ const NewBookingFlow = ({
   }, [isEditing, originalSnapshot, formData, selectedProcedures]);
 
   useEffect(() => {
-    if (formData.appointment_date && formData.city_id) {
-      loadAvailableTimes(formData.appointment_date);
+    if (!formData.appointment_date || !formData.city_id) return;
+
+    if (adminMode && !formData.professional_id) {
+      setAvailableTimes([]);
+      return;
     }
-  }, [formData.appointment_date, formData.city_id]);
+
+    loadAvailableTimes(
+      formData.appointment_date,
+      adminMode ? (formData.professional_id || null) : undefined
+    );
+  }, [formData.appointment_date, formData.city_id, formData.professional_id, adminMode]);
 
   // Sincronizar formData.procedure_id com o primeiro procedimento
   useEffect(() => {
@@ -518,7 +559,7 @@ const NewBookingFlow = ({
         setWhatsappNumber(whatsappData.setting_value);
       }
     } catch (error) {
-      console.error('Erro ao carregar configurações:', error);
+      console.error('Erro ao carregar configuraÃ§Ãµes:', error);
     }
   };
 
@@ -526,13 +567,13 @@ const NewBookingFlow = ({
     if (!formData.city_id) return;
 
     try {
-      // Novo sistema flexível: não bloqueamos mais datas
-      // Apenas limpamos as restrições e permitimos todos os dias
+      // Novo sistema flexÃ­vel: nÃ£o bloqueamos mais datas
+      // Apenas limpamos as restriÃ§Ãµes e permitimos todos os dias
       setAvailableDates(new Set());
       setUnavailableDates(new Set());
       
-      // Nota: O sistema de avisos será implementado na função de seleção de data
-      // quando o usuário selecionar uma data onde a Dra. está em outra cidade
+      // Nota: O sistema de avisos serÃ¡ implementado na funÃ§Ã£o de seleÃ§Ã£o de data
+      // quando o usuÃ¡rio selecionar uma data onde a Dra. estÃ¡ em outra cidade
     } catch (error) {
       console.error('Erro ao carregar disponibilidade da cidade:', error);
     }
@@ -540,7 +581,7 @@ const NewBookingFlow = ({
 
   const checkDateAvailability = async (date: string, cityId: string) => {
     try {
-      // Verificar se a doutora estará disponível na cidade selecionada
+      // Verificar se a doutora estarÃ¡ disponÃ­vel na cidade selecionada
       const { data: cityAvailability, error: availabilityError } = await supabase
         .from('city_availability')
         .select('*')
@@ -554,7 +595,7 @@ const NewBookingFlow = ({
       }
 
       if (!cityAvailability || cityAvailability.length === 0) {
-        // Verificar se ela estará em outra cidade
+        // Verificar se ela estarÃ¡ em outra cidade
         const { data: otherCityAvailability, error: otherError } = await supabase
           .from('city_availability')
           .select(`
@@ -568,7 +609,7 @@ const NewBookingFlow = ({
 
         if (otherError) {
           console.error('Erro ao verificar outras cidades:', otherError);
-          setAvailabilityWarning('A Dra. Karoline não estará disponível nesta data.');
+          setAvailabilityWarning('A Dra. Karoline nÃ£o estarÃ¡ disponÃ­vel nesta data.');
           return;
         }
 
@@ -576,20 +617,20 @@ const NewBookingFlow = ({
           const otherCity = otherCityAvailability[0];
           const cityName = (otherCity.city_settings as any)?.city_name || 'outra cidade';
           
-          // Buscar mensagem configurável
+          // Buscar mensagem configurÃ¡vel
           const { data: messageSetting } = await supabase
             .from('site_settings')
             .select('setting_value')
             .eq('setting_key', 'availability_message')
             .single();
 
-          const defaultMessage = 'A Dra. Karoline estará em {cidade} nesta data.';
+          const defaultMessage = 'A Dra. Karoline estarÃ¡ em {cidade} nesta data.';
           const messageTemplate = messageSetting?.setting_value || defaultMessage;
           const finalMessage = messageTemplate.replace('{cidade}', cityName);
           
           setAvailabilityWarning(finalMessage);
         } else {
-          setAvailabilityWarning('A Dra. Karoline não estará disponível nesta data.');
+          setAvailabilityWarning('A Dra. Karoline nÃ£o estarÃ¡ disponÃ­vel nesta data.');
         }
       } else {
         setAvailabilityWarning('');
@@ -636,6 +677,19 @@ const NewBookingFlow = ({
 
       if (citiesError) throw citiesError;
       setCities(citiesData || []);
+
+      if (adminMode) {
+        const { data: professionalsData, error: professionalsError } = await supabase
+          .from('professionals')
+          .select('id, name')
+          .order('name');
+
+        if (professionalsError) {
+          console.error('Erro ao carregar profissionais:', professionalsError);
+        } else {
+          setProfessionals(professionalsData || []);
+        }
+      }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast({
@@ -648,9 +702,14 @@ const NewBookingFlow = ({
     }
   };
 
-  const loadAvailableTimes = async (selectedDate: string) => {
+  const loadAvailableTimes = async (selectedDate: string, professionalId?: string | null) => {
     if (!formData.city_id || !selectedDate) return;
-    
+
+    if (adminMode && !professionalId) {
+      setAvailableTimes([]);
+      return;
+    }
+
     setLoadingTimes(true);
     
     try {
@@ -716,11 +775,17 @@ const NewBookingFlow = ({
         timeSlots.push(timeString);
       }
 
-      const { data: appointments } = await supabase
+      let appointmentsQuery = supabase
         .from('appointments')
-        .select('id, appointment_time, procedures(duration)')
+        .select('id, appointment_time, professional_id, procedures(duration)')
         .eq('appointment_date', selectedDate)
         .neq('status', 'cancelado');
+
+      if (adminMode && professionalId) {
+        appointmentsQuery = appointmentsQuery.eq('professional_id', professionalId);
+      }
+
+      const { data: appointments } = await appointmentsQuery;
 
       const occupiedSlots = new Set<string>();
       appointments?.forEach(apt => {
@@ -782,7 +847,7 @@ const NewBookingFlow = ({
 
       setAvailableTimes(enrichedAvailable);
     } catch (error) {
-      console.error('Erro ao carregar horários:', error);
+      console.error('Erro ao carregar horarios:', error);
       setAvailableTimes([]);
     } finally {
       setLoadingTimes(false);
@@ -801,6 +866,7 @@ const NewBookingFlow = ({
           appointment_time,
           notes,
           city_id,
+          professional_id,
           city_settings:city_settings (
             city_name,
             clinic_name,
@@ -809,6 +875,10 @@ const NewBookingFlow = ({
           ),
           clients (*),
           procedures (*),
+          professionals (
+            id,
+            name
+          ),
           appointments_procedures (
             order_index,
             custom_price,
@@ -892,9 +962,11 @@ const NewBookingFlow = ({
         appointment_time: data.appointment_time || '',
         notes: data.notes || '',
         city_id: data.city_id || '',
+        professional_id: data.professional_id || '',
       };
 
       ensureCityPresent(newFormState.city_id, (data as any)?.city_settings?.city_name ?? null);
+      ensureProfessionalPresent(data.professional_id, (data as any)?.professionals?.name ?? null);
 
       setSelectedProcedures(normalizedProcedures);
       setFormData(newFormState);
@@ -907,7 +979,7 @@ const NewBookingFlow = ({
       setIsDirty(false);
       hasLoadedEditingData.current = true;
     } catch (error) {
-      console.error('Erro ao carregar agendamento para edição:', error);
+      console.error('Erro ao carregar agendamento para ediÃ§Ã£o:', error);
       toast({
         title: "Erro ao carregar agendamento",
         description: "N?o foi poss?vel carregar os dados do agendamento para edi??o.",
@@ -1002,18 +1074,18 @@ const NewBookingFlow = ({
         console.error('Erro ao enviar evento Meta:', metaError);
       }
       
-      // Enviar notificações
+      // Enviar notificaÃ§Ãµes
       try {
         await sendWhatsAppNotification(client, appointment, procedure, city);
         await sendOwnerNotification(client, appointment, procedure, city);
         await sendAdminNotification(client, appointment, procedure, city);
       } catch (notificationError) {
-        console.error('Erro ao enviar notificações:', notificationError);
+        console.error('Erro ao enviar notificaÃ§Ãµes:', notificationError);
       }
 
       toast({
         title: "Agendamento realizado!",
-        description: "Seu agendamento foi criado com sucesso. Uma confirmação será enviada via WhatsApp.",
+        description: "Seu agendamento foi criado com sucesso. Uma confirmaÃ§Ã£o serÃ¡ enviada via WhatsApp.",
       });
 
       setCurrentView('confirmation');
@@ -1038,13 +1110,13 @@ const NewBookingFlow = ({
     proceduresToSave?: Array<{id: string, procedure: Procedure | null}>
   ) => {
     try {
-      console.log('=== INÃCIO WHATSAPP NOTIFICATION ===');
+      console.log('=== INÃƒÂCIO WHATSAPP NOTIFICATION ===');
       console.log('Client:', client);
       console.log('Appointment:', appointment);
       console.log('Procedure:', procedure);
       console.log('City:', city);
 
-      const notes = appointment.notes ? `\n?? Observações: ${appointment.notes}` : '';
+      const notes = appointment.notes ? `\n?? ObservaÃ§Ãµes: ${appointment.notes}` : '';
       console.log('Notes formatadas:', notes);
 
       // Buscar dados da cidade
@@ -1058,9 +1130,9 @@ const NewBookingFlow = ({
       console.log('City data:', cityData);
       console.log('City error:', cityError);
 
-      // Formatação simples do local da clínica usando dados disponíveis
+      // FormataÃ§Ã£o simples do local da clÃ­nica usando dados disponÃ­veis
       const cityName = cityData?.city_name || city?.city_name || '';
-      const clinicLocation = `?? ClÃ­nica Dra. Karoline Ferreira â€” ${cityName}`;
+      const clinicLocation = `?? ClÃƒÂ­nica Dra. Karoline Ferreira Ã¢â‚¬â€ ${cityName}`;
       
       console.log('Clinic location formatada:', clinicLocation);
 
@@ -1080,7 +1152,7 @@ const NewBookingFlow = ({
         ? proceduresToSave.map((sp, idx) => `${idx + 1}. ${sp.procedure!.name}`).join('\n')
         : procedure?.name || '';
 
-      // Preparar variáveis para substituição
+      // Preparar variÃ¡veis para substituiÃ§Ã£o
       const variables = {
         clientName: client.nome,
         appointmentDate: format(parseISO(appointment.appointment_date), "dd/MM/yyyy", { locale: ptBR }),
@@ -1089,29 +1161,29 @@ const NewBookingFlow = ({
         notes: notes,
         clinicLocation: clinicLocation,
         cityName: cityName,
-        clinicName: 'ClÃ­nica Dra. Karoline Ferreira',
+        clinicName: 'ClÃƒÂ­nica Dra. Karoline Ferreira',
         clinicMapUrl: cityData?.map_url || '',
         specifications: appointment.specifications || ''
       };
 
-      console.log('Variáveis preparadas:', variables);
+      console.log('VariÃ¡veis preparadas:', variables);
 
       // Processar template ou usar fallback
       let message = templateData?.template_content || `?? *Agendamento Confirmado*
 
-Olá {clientName}!
+OlÃ¡ {clientName}!
 
 ?? Data: {appointmentDate}
-? Horário: {appointmentTime}
+? HorÃ¡rio: {appointmentTime}
 ?? Procedimento: {procedureName}{notes}
 
 {clinicLocation}
 
-? Aguardamos vocÃª!`;
+? Aguardamos vocÃƒÂª!`;
 
       console.log('Template inicial:', message);
 
-      // Substituir todas as variáveis
+      // Substituir todas as variÃ¡veis
       Object.entries(variables).forEach(([key, value]) => {
         const regex = new RegExp(`\\{${key}\\}`, 'g');
         const oldMessage = message;
@@ -1178,7 +1250,7 @@ Olá {clientName}!
         }
       });
     } catch (error) {
-      console.error('Erro ao notificar proprietária:', error);
+      console.error('Erro ao notificar proprietÃ¡ria:', error);
     }
   };
 
@@ -1239,7 +1311,7 @@ Olá {clientName}!
         .insert({
           client_id: selectedClient.id,
           procedure_id: primaryProcedureId,
-          professional_id: null,
+          professional_id: formData.professional_id || null,
           appointment_date: formData.appointment_date,
           appointment_time: formData.appointment_time,
           notes: sanitizeNotes(formData.notes) || null,
@@ -1339,6 +1411,7 @@ Olá {clientName}!
         appointment_time: formData.appointment_time,
         notes: sanitizeNotes(formData.notes) || null,
         city_id: formData.city_id || null,
+        professional_id: formData.professional_id || null,
       };
 
       const { error: updateError } = await supabase
@@ -1416,13 +1489,16 @@ Olá {clientName}!
       return;
     }
     
-    if (!formData.appointment_date || !formData.appointment_time || !formData.city_id) {
+    if (!formData.appointment_date || !formData.appointment_time || !formData.city_id || (adminMode && !formData.professional_id)) {
       toast({
         title: "Campos obrigatorios",
-        description: "Por favor, preencha todos os campos obrigatorios (cidade, data e horário).",
+        description: adminMode
+          ? "Por favor, preencha todos os campos obrigatorios (profissional, cidade, data e horario)."
+          : "Por favor, preencha todos os campos obrigatorios (cidade, data e horario).",
         variant: "destructive",
       });
       return;
+    }
     }
 
     for (const sp of validProcedures) {
@@ -1446,9 +1522,9 @@ Olá {clientName}!
           });
           return;
         }
-        await handleUpdateAppointment(validProcedures);
+        handleUpdateAppointment(validProcedures);
       } else {
-        await handleBookingSubmit(validProcedures);
+        handleBookingSubmit(validProcedures);
       }
       return;
     }
@@ -1515,9 +1591,9 @@ Olá {clientName}!
                   <div className="flex items-start gap-3">
                     <CalendarIcon className="w-5 h-5 text-primary mt-0.5" />
                     <div>
-                      <p className="text-sm text-muted-foreground">Data e Horário</p>
+                      <p className="text-sm text-muted-foreground">Data e HorÃ¡rio</p>
                       <p className="font-semibold text-lg">
-                        {format(parseISO(appointmentDetails.appointment_date), "dd/MM/yyyy", { locale: ptBR })} Ã s {appointmentDetails.appointment_time}
+                        {format(parseISO(appointmentDetails.appointment_date), "dd/MM/yyyy", { locale: ptBR })} ÃƒÂ s {appointmentDetails.appointment_time}
                       </p>
                     </div>
                   </div>
@@ -1535,7 +1611,7 @@ Olá {clientName}!
                       </div>
                     );
                   })()}
-                  {/* EndereÃ§o da clÃ­nica conforme cidade do agendamento */}
+                  {/* EndereÃƒÂ§o da clÃƒÂ­nica conforme cidade do agendamento */}
                   {(() => {
                     const cityRec = cities.find(c => c.id === appointmentDetails?.city_id);
                     const clinicName = cityRec?.clinic_name;
@@ -1553,7 +1629,7 @@ Olá {clientName}!
                               {address}
                               {mapUrl ? (
                                 <>
-                                  {" â€¢ "}
+                                  {" Ã¢â‚¬Â¢ "}
                                   <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="underline">Ver no mapa</a>
                                 </>
                               ) : null}
@@ -1577,7 +1653,7 @@ Olá {clientName}!
                     onClick={onSuccess}
                     className="w-full h-12 text-base font-medium bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
                   >
-                    Voltar para o Calendário
+                    Voltar para o CalendÃ¡rio
                   </Button>
                 ) : (
                   <>
@@ -1643,7 +1719,7 @@ Olá {clientName}!
                     className="inline-flex items-center gap-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105"
                   >
                     <MessageCircle className="w-5 h-5" />
-                    Tire suas dúvidas no WhatsApp
+                    Tire suas dÃºvidas no WhatsApp
                   </a>
                 </div>
               )}
@@ -1651,7 +1727,7 @@ Olá {clientName}!
             
             <CardContent className="p-8">
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Seção de Procedimentos - Formato Vertical */}
+                {/* SeÃ§Ã£o de Procedimentos - Formato Vertical */}
                 <div className="space-y-6">
                   {selectedProcedures.map((item, index) => (
                     <div key={item.id} className="space-y-4">
@@ -1717,7 +1793,7 @@ Olá {clientName}!
                                   <div className="flex flex-col items-start">
                                     <span className="font-medium">{procedure.name}</span>
                                     <span className="text-xs text-muted-foreground">
-                                      {procedure.duration}min • {currency(procedure.price || 0)}
+                                      {procedure.duration}min â€¢ {currency(procedure.price || 0)}
                                     </span>
                                   </div>
                                 </SelectItem>
@@ -1726,7 +1802,7 @@ Olá {clientName}!
                           </SelectContent>
                         </Select>                      </div>
 
-                      {/* Box de Descrição do Procedimento */}
+                      {/* Box de DescriÃ§Ã£o do Procedimento */}
                       {item.procedure && (
                         <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent shadow-lg">
                           <CardContent className="p-6">
@@ -1817,7 +1893,7 @@ Olá {clientName}!
                         </Card>
                       )}
 
-                      {/* Especificações (se necessário) */}
+                      {/* EspecificaÃ§Ãµes (se necessÃ¡rio) */}
                       {item.procedure?.requires_specifications && (
                         <div className="space-y-3">
                           <ProcedureSpecificationSelector
@@ -1827,7 +1903,7 @@ Olá {clientName}!
                               newProcedures[index] = { 
                                 ...item, 
                                 specifications: data.selectedSpecifications,
-                                specificationsTotal: data.totalPrice // Salvar o preÃ§o total com desconto
+                                specificationsTotal: data.totalPrice // Salvar o preÃƒÂ§o total com desconto
                               };
                               setSelectedProcedures(newProcedures);
                             }}
@@ -1839,7 +1915,7 @@ Olá {clientName}!
                         </div>
                       )}
 
-                      {/* Link/BotÃ£o para adicionar mais procedimentos */}
+                      {/* Link/BotÃƒÂ£o para adicionar mais procedimentos */}
                       {index === selectedProcedures.length - 1 && item.procedure && (
                         <button
                           type="button"
@@ -1861,7 +1937,7 @@ Olá {clientName}!
                   ))}
                 </div>
 
-                {/* Box de Resumo - SÃ­ntese dos Procedimentos */}
+                {/* Box de Resumo - SÃƒÂ­ntese dos Procedimentos */}
                 {selectedProcedures.filter(p => p.procedure).length > 0 && (
                   <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
                     <CardHeader>
@@ -1896,7 +1972,7 @@ Olá {clientName}!
                       {selectedProcedures.filter(p => p.procedure).length > 1 && (
                         <div className="pt-3 border-t-2 border-primary/20 space-y-2">
                           <div className="flex justify-between text-sm">
-                            <span className="font-semibold">Duração Total:</span>
+                            <span className="font-semibold">DuraÃ§Ã£o Total:</span>
                             <span className="font-bold">
                               {selectedProcedures
                                 .filter(p => p.procedure)
@@ -1917,6 +1993,46 @@ Olá {clientName}!
                       )}
                     </CardContent>
                   </Card>
+                )}
+
+                {adminMode && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-foreground">
+                      Profissional <span className="text-destructive">*</span>
+                    </label>
+                    <Select
+                      value={formData.professional_id || ""}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, professional_id: value, appointment_time: "" }))}
+                      disabled={professionals.length === 0}
+                    >
+                      <SelectTrigger className="h-14 border-2 hover:border-primary/50 transition-all duration-200 bg-background">
+                        <SelectValue
+                          placeholder={
+                            professionals.length === 0
+                              ? "Nenhum profissional cadastrado"
+                              : "Selecione um profissional"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {professionals.map((professional) => (
+                          <SelectItem key={professional.id} value={professional.id} className="py-3">
+                            <span className="font-medium">{professional.name}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {professionals.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Cadastre profissionais na area administrativa para habilitar esta selecao.
+                      </p>
+                    )}
+                    {professionals.length > 0 && !formData.professional_id && (
+                      <p className="text-xs text-muted-foreground">
+                        Selecione um profissional para visualizar os horarios disponiveis.
+                      </p>
+                    )}
+                  </div>
                 )}
 
                 {/* Cidade */}
@@ -1944,7 +2060,7 @@ Olá {clientName}!
                   </Select>
                 </div>
 
-                {/* Data com Calendário */}
+                {/* Data com CalendÃ¡rio */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <CalendarIcon className="w-4 h-4 text-primary" />
@@ -1986,7 +2102,7 @@ Olá {clientName}!
                           }
                         }}
                         disabled={(date) => {
-                          // Se allowPastDates for true, nÃ£o desabilitar nenhuma data
+                          // Se allowPastDates for true, nÃƒÂ£o desabilitar nenhuma data
                           if (allowPastDates) return false;
                           
                           const today = new Date();
@@ -2005,16 +2121,16 @@ Olá {clientName}!
                   {availabilityWarning && (
                     <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                       <p className="text-sm text-yellow-800">
-                        âš ï¸ {availabilityWarning}
+                        Ã¢Å¡Â Ã¯Â¸Â {availabilityWarning}
                       </p>
                     </div>
                   )}
                 </div>
 
-                {/* Horário */}
+                {/* HorÃ¡rio */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground">
-                    Horário <span className="text-destructive">*</span>
+                    HorÃ¡rio <span className="text-destructive">*</span>
                   </label>
                   <Select 
                     value={formData.appointment_time} 
@@ -2023,10 +2139,10 @@ Olá {clientName}!
                   >
                     <SelectTrigger className="h-14 border-2 hover:border-primary/50 transition-all duration-200 bg-background">
                       <SelectValue placeholder={
-                        loadingTimes ? "Carregando horários..." : 
+                        loadingTimes ? "Carregando horarios..." : 
                         !formData.appointment_date ? "Selecione a data primeiro" : 
-                        availableTimes.length === 0 ? "Sem horários disponíveis" :
-                        "Selecione um horário"
+                        availableTimes.length === 0 ? "Sem horarios disponiveis" :
+                        "Selecione um horario"
                       } />
                     </SelectTrigger>
                     <SelectContent>
@@ -2039,20 +2155,20 @@ Olá {clientName}!
                   </Select>
                 </div>
 
-                {/* Observações */}
+                {/* ObservaÃ§Ãµes */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground">
-                    Observações (opcional)
+                    ObservaÃ§Ãµes (opcional)
                   </label>
                   <Textarea
                     value={formData.notes}
                     onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                    placeholder="Adicione qualquer observação relevante sobre o agendamento..."
+                    placeholder="Adicione qualquer observaÃ§Ã£o relevante sobre o agendamento..."
                     className="min-h-[100px] border-2 hover:border-primary/50 transition-all duration-200"
                   />
                 </div>
 
-                {/* Botões de Ação */}
+                {/* BotÃµes de AÃ§Ã£o */}
                 <div className="flex gap-4 pt-4">
                   <Button
                     type="button"
@@ -2089,6 +2205,8 @@ Olá {clientName}!
 };
 
 export default NewBookingFlow;
+
+
 
 
 

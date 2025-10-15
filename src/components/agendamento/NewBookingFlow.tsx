@@ -2202,14 +2202,7 @@ OlÃ¡ {clientName}!
       {renderCurrentView()}
     </div>
   );
-};
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 py-8">
-      {renderCurrentView()}
-    </div>
-  );
-};
+}
 
 export default NewBookingFlow;
 

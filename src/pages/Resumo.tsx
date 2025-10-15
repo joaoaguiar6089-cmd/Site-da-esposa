@@ -6,7 +6,7 @@ import ResumoAuth from "@/components/resumo/ResumoAuth";
 import MonthlyCards from "@/components/resumo/MonthlyCards";
 import MonthlyDetail from "@/components/resumo/MonthlyDetail";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/components/auth/AuthContext";
+
 import { supabase } from "@/integrations/supabase/client";
 
 interface MonthSummary {
@@ -25,11 +25,10 @@ const Resumo = () => {
   const [monthlySummaries, setMonthlySummaries] = useState<MonthSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { user, signOut, loading: authLoading } = useAuth();
 
   useEffect(() => {
     checkAuth();
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     if (authenticated) {
@@ -37,33 +36,11 @@ const Resumo = () => {
     }
   }, [authenticated]);
 
-  const checkAuth = async () => {
-    if (!user) {
-      setAuthenticated(false);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      // Verificar se o usuário tem role de resumo
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
-
-      if (profile && profile.role === 'resumo') {
-        setAuthenticated(true);
-      } else {
-        setAuthenticated(false);
-        await signOut();
-      }
-    } catch (error) {
-      console.error('Erro ao verificar autenticação:', error);
-      setAuthenticated(false);
-    } finally {
-      setLoading(false);
-    }
+  const checkAuth = () => {
+    // Verificar sessão local (não usa Supabase Auth)
+    const isAuth = sessionStorage.getItem('resumo_authenticated') === 'true';
+    setAuthenticated(isAuth);
+    setLoading(false);
   };
 
   const loadMonthlySummaries = async () => {
@@ -157,11 +134,18 @@ const Resumo = () => {
 
   const handleLogout = async () => {
     try {
+      const username = sessionStorage.getItem('resumo_username');
+      
+      // Log de segurança
       await supabase.rpc('log_security_event', {
-        event_type: 'resumo_logout'
+        event_type: 'resumo_logout',
+        event_details: { username }
       });
       
-      await signOut();
+      // Limpar sessão local
+      sessionStorage.removeItem('resumo_authenticated');
+      sessionStorage.removeItem('resumo_username');
+      setAuthenticated(false);
       
       toast({
         title: "Logout realizado",
@@ -169,7 +153,10 @@ const Resumo = () => {
       });
     } catch (error) {
       console.error('Logout error:', error);
-      await signOut();
+      // Limpar sessão mesmo se houver erro no log
+      sessionStorage.removeItem('resumo_authenticated');
+      sessionStorage.removeItem('resumo_username');
+      setAuthenticated(false);
     }
   };
 
@@ -177,7 +164,7 @@ const Resumo = () => {
     window.location.href = "/";
   };
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

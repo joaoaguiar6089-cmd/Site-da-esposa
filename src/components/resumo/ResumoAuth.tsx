@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/components/auth/AuthContext";
+
 import { supabase } from "@/integrations/supabase/client";
 import { Lock } from "lucide-react";
 
@@ -13,52 +13,49 @@ interface ResumoAuthProps {
 }
 
 const ResumoAuth = ({ onAuth }: ResumoAuthProps) => {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { signIn } = useAuth();
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Autenticar com Supabase
-      const { error } = await signIn(email, password);
+      // Verificar credenciais usando função do banco
+      const { data, error } = await supabase.rpc('verify_resumo_credentials', {
+        p_username: username,
+        p_password: password
+      });
 
       if (error) {
+        console.error('Erro ao verificar credenciais:', error);
+        toast({
+          title: "Erro",
+          description: "Erro ao verificar credenciais. Tente novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!data) {
         toast({
           title: "Erro de autenticação",
-          description: "Email ou senha inválidos.",
+          description: "Usuário ou senha inválidos.",
           variant: "destructive",
         });
         return;
       }
 
-      // Verificar se o usuário tem role de resumo
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
-        .single();
-
-      if (!profile || profile.role !== 'resumo') {
-        // Fazer logout se não tiver permissão
-        await supabase.auth.signOut();
-        toast({
-          title: "Acesso negado",
-          description: "Você não tem permissão para acessar esta área.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Log de segurança
-      await supabase.rpc('log_security_event', {
-        event_type: 'resumo_login',
-        event_details: { email }
+      // Registrar login bem-sucedido
+      await supabase.rpc('log_resumo_login', {
+        p_username: username
       });
+
+      // Armazenar sessão local (não usa Supabase Auth)
+      sessionStorage.setItem('resumo_authenticated', 'true');
+      sessionStorage.setItem('resumo_username', username);
 
       toast({
         title: "Login realizado",
@@ -95,13 +92,13 @@ const ResumoAuth = ({ onAuth }: ResumoAuthProps) => {
         <CardContent>
           <form onSubmit={handleAuth} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="username">Usuário</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="username"
+                type="text"
+                placeholder="enfesteta.karoline"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
                 autoComplete="username"
               />

@@ -1579,6 +1579,33 @@ export type Database = {
         }
         Relationships: []
       }
+      resumo_credentials: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          last_login: string | null
+          password_hash: string
+          username: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_login?: string | null
+          password_hash: string
+          username: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_login?: string | null
+          password_hash?: string
+          username?: string
+        }
+        Relationships: []
+      }
       schedule_exceptions: {
         Row: {
           created_at: string
@@ -1907,6 +1934,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      log_resumo_login: {
+        Args: { p_username: string }
+        Returns: undefined
+      }
       log_security_event: {
         Args: {
           event_details?: Json
@@ -1937,6 +1968,10 @@ export type Database = {
       }
       validate_cpf: {
         Args: { p_cpf: string }
+        Returns: boolean
+      }
+      verify_resumo_credentials: {
+        Args: { p_password: string; p_username: string }
         Returns: boolean
       }
     }

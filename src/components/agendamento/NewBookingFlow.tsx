@@ -332,7 +332,7 @@ const NewBookingFlow = ({
   useEffect(() => {
     loadData();
     loadSiteSettings();
-    // SÃ³ definir cliente inicial se estiver em modo admin
+  // Só definir cliente inicial se estiver em modo admin
     if (adminMode && initialClient) {
       setSelectedClient(initialClient);
     }
@@ -559,7 +559,7 @@ const NewBookingFlow = ({
         setWhatsappNumber(whatsappData.setting_value);
       }
     } catch (error) {
-      console.error('Erro ao carregar configuraÃ§Ãµes:', error);
+      console.error('Erro ao carregar configurações:', error);
     }
   };
 
@@ -567,13 +567,13 @@ const NewBookingFlow = ({
     if (!formData.city_id) return;
 
     try {
-      // Novo sistema flexÃ­vel: nÃ£o bloqueamos mais datas
-      // Apenas limpamos as restriÃ§Ãµes e permitimos todos os dias
+      // Novo sistema flexível: não bloqueamos mais datas
+      // Apenas limpamos as restrições e permitimos todos os dias
       setAvailableDates(new Set());
       setUnavailableDates(new Set());
       
-      // Nota: O sistema de avisos serÃ¡ implementado na funÃ§Ã£o de seleÃ§Ã£o de data
-      // quando o usuÃ¡rio selecionar uma data onde a Dra. estÃ¡ em outra cidade
+      // Nota: O sistema de avisos será implementado na função de seleção de data
+      // quando o usuário selecionar uma data onde a Dra. está em outra cidade
     } catch (error) {
       console.error('Erro ao carregar disponibilidade da cidade:', error);
     }
@@ -581,7 +581,7 @@ const NewBookingFlow = ({
 
   const checkDateAvailability = async (date: string, cityId: string) => {
     try {
-      // Verificar se a doutora estarÃ¡ disponÃ­vel na cidade selecionada
+  // Verificar se a doutora estará disponível na cidade selecionada
       const { data: cityAvailability, error: availabilityError } = await supabase
         .from('city_availability')
         .select('*')
@@ -609,7 +609,7 @@ const NewBookingFlow = ({
 
         if (otherError) {
           console.error('Erro ao verificar outras cidades:', otherError);
-          setAvailabilityWarning('A Dra. Karoline nÃ£o estarÃ¡ disponÃ­vel nesta data.');
+          setAvailabilityWarning('A Dra. Karoline não estará disponível nesta data.');
           return;
         }
 
@@ -617,20 +617,20 @@ const NewBookingFlow = ({
           const otherCity = otherCityAvailability[0];
           const cityName = (otherCity.city_settings as any)?.city_name || 'outra cidade';
           
-          // Buscar mensagem configurÃ¡vel
+          // Buscar mensagem configurável
           const { data: messageSetting } = await supabase
             .from('site_settings')
             .select('setting_value')
             .eq('setting_key', 'availability_message')
             .single();
 
-          const defaultMessage = 'A Dra. Karoline estarÃ¡ em {cidade} nesta data.';
+          const defaultMessage = 'A Dra. Karoline estará em {cidade} nesta data.';
           const messageTemplate = messageSetting?.setting_value || defaultMessage;
           const finalMessage = messageTemplate.replace('{cidade}', cityName);
           
           setAvailabilityWarning(finalMessage);
         } else {
-          setAvailabilityWarning('A Dra. Karoline nÃ£o estarÃ¡ disponÃ­vel nesta data.');
+          setAvailabilityWarning('A Dra. Karoline não estará disponível nesta data.');
         }
       } else {
         setAvailabilityWarning('');
@@ -979,10 +979,10 @@ const NewBookingFlow = ({
       setIsDirty(false);
       hasLoadedEditingData.current = true;
     } catch (error) {
-      console.error('Erro ao carregar agendamento para ediÃ§Ã£o:', error);
+      console.error('Erro ao carregar agendamento para edição:', error);
       toast({
         title: "Erro ao carregar agendamento",
-        description: "N?o foi poss?vel carregar os dados do agendamento para edi??o.",
+        description: "Não foi possível carregar os dados do agendamento para edição.",
         variant: "destructive",
       });
       hasLoadedEditingData.current = true;
@@ -1074,18 +1074,18 @@ const NewBookingFlow = ({
         console.error('Erro ao enviar evento Meta:', metaError);
       }
       
-      // Enviar notificaÃ§Ãµes
+  // Enviar notificações
       try {
         await sendWhatsAppNotification(client, appointment, procedure, city);
         await sendOwnerNotification(client, appointment, procedure, city);
         await sendAdminNotification(client, appointment, procedure, city);
       } catch (notificationError) {
-        console.error('Erro ao enviar notificaÃ§Ãµes:', notificationError);
+        console.error('Erro ao enviar notificações:', notificationError);
       }
 
       toast({
         title: "Agendamento realizado!",
-        description: "Seu agendamento foi criado com sucesso. Uma confirmaÃ§Ã£o serÃ¡ enviada via WhatsApp.",
+        description: "Seu agendamento foi criado com sucesso. Uma confirmação será enviada via WhatsApp.",
       });
 
       setCurrentView('confirmation');
@@ -1108,15 +1108,15 @@ const NewBookingFlow = ({
     city: any, 
     hasMultipleProcedures: boolean = false,
     proceduresToSave?: Array<{id: string, procedure: Procedure | null}>
-  ) => {
+    ) => {
     try {
-      console.log('=== INÃƒÂCIO WHATSAPP NOTIFICATION ===');
+      console.log('=== INÍCIO WHATSAPP NOTIFICATION ===');
       console.log('Client:', client);
       console.log('Appointment:', appointment);
       console.log('Procedure:', procedure);
       console.log('City:', city);
 
-      const notes = appointment.notes ? `\n?? ObservaÃ§Ãµes: ${appointment.notes}` : '';
+  const notes = appointment.notes ? `\n📝 Observações: ${appointment.notes}` : '';
       console.log('Notes formatadas:', notes);
 
       // Buscar dados da cidade
@@ -1130,9 +1130,9 @@ const NewBookingFlow = ({
       console.log('City data:', cityData);
       console.log('City error:', cityError);
 
-      // FormataÃ§Ã£o simples do local da clÃ­nica usando dados disponÃ­veis
+  // Formatação simples do local da clínica usando dados disponíveis
       const cityName = cityData?.city_name || city?.city_name || '';
-      const clinicLocation = `?? ClÃƒÂ­nica Dra. Karoline Ferreira Ã¢â‚¬â€ ${cityName}`;
+  const clinicLocation = `📍 Clínica Dra. Karoline Ferreira — ${cityName}`;
       
       console.log('Clinic location formatada:', clinicLocation);
 
@@ -1152,7 +1152,7 @@ const NewBookingFlow = ({
         ? proceduresToSave.map((sp, idx) => `${idx + 1}. ${sp.procedure!.name}`).join('\n')
         : procedure?.name || '';
 
-      // Preparar variÃ¡veis para substituiÃ§Ã£o
+  // Preparar variáveis para substituição
       const variables = {
         clientName: client.nome,
         appointmentDate: format(parseISO(appointment.appointment_date), "dd/MM/yyyy", { locale: ptBR }),
@@ -1161,29 +1161,29 @@ const NewBookingFlow = ({
         notes: notes,
         clinicLocation: clinicLocation,
         cityName: cityName,
-        clinicName: 'ClÃƒÂ­nica Dra. Karoline Ferreira',
+  clinicName: 'Clínica Dra. Karoline Ferreira',
         clinicMapUrl: cityData?.map_url || '',
         specifications: appointment.specifications || ''
       };
 
-      console.log('VariÃ¡veis preparadas:', variables);
+  console.log('Variáveis preparadas:', variables);
 
       // Processar template ou usar fallback
-      let message = templateData?.template_content || `?? *Agendamento Confirmado*
+  let message = templateData?.template_content || `✅ *Agendamento Confirmado*
 
-OlÃ¡ {clientName}!
+Olá {clientName}!
 
-?? Data: {appointmentDate}
-? HorÃ¡rio: {appointmentTime}
-?? Procedimento: {procedureName}{notes}
+📅 Data: {appointmentDate}
+⏰ Horário: {appointmentTime}
+💆 Procedimento: {procedureName}{notes}
 
 {clinicLocation}
 
-? Aguardamos vocÃƒÂª!`;
+✨ Aguardamos você!`;
 
       console.log('Template inicial:', message);
 
-      // Substituir todas as variÃ¡veis
+  // Substituir todas as variáveis
       Object.entries(variables).forEach(([key, value]) => {
         const regex = new RegExp(`\\{${key}\\}`, 'g');
         const oldMessage = message;
@@ -1250,7 +1250,7 @@ OlÃ¡ {clientName}!
         }
       });
     } catch (error) {
-      console.error('Erro ao notificar proprietÃ¡ria:', error);
+      console.error('Erro ao notificar proprietária:', error);
     }
   };
 
@@ -1590,9 +1590,9 @@ OlÃ¡ {clientName}!
                   <div className="flex items-start gap-3">
                     <CalendarIcon className="w-5 h-5 text-primary mt-0.5" />
                     <div>
-                      <p className="text-sm text-muted-foreground">Data e HorÃ¡rio</p>
+                      <p className="text-sm text-muted-foreground">Data e Horário</p>
                       <p className="font-semibold text-lg">
-                        {format(parseISO(appointmentDetails.appointment_date), "dd/MM/yyyy", { locale: ptBR })} ÃƒÂ s {appointmentDetails.appointment_time}
+                        {format(parseISO(appointmentDetails.appointment_date), "dd/MM/yyyy", { locale: ptBR })} às {appointmentDetails.appointment_time}
                       </p>
                     </div>
                   </div>
@@ -1610,7 +1610,7 @@ OlÃ¡ {clientName}!
                       </div>
                     );
                   })()}
-                  {/* EndereÃƒÂ§o da clÃƒÂ­nica conforme cidade do agendamento */}
+                  {/* Endereço da clínica conforme cidade do agendamento */}
                   {(() => {
                     const cityRec = cities.find(c => c.id === appointmentDetails?.city_id);
                     const clinicName = cityRec?.clinic_name;
@@ -1628,7 +1628,7 @@ OlÃ¡ {clientName}!
                               {address}
                               {mapUrl ? (
                                 <>
-                                  {" Ã¢â‚¬Â¢ "}
+                                  {" • "}
                                   <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="underline">Ver no mapa</a>
                                 </>
                               ) : null}
@@ -1652,7 +1652,7 @@ OlÃ¡ {clientName}!
                     onClick={onSuccess}
                     className="w-full h-12 text-base font-medium bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
                   >
-                    Voltar para o CalendÃ¡rio
+                    Voltar para o Calendário
                   </Button>
                 ) : (
                   <>
@@ -1718,7 +1718,7 @@ OlÃ¡ {clientName}!
                     className="inline-flex items-center gap-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105"
                   >
                     <MessageCircle className="w-5 h-5" />
-                    Tire suas dÃºvidas no WhatsApp
+                    Tire suas dúvidas no WhatsApp
                   </a>
                 </div>
               )}
@@ -1726,7 +1726,7 @@ OlÃ¡ {clientName}!
             
             <CardContent className="p-8">
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* SeÃ§Ã£o de Procedimentos - Formato Vertical */}
+                {/* Seção de Procedimentos - Formato Vertical */}
                 <div className="space-y-6">
                   {selectedProcedures.map((item, index) => (
                     <div key={item.id} className="space-y-4">
@@ -1801,7 +1801,7 @@ OlÃ¡ {clientName}!
                           </SelectContent>
                         </Select>                      </div>
 
-                      {/* Box de DescriÃ§Ã£o do Procedimento */}
+                      {/* Box de Descrição do Procedimento */}
                       {item.procedure && (
                         <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent shadow-lg">
                           <CardContent className="p-6">
@@ -1892,7 +1892,7 @@ OlÃ¡ {clientName}!
                         </Card>
                       )}
 
-                      {/* EspecificaÃ§Ãµes (se necessÃ¡rio) */}
+                      {/* Especificações (se necessário) */}
                       {item.procedure?.requires_specifications && (
                         <div className="space-y-3">
                           <ProcedureSpecificationSelector
@@ -1902,7 +1902,7 @@ OlÃ¡ {clientName}!
                               newProcedures[index] = { 
                                 ...item, 
                                 specifications: data.selectedSpecifications,
-                                specificationsTotal: data.totalPrice // Salvar o preÃƒÂ§o total com desconto
+                                specificationsTotal: data.totalPrice // Salvar o preço total com desconto
                               };
                               setSelectedProcedures(newProcedures);
                             }}
@@ -1914,7 +1914,7 @@ OlÃ¡ {clientName}!
                         </div>
                       )}
 
-                      {/* Link/BotÃƒÂ£o para adicionar mais procedimentos */}
+                      {/* Link/Botão para adicionar mais procedimentos */}
                       {index === selectedProcedures.length - 1 && item.procedure && (
                         <button
                           type="button"
@@ -1936,7 +1936,7 @@ OlÃ¡ {clientName}!
                   ))}
                 </div>
 
-                {/* Box de Resumo - SÃƒÂ­ntese dos Procedimentos */}
+                {/* Box de Resumo - Síntese dos Procedimentos */}
                 {selectedProcedures.filter(p => p.procedure).length > 0 && (
                   <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
                     <CardHeader>
@@ -1971,7 +1971,7 @@ OlÃ¡ {clientName}!
                       {selectedProcedures.filter(p => p.procedure).length > 1 && (
                         <div className="pt-3 border-t-2 border-primary/20 space-y-2">
                           <div className="flex justify-between text-sm">
-                            <span className="font-semibold">DuraÃ§Ã£o Total:</span>
+                            <span className="font-semibold">Duração Total:</span>
                             <span className="font-bold">
                               {selectedProcedures
                                 .filter(p => p.procedure)
@@ -2059,7 +2059,7 @@ OlÃ¡ {clientName}!
                   </Select>
                 </div>
 
-                {/* Data com CalendÃ¡rio */}
+                {/* Data com Calendário */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <CalendarIcon className="w-4 h-4 text-primary" />
@@ -2101,7 +2101,7 @@ OlÃ¡ {clientName}!
                           }
                         }}
                         disabled={(date) => {
-                          // Se allowPastDates for true, nÃƒÂ£o desabilitar nenhuma data
+                          // Se allowPastDates for true, não desabilitar nenhuma data
                           if (allowPastDates) return false;
                           
                           const today = new Date();
@@ -2120,16 +2120,16 @@ OlÃ¡ {clientName}!
                   {availabilityWarning && (
                     <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                       <p className="text-sm text-yellow-800">
-                        Ã¢Å¡Â Ã¯Â¸Â {availabilityWarning}
+                        ⚠️ {availabilityWarning}
                       </p>
                     </div>
                   )}
                 </div>
 
-                {/* HorÃ¡rio */}
+                {/* Horário */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground">
-                    HorÃ¡rio <span className="text-destructive">*</span>
+                    Horário <span className="text-destructive">*</span>
                   </label>
                   <Select 
                     value={formData.appointment_time} 
@@ -2154,20 +2154,20 @@ OlÃ¡ {clientName}!
                   </Select>
                 </div>
 
-                {/* ObservaÃ§Ãµes */}
+                {/* Observações */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground">
-                    ObservaÃ§Ãµes (opcional)
+                    Observações (opcional)
                   </label>
                   <Textarea
                     value={formData.notes}
                     onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                    placeholder="Adicione qualquer observaÃ§Ã£o relevante sobre o agendamento..."
+                    placeholder="Adicione qualquer observação relevante sobre o agendamento..."
                     className="min-h-[100px] border-2 hover:border-primary/50 transition-all duration-200"
                   />
                 </div>
 
-                {/* BotÃµes de AÃ§Ã£o */}
+                {/* Botões de Ação */}
                 <div className="flex gap-4 pt-4">
                   <Button
                     type="button"

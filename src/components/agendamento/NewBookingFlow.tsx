@@ -1499,7 +1499,6 @@ OlÃ¡ {clientName}!
       });
       return;
     }
-    }
 
     for (const sp of validProcedures) {
       if (sp.procedure?.requires_specifications && (!sp.specifications || sp.specifications.length === 0)) {

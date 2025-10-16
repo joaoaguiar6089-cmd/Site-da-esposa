@@ -47,11 +47,13 @@ export function FormSignatureDialog({ responseId, onClose, onSigned }: FormSigna
   const [isSaving, setIsSaving] = useState(false);
   const [numPages, setNumPages] = useState(0);
   const [pageDimensions, setPageDimensions] = useState<Record<number, { width: number; height: number }>>({});
+  const [draggingSignature, setDraggingSignature] = useState<{ pageNumber: number; offsetX: number; offsetY: number } | null>(null);
   const [signatureValue, setSignatureValue] = useState<SignaturePadValue | null>(null);
   const [selectedPages, setSelectedPages] = useState<number[]>([]);
   const [signaturePositions, setSignaturePositions] = useState<Record<number, { x: number; y: number }>>({});
 
   const pdfPathRef = useRef<string | null>(null);
+  const pageRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   const signatureLog = useMemo<SignatureLogEntry[]>(() => {
     const rawData = (response?.response_data as Record<string, any> | undefined)?.__signatures;
@@ -617,13 +619,17 @@ export function FormSignatureDialog({ responseId, onClose, onSigned }: FormSigna
                         y: dimensions ? dimensions.height * 0.05 : 0 
                       };
                       
-                      return (
-                        <div 
-                          key={pageNumber} 
-                          className={`relative inline-block shadow border-2 transition-all ${
-                            isSelected ? 'border-primary ring-2 ring-primary/40' : 'border-border hover:border-primary/50'
-                          }`}
-                        >
+                        return (
+                          <div 
+                            key={pageNumber} 
+                            ref={(el) => {
+                              pageRefs.current[pageNumber] = el;
+                            }}
+                            data-page-number={pageNumber}
+                            className={`relative inline-block shadow border-2 transition-all ${
+                              isSelected ? 'border-primary ring-2 ring-primary/40' : 'border-border hover:border-primary/50'
+                            }`}
+                          >
                           <Page
                             pageNumber={pageNumber}
                             renderTextLayer={false}
@@ -641,34 +647,59 @@ export function FormSignatureDialog({ responseId, onClose, onSigned }: FormSigna
                             />
                           </div>
                           
-                          {isSelected && signatureValue && dimensions && (
-                            <div 
-                              className="absolute cursor-move group"
-                              style={{ 
-                                left: `${signaturePos.x}px`,
-                                top: `${signaturePos.y}px`,
-                              }}
-                              draggable
-                              onDragStart={(e) => {
-                                e.dataTransfer.effectAllowed = 'move';
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                e.dataTransfer.setData('offsetX', String(e.clientX - rect.left));
-                                e.dataTransfer.setData('offsetY', String(e.clientY - rect.top));
-                              }}
-                              onDragEnd={(e) => {
-                                const pageElement = e.currentTarget.closest('.relative');
-                                if (!pageElement) return;
-                                const pageRect = pageElement.getBoundingClientRect();
-                                const offsetX = parseFloat(e.dataTransfer.getData('offsetX') || '0');
-                                const offsetY = parseFloat(e.dataTransfer.getData('offsetY') || '0');
-                                const newX = Math.max(0, Math.min(e.clientX - pageRect.left - offsetX, dimensions.width - 180));
-                                const newY = Math.max(0, Math.min(e.clientY - pageRect.top - offsetY, dimensions.height - 80));
-                                setSignaturePositions(prev => ({
-                                  ...prev,
-                                  [pageNumber]: { x: newX, y: newY }
-                                }));
-                              }}
-                            >
+                            {isSelected && signatureValue && dimensions && (
+                              <div 
+                                className="absolute cursor-move group"
+                                style={{ 
+                                  left: `${signaturePos.x}px`,
+                                  top: `${signaturePos.y}px`,
+                                  touchAction: 'none',
+                                }}
+                                onPointerDown={(e) => {
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  setDraggingSignature({
+                                    pageNumber,
+                                    offsetX: e.clientX - rect.left,
+                                    offsetY: e.clientY - rect.top,
+                                  });
+                                  e.currentTarget.setPointerCapture(e.pointerId);
+                                  e.preventDefault();
+                                }}
+                                onPointerMove={(e) => {
+                                  if (!draggingSignature || draggingSignature.pageNumber !== pageNumber) return;
+                                  const pageElement = pageRefs.current[pageNumber];
+                                  if (!pageElement) return;
+                                  const pageRect = pageElement.getBoundingClientRect();
+                                  const newX = Math.max(
+                                    0,
+                                    Math.min(e.clientX - pageRect.left - draggingSignature.offsetX, dimensions.width - 180)
+                                  );
+                                  const newY = Math.max(
+                                    0,
+                                    Math.min(e.clientY - pageRect.top - draggingSignature.offsetY, dimensions.height - 80)
+                                  );
+                                  setSignaturePositions(prev => ({
+                                    ...prev,
+                                    [pageNumber]: { x: newX, y: newY }
+                                  }));
+                                }}
+                                onPointerUp={(e) => {
+                                  if (draggingSignature?.pageNumber === pageNumber) {
+                                    setDraggingSignature(null);
+                                  }
+                                  if ((e.currentTarget as HTMLElement).releasePointerCapture) {
+                                    e.currentTarget.releasePointerCapture(e.pointerId);
+                                  }
+                                }}
+                                onPointerCancel={(e) => {
+                                  if (draggingSignature?.pageNumber === pageNumber) {
+                                    setDraggingSignature(null);
+                                  }
+                                  if ((e.currentTarget as HTMLElement).releasePointerCapture) {
+                                    e.currentTarget.releasePointerCapture(e.pointerId);
+                                  }
+                                }}
+                              >
                               <div 
                                 className="bg-white/95 border-2 border-primary rounded p-2 shadow-xl group-hover:shadow-2xl transition-shadow"
                                 style={{ 

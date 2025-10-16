@@ -145,9 +145,9 @@ export default function FormTemplatesList({ onEditTemplate }: FormTemplatesListP
       <div className="flex flex-col gap-4 mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Fichas Personalizadas</h1>
+            <h1 className="text-3xl font-bold">Documentos</h1>
             <p className="text-muted-foreground mt-1">
-              Crie e gerencie formulários personalizados para seus clientes
+              Crie e gerencie documentos personalizados para seus clientes
             </p>
           </div>
           <Button onClick={() => setShowCreateDialog(true)} size="lg">

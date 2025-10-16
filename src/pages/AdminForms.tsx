@@ -69,7 +69,7 @@ const AdminForms = () => {
               Voltar ao Admin
             </Button>
             <div className="h-6 w-px bg-border" />
-            <h1 className="text-lg font-semibold">Fichas Personalizadas</h1>
+            <h1 className="text-lg font-semibold">Documentos</h1>
           </div>
           
           <div className="flex items-center gap-2">

@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import NewBookingFlow from "@/components/agendamento/NewBookingFlow";
-import ClientDocuments from "./ClientDocuments";
+
 import type { Client, Appointment, ProcedureResult } from "@/types/client";
 import { getPackageInfo, formatSessionProgress } from "@/utils/packageUtils";
 import { formatDateToBrazil } from "@/utils/dateUtils";
@@ -291,7 +291,7 @@ const AreaCliente = ({
     <div className="space-y-6">
       {/* Tabs de Navegação */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="dados" className="flex items-center gap-2">
             <Phone className="h-4 w-4" />
             Meus Dados
@@ -303,10 +303,6 @@ const AreaCliente = ({
           <TabsTrigger value="fichas" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Fichas
-          </TabsTrigger>
-          <TabsTrigger value="documentos" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Documentos
           </TabsTrigger>
         </TabsList>
 
@@ -523,10 +519,6 @@ const AreaCliente = ({
               </p>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="documentos" className="mt-6">
-          <ClientDocuments clientId={localClient.id} />
         </TabsContent>
       </Tabs>
 

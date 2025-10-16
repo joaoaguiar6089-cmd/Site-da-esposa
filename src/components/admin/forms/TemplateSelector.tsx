@@ -59,7 +59,7 @@ export function TemplateSelector({ onSelect, onCancel }: TemplateSelectorProps) 
             Nenhum template disponível
           </h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Configure templates na seção de Fichas Personalizadas
+            Configure templates na seção de Documentos
           </p>
           {onCancel && (
             <Button variant="outline" onClick={onCancel}>

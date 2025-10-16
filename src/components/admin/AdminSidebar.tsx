@@ -32,7 +32,7 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
     { id: "calendar", label: "Calendário", icon: Calendar },
     { id: "appointments", label: "Histórico", icon: DollarSign },
     { id: "clients", label: "Clientes", icon: User },
-    { id: "forms", label: "Fichas Personalizadas", icon: FileText },
+    { id: "forms", label: "Documentos", icon: FileText },
     { id: "professionals", label: "Profissionais", icon: UserPlus },
     { id: "categories", label: "Categorias", icon: Tag },
     { id: "procedures", label: "Procedimentos", icon: Stethoscope },

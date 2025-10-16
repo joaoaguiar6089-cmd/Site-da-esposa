@@ -9,7 +9,6 @@ import { formatCPF } from "@/utils/cpfValidator";
 import ClientHeader from "./ClientHeader";
 import ProcedureHistory from "./ProcedureHistory";
 import PhotoGallery from "./PhotoGallery";
-import DocumentsManager from "./DocumentsManager";
 import { ClientFormsArea } from "./forms/ClientFormsArea";
 
 interface Client {
@@ -101,7 +100,7 @@ const ClientDetail = ({
       {/* Abas de Conteúdo */}
       <Card className="border-0 shadow-md">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="historico" className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               Histórico de Procedimentos
@@ -109,10 +108,6 @@ const ClientDetail = ({
             <TabsTrigger value="fotos" className="flex items-center gap-2">
               <User className="h-4 w-4" />
               Galeria de Fotos
-            </TabsTrigger>
-            <TabsTrigger value="documentos" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Documentos
             </TabsTrigger>
             <TabsTrigger value="fichas" className="flex items-center gap-2">
               <ClipboardList className="h-4 w-4" />
@@ -139,14 +134,6 @@ const ClientDetail = ({
             />
           </TabsContent>
           
-          <TabsContent value="documentos" className="mt-6">
-            <DocumentsManager
-              clientId={client.id}
-              clientName={`${client.nome} ${client.sobrenome}`}
-              onDocumentUpdated={onClientUpdated}
-            />
-          </TabsContent>
-
           <TabsContent value="fichas" className="mt-6">
             <ClientFormsArea
               clientId={client.id}

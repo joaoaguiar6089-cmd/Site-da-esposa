@@ -4,7 +4,7 @@ import { LogOut, Home, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/auth/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import FormTemplateEditorSimple from "@/components/admin/forms/FormTemplateEditorSimple";
+import FormTemplateEditor from "@/components/admin/forms/FormTemplateEditor";
 import AdminAuth from "@/components/admin/AdminAuth";
 
 const AdminFormEditor = () => {
@@ -98,7 +98,21 @@ const AdminFormEditor = () => {
 
       {/* Main Content */}
       <main className="h-[calc(100vh-4rem)]">
-        <FormTemplateEditorSimple />
+        {id ? (
+          <FormTemplateEditor templateId={id} onExit={goBackToForms} />
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <div className="text-center space-y-3">
+              <p className="text-muted-foreground">
+                Selecione uma ficha existente para editar ou crie uma nova pela lista de fichas.
+              </p>
+              <Button onClick={goBackToForms}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Voltar para lista
+              </Button>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Plus, Search, FileText, Edit, Copy, Trash2, Eye, EyeOff } from "lucide-react";
 import { useFormTemplates } from "@/hooks/forms/useFormTemplates";
 import { Button } from "@/components/ui/button";
@@ -37,11 +37,15 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 
+interface FormTemplatesListProps {
+  onEditTemplate?: (templateId: string) => void;
+}
+
 // =====================================================
 // COMPONENTE PRINCIPAL
 // =====================================================
 
-export default function FormTemplatesList() {
+export default function FormTemplatesList({ onEditTemplate }: FormTemplatesListProps = {}) {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -81,18 +85,30 @@ export default function FormTemplatesList() {
   });
 
   // Handler: Criar template
+  const openTemplateEditor = (templateId: string) => {
+    if (onEditTemplate) {
+      onEditTemplate(templateId);
+    } else {
+      navigate(`/admin/forms/edit/${templateId}`);
+    }
+  };
+
   const handleCreate = async () => {
     if (!newTemplate.name.trim()) return;
 
-    await createTemplate({
+    const created = await createTemplate({
       name: newTemplate.name,
       description: newTemplate.description,
       category: newTemplate.category || null,
       is_published: false,
-    });
+    }) as FormTemplate;
 
     setShowCreateDialog(false);
     setNewTemplate({ name: "", description: "", category: "" });
+
+    if (created?.id) {
+      openTemplateEditor(created.id);
+    }
   };
 
   // Handler: Deletar template
@@ -105,9 +121,13 @@ export default function FormTemplatesList() {
   // Handler: Clonar template
   const handleClone = async () => {
     if (!templateToClone || !cloneName.trim()) return;
-    await cloneTemplate(templateToClone.id, cloneName);
+    const cloned = await cloneTemplate(templateToClone.id, cloneName) as FormTemplate;
     setTemplateToClone(null);
     setCloneName("");
+
+    if (cloned?.id) {
+      openTemplateEditor(cloned.id);
+    }
   };
 
   // Handler: Toggle publish
@@ -127,11 +147,10 @@ export default function FormTemplatesList() {
           <div>
             <h1 className="text-3xl font-bold">Fichas Personalizadas</h1>
             <p className="text-muted-foreground mt-1">
-              Crie e gerencie formulários personalizados para seus clientes
+              Crie e gerencie formulÃ¡rios personalizados para seus clientes
             </p>
           </div>
-          <Button onClick={() => navigate('/admin/forms/new')} size="lg">
-            <Plus className="mr-2 h-5 w-5" />
+          <Button onClick={() => setShowCreateDialog(true)} size="lg">
             Nova Ficha
           </Button>
         </div>
@@ -155,7 +174,7 @@ export default function FormTemplatesList() {
               <SelectItem value="all">Todas as categorias</SelectItem>
               <SelectItem value="anamnese">Anamnese</SelectItem>
               <SelectItem value="consentimento">Consentimento</SelectItem>
-              <SelectItem value="avaliacao">Avaliação</SelectItem>
+              <SelectItem value="avaliacao">AvaliaÃ§Ã£o</SelectItem>
               <SelectItem value="cadastro">Cadastro</SelectItem>
             </SelectContent>
           </Select>
@@ -197,10 +216,10 @@ export default function FormTemplatesList() {
             <TemplateCard
               key={template.id}
               template={template}
-              onEdit={() => navigate(`/admin/forms/edit/${template.id}`)}
+              onEdit={() => openTemplateEditor(template.id)}
               onClone={() => {
                 setTemplateToClone(template);
-                setCloneName(`${template.name} (cópia)`);
+                setCloneName(`${template.name} (cÃ³pia)`);
               }}
               onDelete={() => setTemplateToDelete(template)}
               onTogglePublish={() => handleTogglePublish(template)}
@@ -229,10 +248,10 @@ export default function FormTemplatesList() {
               />
             </div>
             <div>
-              <Label htmlFor="description">Descrição</Label>
+              <Label htmlFor="description">DescriÃ§Ã£o</Label>
               <Textarea
                 id="description"
-                placeholder="Descreva o propósito desta ficha..."
+                placeholder="Descreva o propÃ³sito desta ficha..."
                 value={newTemplate.description}
                 onChange={(e) => setNewTemplate({ ...newTemplate, description: e.target.value })}
                 rows={3}
@@ -250,7 +269,7 @@ export default function FormTemplatesList() {
                 <SelectContent>
                   <SelectItem value="anamnese">Anamnese</SelectItem>
                   <SelectItem value="consentimento">Consentimento</SelectItem>
-                  <SelectItem value="avaliacao">Avaliação</SelectItem>
+                  <SelectItem value="avaliacao">AvaliaÃ§Ã£o</SelectItem>
                   <SelectItem value="cadastro">Cadastro</SelectItem>
                 </SelectContent>
               </Select>
@@ -273,16 +292,16 @@ export default function FormTemplatesList() {
           <DialogHeader>
             <DialogTitle>Clonar Ficha</DialogTitle>
             <DialogDescription>
-              Será criada uma cópia da ficha "{templateToClone?.name}" com todos os campos
+              SerÃ¡ criada uma cÃ³pia da ficha "{templateToClone?.name}" com todos os campos
             </DialogDescription>
           </DialogHeader>
           <div>
-            <Label htmlFor="clone-name">Nome da Cópia *</Label>
+            <Label htmlFor="clone-name">Nome da CÃ³pia *</Label>
             <Input
               id="clone-name"
               value={cloneName}
               onChange={(e) => setCloneName(e.target.value)}
-              placeholder="Digite o nome da cópia"
+              placeholder="Digite o nome da cÃ³pia"
             />
           </div>
           <DialogFooter>
@@ -303,7 +322,7 @@ export default function FormTemplatesList() {
             <AlertDialogTitle>Deletar Ficha?</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja deletar "{templateToDelete?.name}"? 
-              Esta ação não pode ser desfeita e todos os campos serão permanentemente removidos.
+              Esta aÃ§Ã£o nÃ£o pode ser desfeita e todos os campos serÃ£o permanentemente removidos.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -359,7 +378,7 @@ function TemplateCard({ template, onEdit, onClone, onDelete, onTogglePublish }: 
       </CardHeader>
       <CardContent>
         <div className="text-sm text-muted-foreground space-y-1">
-          <p>Versão: {template.version}</p>
+          <p>VersÃ£o: {template.version}</p>
           <p>Editado: {template.edit_count} {template.edit_count === 1 ? 'vez' : 'vezes'}</p>
           <p>
             Criado em: {format(new Date(template.created_at), "dd/MM/yyyy", { locale: ptBR })}

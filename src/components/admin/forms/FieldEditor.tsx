@@ -1,11 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { X, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
 import {
   Select,
   SelectContent,
@@ -13,14 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import type { FormField, FieldType } from "@/types/forms";
 
 interface FieldEditorProps {
@@ -42,76 +33,94 @@ export default function FieldEditor({ field, onUpdate, onClose }: FieldEditorPro
     onUpdate(updates);
   };
 
-  // Tipos de campo disponíveis
+  const requiresOptions = (type: FieldType) =>
+    ["select", "radio", "checkbox"].includes(type);
+
   const fieldTypes: { value: FieldType; label: string }[] = [
-    { value: "text", label: "Texto Curto" },
-    { value: "textarea", label: "Texto Longo" },
+    { value: "text", label: "Texto curto" },
+    { value: "textarea", label: "Texto longo" },
     { value: "number", label: "Número" },
     { value: "email", label: "E-mail" },
     { value: "phone", label: "Telefone" },
     { value: "cpf", label: "CPF" },
     { value: "date", label: "Data" },
     { value: "time", label: "Hora" },
-    { value: "datetime", label: "Data e Hora" },
-    { value: "select", label: "Seleção (Dropdown)" },
-    { value: "radio", label: "Opção Única (Radio)" },
-    { value: "checkbox", label: "Múltipla Escolha" },
-    { value: "toggle", label: "Sim/Não (Toggle)" },
-    { value: "file", label: "Upload de Arquivo" },
+    { value: "datetime", label: "Data e hora" },
+    { value: "select", label: "Seleção (dropdown)" },
+    { value: "radio", label: "Opção única" },
+    { value: "checkbox", label: "Múltipla escolha" },
+    { value: "toggle", label: "Sim/Não" },
+    { value: "file", label: "Upload de arquivo" },
     { value: "signature", label: "Assinatura" },
-    { value: "rating", label: "Avaliação (Estrelas)" },
-    { value: "slider", label: "Controle Deslizante" },
-    { value: "color", label: "Cor" },
+    { value: "rating", label: "Avaliação (estrelas)" },
+    { value: "slider", label: "Controle deslizante" },
+    { value: "color", label: "Selecionar cor" },
   ];
 
-  // Verifica se o campo precisa de opções
-  const needsOptions = ["select", "radio", "checkbox"].includes(localField.field_type);
+  const autoFillOptions = useMemo(
+    () => [
+      { value: "none", label: "Nenhum" },
+      { value: "client.nome", label: "Cliente - Nome" },
+      { value: "client.sobrenome", label: "Cliente - Sobrenome" },
+      { value: "client.cpf", label: "Cliente - CPF" },
+      { value: "client.email", label: "Cliente - E-mail" },
+      { value: "client.telefone", label: "Cliente - Telefone" },
+      { value: "client.whatsapp", label: "Cliente - WhatsApp" },
+      { value: "client.data_nascimento", label: "Cliente - Data de nascimento" },
+      { value: "appointment.date", label: "Agendamento - Data" },
+      { value: "appointment.time", label: "Agendamento - Hora" },
+      { value: "appointment.city", label: "Agendamento - Cidade" },
+      { value: "procedure.name", label: "Procedimento - Nome" },
+      { value: "procedure.duration", label: "Procedimento - Duração (min)" },
+      { value: "system.current_date", label: "Sistema - Data atual" },
+      { value: "system.current_time", label: "Sistema - Hora atual" },
+      { value: "system.current_user", label: "Sistema - Usuário atual" },
+    ],
+    []
+  );
+
+  const handleTypeChange = (value: FieldType) => {
+    const updates: Partial<FormField> = { field_type: value };
+
+    if (requiresOptions(value)) {
+      if (!localField.options || localField.options.length === 0) {
+        updates.options = [
+          { label: "Opção 1", value: "opcao_1" },
+          { label: "Opção 2", value: "opcao_2" },
+        ];
+      }
+    } else if (localField.options) {
+      updates.options = null;
+    }
+
+    handleUpdate(updates);
+  };
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Header */}
       <div className="flex items-center justify-between p-4 border-b">
-        <h3 className="font-semibold">Propriedades do Campo</h3>
+        <h3 className="font-semibold">Configurações do campo</h3>
         <Button variant="ghost" size="sm" onClick={onClose}>
           <X className="h-4 w-4" />
         </Button>
       </div>
 
-      {/* Conteúdo */}
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-6">
-          {/* Básico */}
           <div className="space-y-4">
             <div>
-              <Label htmlFor="label">Rótulo do Campo *</Label>
+              <Label htmlFor="label">Rótulo *</Label>
               <Input
                 id="label"
                 value={localField.label}
                 onChange={(e) => handleUpdate({ label: e.target.value })}
-                placeholder="Ex: Nome Completo"
+                placeholder="Ex: Nome completo"
               />
             </div>
 
             <div>
-              <Label htmlFor="field_key">Chave Única *</Label>
-              <Input
-                id="field_key"
-                value={localField.field_key}
-                onChange={(e) => handleUpdate({ field_key: e.target.value })}
-                placeholder="Ex: nome_completo"
-                className="font-mono text-sm"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Identificador único usado no banco de dados
-              </p>
-            </div>
-
-            <div>
-              <Label htmlFor="field_type">Tipo de Campo</Label>
-              <Select
-                value={localField.field_type}
-                onValueChange={(value: FieldType) => handleUpdate({ field_type: value })}
-              >
+              <Label htmlFor="field_type">Tipo de campo</Label>
+              <Select value={localField.field_type} onValueChange={handleTypeChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -126,152 +135,74 @@ export default function FieldEditor({ field, onUpdate, onClose }: FieldEditorPro
             </div>
 
             <div className="flex items-center justify-between">
-              <Label htmlFor="is_required">Campo Obrigatório</Label>
+              <Label htmlFor="is_required">Campo obrigatório</Label>
               <Switch
                 id="is_required"
                 checked={localField.is_required}
                 onCheckedChange={(checked) => handleUpdate({ is_required: checked })}
               />
             </div>
+
+            <div>
+              <Label htmlFor="placeholder">Placeholder</Label>
+              <Input
+                id="placeholder"
+                value={localField.placeholder || ""}
+                onChange={(e) => handleUpdate({ placeholder: e.target.value })}
+                placeholder="Texto exibido quando o campo estiver vazio"
+              />
+            </div>
           </div>
 
-          <Separator />
+          {requiresOptions(localField.field_type) && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Opções</Label>
+                <span className="text-xs text-muted-foreground">
+                  Configure as opções exibidas para o usuário
+                </span>
+              </div>
+              <OptionsEditor
+                options={localField.options || []}
+                onChange={(options) => handleUpdate({ options })}
+              />
+            </div>
+          )}
 
-          {/* Accordion com configurações avançadas */}
-          <Accordion type="multiple" className="w-full">
-            {/* Texto de Ajuda */}
-            <AccordionItem value="help">
-              <AccordionTrigger>Texto de Ajuda</AccordionTrigger>
-              <AccordionContent className="space-y-3">
-                <div>
-                  <Label htmlFor="placeholder">Placeholder</Label>
-                  <Input
-                    id="placeholder"
-                    value={localField.placeholder || ""}
-                    onChange={(e) => handleUpdate({ placeholder: e.target.value })}
-                    placeholder="Digite aqui..."
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="help_text">Texto de Ajuda</Label>
-                  <Textarea
-                    id="help_text"
-                    value={localField.help_text || ""}
-                    onChange={(e) => handleUpdate({ help_text: e.target.value })}
-                    placeholder="Informações adicionais para o usuário"
-                    rows={2}
-                  />
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-
-            {/* Layout */}
-            <AccordionItem value="layout">
-              <AccordionTrigger>Layout</AccordionTrigger>
-              <AccordionContent className="space-y-3">
-                <div>
-                  <Label>Largura do Campo (colunas)</Label>
-                  <div className="flex items-center gap-4 mt-2">
-                    <Slider
-                      value={[localField.column_span || 12]}
-                      onValueChange={([value]) => handleUpdate({ column_span: value })}
-                      min={1}
-                      max={12}
-                      step={1}
-                      className="flex-1"
-                    />
-                    <span className="text-sm font-medium w-12 text-right">
-                      {localField.column_span || 12}/12
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    12 colunas = largura total
-                  </p>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-
-            {/* Opções (para select, radio, checkbox) */}
-            {needsOptions && (
-              <AccordionItem value="options">
-                <AccordionTrigger>Opções</AccordionTrigger>
-                <AccordionContent className="space-y-3">
-                  <OptionsEditor
-                    options={localField.options || []}
-                    onChange={(options) => handleUpdate({ options })}
-                  />
-                </AccordionContent>
-              </AccordionItem>
+          <div className="space-y-3">
+            <Label htmlFor="auto_fill_source">Preenchimento automático</Label>
+            <Select
+              value={localField.auto_fill_source || "none"}
+              onValueChange={(value) =>
+                handleUpdate({ auto_fill_source: value === "none" ? null : value })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione uma fonte" />
+              </SelectTrigger>
+              <SelectContent>
+                {autoFillOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {localField.auto_fill_source && (
+              <div className="flex items-start gap-2 rounded-md bg-muted p-2 text-xs text-muted-foreground">
+                <AlertCircle className="h-4 w-4 mt-0.5" />
+                <span>
+                  O sistema tentará preencher este campo automaticamente usando os dados
+                  disponíveis do cliente ou do agendamento.
+                </span>
+              </div>
             )}
-
-            {/* Auto-fill */}
-            <AccordionItem value="autofill">
-              <AccordionTrigger>Preenchimento Automático</AccordionTrigger>
-              <AccordionContent className="space-y-3">
-                <div>
-                  <Label htmlFor="auto_fill_source">Fonte de Dados</Label>
-                  <Select
-                    value={localField.auto_fill_source || "none"}
-                    onValueChange={(value) =>
-                      handleUpdate({ auto_fill_source: value === "none" ? null : value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Nenhum</SelectItem>
-                      <SelectItem value="client.nome">Cliente - Nome</SelectItem>
-                      <SelectItem value="client.sobrenome">Cliente - Sobrenome</SelectItem>
-                      <SelectItem value="client.cpf">Cliente - CPF</SelectItem>
-                      <SelectItem value="client.celular">Cliente - Celular</SelectItem>
-                      <SelectItem value="client.email">Cliente - E-mail</SelectItem>
-                      <SelectItem value="client.data_nascimento">Cliente - Data Nascimento</SelectItem>
-                      <SelectItem value="system.current_date">Sistema - Data Atual</SelectItem>
-                      <SelectItem value="system.current_time">Sistema - Hora Atual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {localField.auto_fill_source && (
-                    <div className="flex items-start gap-2 mt-2 p-2 bg-muted rounded-md">
-                      <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5" />
-                      <p className="text-xs text-muted-foreground">
-                        Este campo será preenchido automaticamente quando disponível
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-
-            {/* Validações */}
-            <AccordionItem value="validation">
-              <AccordionTrigger>Validações</AccordionTrigger>
-              <AccordionContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Configurações avançadas de validação serão implementadas em breve
-                </p>
-              </AccordionContent>
-            </AccordionItem>
-
-            {/* Lógica Condicional */}
-            <AccordionItem value="conditional">
-              <AccordionTrigger>Lógica Condicional</AccordionTrigger>
-              <AccordionContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Configurar quando este campo deve aparecer/ser obrigatório será implementado em breve
-                </p>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
+          </div>
         </div>
       </ScrollArea>
     </div>
   );
 }
-
-// =====================================================
-// SUB-COMPONENTE: Editor de Opções
-// =====================================================
 
 interface OptionsEditorProps {
   options: Array<{ label: string; value: string }>;
@@ -285,23 +216,31 @@ function OptionsEditor({ options, onChange }: OptionsEditorProps) {
     setLocalOptions(options || []);
   }, [options]);
 
+  const update = (updated: Array<{ label: string; value: string }>) => {
+    setLocalOptions(updated);
+    onChange(updated);
+  };
+
   const addOption = () => {
-    const newOptions = [...localOptions, { label: "", value: "" }];
-    setLocalOptions(newOptions);
-    onChange(newOptions);
+    const index = localOptions.length + 1;
+    update([
+      ...localOptions,
+      {
+        label: `Opção ${index}`,
+        value: `opcao_${index}`,
+      },
+    ]);
   };
 
   const updateOption = (index: number, field: "label" | "value", value: string) => {
-    const newOptions = [...localOptions];
-    newOptions[index] = { ...newOptions[index], [field]: value };
-    setLocalOptions(newOptions);
-    onChange(newOptions);
+    const updated = [...localOptions];
+    updated[index] = { ...updated[index], [field]: value };
+    update(updated);
   };
 
   const removeOption = (index: number) => {
-    const newOptions = localOptions.filter((_, i) => i !== index);
-    setLocalOptions(newOptions);
-    onChange(newOptions);
+    const updated = localOptions.filter((_, i) => i !== index);
+    update(updated);
   };
 
   return (
@@ -309,28 +248,29 @@ function OptionsEditor({ options, onChange }: OptionsEditorProps) {
       {localOptions.map((option, index) => (
         <div key={index} className="flex gap-2">
           <Input
-            placeholder="Rótulo"
             value={option.label}
             onChange={(e) => updateOption(index, "label", e.target.value)}
+            placeholder={`Rótulo ${index + 1}`}
             className="flex-1"
           />
           <Input
-            placeholder="Valor"
             value={option.value}
             onChange={(e) => updateOption(index, "value", e.target.value)}
+            placeholder={`Valor ${index + 1}`}
             className="flex-1"
           />
           <Button
             variant="ghost"
             size="sm"
             onClick={() => removeOption(index)}
+            className="text-destructive"
           >
             <X className="h-4 w-4" />
           </Button>
         </div>
       ))}
       <Button variant="outline" size="sm" onClick={addOption} className="w-full">
-        + Adicionar Opção
+        + Adicionar opção
       </Button>
     </div>
   );

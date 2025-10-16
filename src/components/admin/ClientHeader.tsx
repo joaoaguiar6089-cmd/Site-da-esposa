@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Edit, User, Phone, CreditCard, Calendar, MapPin, Camera, FileText, CheckCircle, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { formatDateToBrazil } from "@/utils/dateUtils";
 import { formatCPF, cleanCPF, isValidCPF } from "@/utils/cpfValidator";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -199,7 +200,7 @@ const ClientHeader = ({
                       <Calendar className="h-5 w-5 text-muted-foreground" />
                       <div>
                         <p className="text-sm text-muted-foreground">Nascimento</p>
-                        <p className="font-medium">{format(new Date(client.data_nascimento), "dd/MM/yyyy")}</p>
+                        <p className="font-medium">{formatDateToBrazil(client.data_nascimento)}</p>
                       </div>
                     </div>
                   )}

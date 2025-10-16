@@ -15,6 +15,7 @@ interface MonthSummary {
   totalAppointments: number;
   plannedValue: number;
   receivedValue: number;
+  costValue: number;
   topProcedures: { name: string; count: number }[];
 }
 
@@ -57,7 +58,8 @@ const Resumo = () => {
           payment_value,
           procedures (
             name,
-            price
+            price,
+            material_cost
           )
         `)
         .order('appointment_date', { ascending: false });
@@ -80,12 +82,14 @@ const Resumo = () => {
             totalAppointments: 0,
             plannedValue: 0,
             receivedValue: 0,
+            costValue: 0,
             topProcedures: []
           };
         }
 
         monthlyData[key].totalAppointments++;
         monthlyData[key].plannedValue += apt.procedures?.price || 0;
+        monthlyData[key].costValue += apt.procedures?.material_cost || 0;
 
         if (apt.payment_status === 'pago' || apt.payment_status === 'pago_parcialmente') {
           monthlyData[key].receivedValue += apt.payment_value || 0;

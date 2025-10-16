@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { User, Calendar, Phone, MapPin, CreditCard } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { formatDateToBrazil } from "@/utils/dateUtils";
 import { formatCPF } from "@/utils/cpfValidator";
 
 interface Client {
@@ -120,7 +121,7 @@ const ClientsList = ({ clients, appointments, onClientSelect, loading }: Clients
                   {client.data_nascimento && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Calendar className="h-3 w-3" />
-                      <span>{format(new Date(client.data_nascimento), "dd/MM/yyyy")}</span>
+                      <span>{formatDateToBrazil(client.data_nascimento)}</span>
                     </div>
                   )}
                   

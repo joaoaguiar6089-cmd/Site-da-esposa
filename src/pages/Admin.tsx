@@ -138,17 +138,18 @@ const Admin = () => {
         if (editingFormId) {
           return (
             <div className="h-[calc(100vh-8rem)]">
-              <button
-                onClick={() => setEditingFormId(null)}
-                className="mb-4 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded"
-              >
-                ← Voltar para lista
-              </button>
-              <FormTemplateEditor />
+              <FormTemplateEditor
+                templateId={editingFormId}
+                onExit={() => setEditingFormId(null)}
+              />
             </div>
           );
         }
-        return <FormTemplatesList />;
+        return (
+          <FormTemplatesList
+            onEditTemplate={(templateId) => setEditingFormId(templateId)}
+          />
+        );
       default:
         return <AdminDashboard />;
     }

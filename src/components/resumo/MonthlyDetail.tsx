@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Calendar, DollarSign, Activity, TrendingUp, Search, Filter } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { ArrowLeft, Calendar, DollarSign, Activity, TrendingUp, TrendingDown, Search, Filter, Smartphone, CreditCard, Wallet, CheckCircle2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
@@ -36,6 +37,7 @@ interface Appointment {
   procedures: {
     name: string;
     price: number;
+    material_cost?: number | null;
   };
 }
 
@@ -53,6 +55,7 @@ const MonthlyDetail = ({ month, year, onBack }: MonthlyDetailProps) => {
     totalAppointments: 0,
     plannedValue: 0,
     receivedValue: 0,
+    costValue: 0,
     topProcedures: [] as { name: string; count: number }[]
   });
 
@@ -91,7 +94,8 @@ const MonthlyDetail = ({ month, year, onBack }: MonthlyDetailProps) => {
           ),
           procedures (
             name,
-            price
+            price,
+            material_cost
           )
         `)
         .gte('appointment_date', startDate)
@@ -124,6 +128,7 @@ const MonthlyDetail = ({ month, year, onBack }: MonthlyDetailProps) => {
       }
       return sum;
     }, 0);
+    const cost = appts.reduce((sum, apt) => sum + (apt.procedures?.material_cost || 0), 0);
 
     // Contar procedimentos mais realizados
     const procedureCounts = appts.reduce((acc, apt) => {
@@ -141,6 +146,7 @@ const MonthlyDetail = ({ month, year, onBack }: MonthlyDetailProps) => {
       totalAppointments: total,
       plannedValue: planned,
       receivedValue: received,
+      costValue: cost,
       topProcedures: topProcs
     });
   };
@@ -191,38 +197,81 @@ const MonthlyDetail = ({ month, year, onBack }: MonthlyDetailProps) => {
 
   const getPaymentStatusBadge = (appointment: Appointment) => {
     const status = appointment.payment_status || 'aguardando';
-    const variants: Record<string, any> = {
-      pago: { label: 'Pago', variant: 'default' },
-      pago_parcialmente: { label: 'Parcial', variant: 'secondary' },
-      nao_pago: { label: 'Não Pago', variant: 'destructive' },
-      aguardando: { label: 'Aguardando', variant: 'outline' },
+    const variants: Record<string, { label: string; className: string }> = {
+      pago: { label: 'Pago', className: 'bg-emerald-50 text-emerald-600 border border-emerald-200' },
+      pago_parcialmente: { label: 'Parcial', className: 'bg-amber-50 text-amber-600 border border-amber-200' },
+      nao_pago: { label: 'Nao Pago', className: 'bg-rose-50 text-rose-600 border border-rose-200' },
+      aguardando: { label: 'Aguardando', className: 'bg-slate-50 text-slate-600 border border-slate-200' },
     };
     
     const config = variants[status] || variants.aguardando;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    return (
+      <Badge variant="outline" className={`rounded-full px-3 py-1 ${config.className}`}>
+        {config.label}
+      </Badge>
+    );
   };
-
+  
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, any> = {
-      agendado: { label: 'Agendado', variant: 'default' },
-      concluido: { label: 'Concluído', variant: 'secondary' },
-      cancelado: { label: 'Cancelado', variant: 'destructive' },
-      ausente: { label: 'Ausente', variant: 'outline' },
+    const variants: Record<string, { label: string; className: string }> = {
+      agendado: { label: 'Agendado', className: 'bg-blue-50 text-blue-600 border border-blue-200' },
+      concluido: { label: 'Concluido', className: 'bg-emerald-50 text-emerald-600 border border-emerald-200' },
+      cancelado: { label: 'Cancelado', className: 'bg-rose-50 text-rose-600 border border-rose-200' },
+      ausente: { label: 'Ausente', className: 'bg-amber-50 text-amber-600 border border-amber-200' },
     };
     
     const config = variants[status] || variants.agendado;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    return (
+      <Badge variant="outline" className={`rounded-full px-3 py-1 ${config.className}`}>
+        {config.label}
+      </Badge>
+    );
   };
 
   const percentage = stats.plannedValue > 0 
     ? Math.round((stats.receivedValue / stats.plannedValue) * 100)
     : 0;
+  const costPercentage = stats.plannedValue > 0
+    ? Math.round((stats.costValue / stats.plannedValue) * 100)
+    : 0;
+  const profit = stats.receivedValue - stats.costValue;
+  const profitLabel = profit >= 0 ? 'Resultado (Lucro)' : 'Resultado (Prejuizo)';
+  const profitColor = profit >= 0 ? 'text-blue-600' : 'text-amber-600';
+  const profitBackground = profit >= 0 ? 'bg-blue-50/70 border-blue-200' : 'bg-amber-50/70 border-amber-200';
+  const profitMargin = stats.receivedValue > 0
+    ? Math.round((profit / stats.receivedValue) * 100)
+    : 0;
+  const progressWidth = Math.min(Math.max(percentage, 0), 150);
+  const paymentMethodStyles: Record<string, { label: string; icon: LucideIcon; className: string }> = {
+    pix: { label: "PIX", icon: Smartphone, className: "bg-blue-50 text-blue-600 border border-blue-200" },
+    cartao: { label: "Cartao", icon: CreditCard, className: "bg-purple-50 text-purple-600 border border-purple-200" },
+    dinheiro: { label: "Dinheiro", icon: Wallet, className: "bg-emerald-50 text-emerald-600 border border-emerald-200" },
+  };
+
+  const getPaymentMethodBadge = (method?: string | null, installments?: number | null) => {
+    if (!method) return null;
+    const info = paymentMethodStyles[method] ?? {
+      label: method.toUpperCase(),
+      icon: DollarSign,
+      className: "bg-slate-50 text-slate-600 border border-slate-200",
+    };
+    const Icon = info.icon;
+    return (
+                  <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${info.className}`}>
+        <Icon className="h-3.5 w-3.5" />
+        <span>
+          {info.label}
+          {installments && installments > 1 ? ` • ${installments}x` : ""}
+        </span>
+      </div>
+    );
+  };
 
   const monthLabel = format(new Date(year, parseInt(month) - 1, 1), 'MMMM yyyy', { locale: ptBR });
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+                  <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p>Carregando dados...</p>
@@ -232,7 +281,7 @@ const MonthlyDetail = ({ month, year, onBack }: MonthlyDetailProps) => {
   }
 
   return (
-    <div className="space-y-6">
+                  <div className="space-y-6">
       {/* Header com botão voltar */}
       <div className="flex items-center gap-4">
         <Button variant="outline" size="sm" onClick={onBack}>
@@ -243,53 +292,71 @@ const MonthlyDetail = ({ month, year, onBack }: MonthlyDetailProps) => {
       </div>
 
       {/* Cards de estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <Card className="border border-blue-100 bg-blue-50/60">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Activity className="w-4 h-4" />
+            <CardTitle className="text-sm font-semibold text-blue-700 flex items-center gap-2">
+              <Activity className="w-4 h-4 text-blue-500" />
               Atendimentos
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{stats.totalAppointments}</div>
+            <div className="text-3xl font-bold text-blue-700">{stats.totalAppointments}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border border-slate-200 bg-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <DollarSign className="w-4 h-4" />
+              <Calendar className="w-4 h-4 text-slate-500" />
               Valor Planejado
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.plannedValue)}</div>
+            <div className="text-2xl font-bold text-foreground">{formatCurrency(stats.plannedValue)}</div>
+            <p className="text-xs text-muted-foreground mt-1">Base para metas do mes</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border border-emerald-200 bg-emerald-50/70">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <DollarSign className="w-4 h-4" />
+            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-emerald-700">
+              <DollarSign className="w-4 h-4 text-emerald-600" />
               Valor Recebido
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{formatCurrency(stats.receivedValue)}</div>
+            <div className="text-2xl font-bold text-emerald-700">{formatCurrency(stats.receivedValue)}</div>
+            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-emerald-100">
+              <div className="h-full bg-emerald-500" style={{ width: `${progressWidth}%` }}></div>
+            </div>
+            <p className="text-xs mt-2 text-emerald-700/80">{percentage}% do planejado</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border border-rose-200 bg-rose-50/70">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              Desempenho
+            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-rose-700">
+              <TrendingDown className="w-4 h-4 text-rose-600" />
+              Custo de Procedimentos
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{percentage}%</div>
-            <p className="text-xs text-muted-foreground mt-1">do planejado</p>
+            <div className="text-2xl font-bold text-rose-700">{formatCurrency(stats.costValue)}</div>
+            <p className="text-xs text-rose-700/80 mt-2">{costPercentage}% do planejado</p>
+          </CardContent>
+        </Card>
+
+        <Card className={`border ${profitBackground}`}>
+          <CardHeader className="pb-2">
+            <CardTitle className={`text-sm font-semibold flex items-center gap-2 ${profitColor}`}>
+              <TrendingUp className="w-4 h-4" />
+              {profitLabel}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${profitColor}`}>{formatCurrency(profit)}</div>
+            <p className={`text-xs mt-2 ${profitColor}`}>Margem {profitMargin}%</p>
           </CardContent>
         </Card>
       </div>
@@ -344,7 +411,7 @@ const MonthlyDetail = ({ month, year, onBack }: MonthlyDetailProps) => {
                 <SelectContent>
                   <SelectItem value="todos">Todos</SelectItem>
                   <SelectItem value="agendado">Agendado</SelectItem>
-                  <SelectItem value="concluido">Concluído</SelectItem>
+                  <SelectItem value="concluido">Concluido</SelectItem>
                   <SelectItem value="cancelado">Cancelado</SelectItem>
                   <SelectItem value="ausente">Ausente</SelectItem>
                 </SelectContent>
@@ -358,7 +425,7 @@ const MonthlyDetail = ({ month, year, onBack }: MonthlyDetailProps) => {
                 {[
                   { value: 'pago', label: 'Pago' },
                   { value: 'pago_parcialmente', label: 'Parcial' },
-                  { value: 'nao_pago', label: 'Não Pago' },
+                  { value: 'nao_pago', label: 'Nao Pago' },
                   { value: 'aguardando', label: 'Aguardando' },
                 ].map((status) => (
                   <div key={status.value} className="flex items-center space-x-2">
@@ -395,61 +462,90 @@ const MonthlyDetail = ({ month, year, onBack }: MonthlyDetailProps) => {
             </p>
           ) : (
             <div className="space-y-4">
-              {filteredAppointments.map((appointment) => (
-                <div
-                  key={appointment.id}
-                  className="border rounded-lg p-4 hover:bg-accent/50 transition-colors"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h3 className="font-semibold">
-                        {appointment.clients?.nome} {appointment.clients?.sobrenome}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {appointment.clients?.celular}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      {getStatusBadge(appointment.status)}
-                      {getPaymentStatusBadge(appointment)}
-                    </div>
-                  </div>
+              {filteredAppointments.map((appointment) => {
+                const plannedValue = appointment.procedures?.price || 0;
+                const receivedValue = appointment.payment_value || 0;
+                const pendingValue = Math.max(plannedValue - receivedValue, 0);
+                const methodBadge = getPaymentMethodBadge(appointment.payment_method, appointment.payment_installments);
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-muted-foreground" />
-                      <span>{formatDateToBrazil(appointment.appointment_date)}</span>
-                      <span className="text-muted-foreground">às {appointment.appointment_time}</span>
+                return (
+                  <div
+                    key={appointment.id}
+                    className="border rounded-lg p-4 hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h3 className="font-semibold">
+                          {appointment.clients?.nome} {appointment.clients?.sobrenome}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {appointment.clients?.celular}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        {getStatusBadge(appointment.status)}
+                      </div>
                     </div>
 
-                    <div>
-                      <span className="font-medium">Procedimento:</span>{' '}
-                      {appointment.procedures?.name}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-muted-foreground" />
+                        <span>{formatDateToBrazil(appointment.appointment_date)}</span>
+                        <span className="text-muted-foreground">??s {appointment.appointment_time}</span>
+                      </div>
+
+                      <div>
+                        <span className="font-medium">Procedimento:</span>{' '}
+                        {appointment.procedures?.name}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="w-4 h-4 text-muted-foreground" />
+                        <span className="font-semibold text-slate-700">{formatCurrency(plannedValue)}</span>
+                        <span className="text-xs text-muted-foreground">previsto</span>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="w-4 h-4 text-muted-foreground" />
-                      {appointment.payment_value ? (
-                        <>
-                          <span className="font-medium">{formatCurrency(appointment.payment_value)}</span>
-                          {appointment.payment_method && (
-                            <span className="text-muted-foreground text-xs">
-                              ({appointment.payment_method}
-                              {appointment.payment_installments && appointment.payment_installments > 1
-                                ? ` ${appointment.payment_installments}x`
-                                : ''})
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground">
-                          Previsto: {formatCurrency(appointment.procedures?.price || 0)}
+                    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Pagamento
                         </span>
+                        {getPaymentStatusBadge(appointment)}
+                      </div>
+                      <div className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Previsto</p>
+                          <p className="font-semibold text-slate-700">{formatCurrency(plannedValue)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Recebido</p>
+                          <p className="font-semibold text-emerald-600">{formatCurrency(receivedValue)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Saldo</p>
+                          {pendingValue > 0 ? (
+                            <div className="inline-flex items-center gap-2 rounded-md bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                              <AlertTriangle className="h-4 w-4" />
+                              {formatCurrency(pendingValue)}
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">
+                              <CheckCircle2 className="h-4 w-4" />
+                              Sem pendencias
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {methodBadge && (
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          {methodBadge}
+                        </div>
                       )}
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -459,3 +555,9 @@ const MonthlyDetail = ({ month, year, onBack }: MonthlyDetailProps) => {
 };
 
 export default MonthlyDetail;
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
@@ -47,15 +47,20 @@ import SnippetLibrary from "./SnippetLibrary";
 import FieldEditor from "./FieldEditor";
 import SortableFieldItem from "./SortableFieldItem";
 import PDFTemplateUploader from "./PDFTemplateUploader";
-import type { FormField, FormTemplate } from "@/types/forms";
+import type { FormField, FormTemplate, FieldType } from "@/types/forms";
 import { useFormSnippets } from "@/hooks/forms/useFormSnippets";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+interface FormTemplateEditorProps {
+  templateId?: string | null;
+  onExit?: () => void;
+}
 
 // =====================================================
 // COMPONENTE PRINCIPAL
 // =====================================================
 
-export default function FormTemplateEditor() {
+export default function FormTemplateEditor({ templateId: externalTemplateId = null, onExit }: FormTemplateEditorProps = {}) {
   const { id: urlId } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
@@ -63,7 +68,17 @@ export default function FormTemplateEditor() {
 
   // Pega ID da URL ou do state (quando vem do Admin)
   const state = location.state as any;
-  const id = urlId || state?.editingFormId || "";
+  const id = (externalTemplateId && externalTemplateId.length > 0)
+    ? externalTemplateId
+    : urlId || state?.editingFormId || "";
+
+  const handleBack = () => {
+    if (onExit) {
+      onExit();
+    } else {
+      navigate("/admin/forms");
+    }
+  };
 
   const { template, isLoading: loadingTemplate, refetch: refetchTemplate } = useFormTemplate(id);
   const { fields, isLoading: loadingFields, createField, updateField, deleteField, reorderFields } = useFormFields(id);
@@ -81,6 +96,34 @@ export default function FormTemplateEditor() {
   const [fieldToSaveToSnippet, setFieldToSaveToSnippet] = useState<FormField | null>(null);
   const [selectedSnippetId, setSelectedSnippetId] = useState<string>("");
   const [isSavingSnippetField, setIsSavingSnippetField] = useState(false);
+  const [newFieldLabel, setNewFieldLabel] = useState("");
+  const [newFieldType, setNewFieldType] = useState<FieldType>("text");
+  const [isAddingField, setIsAddingField] = useState(false);
+
+  const quickAddFieldTypes: { value: FieldType; label: string }[] = [
+    { value: "text", label: "Texto curto" },
+    { value: "textarea", label: "Texto longo" },
+    { value: "number", label: "Número" },
+    { value: "date", label: "Data" },
+    { value: "time", label: "Hora" },
+    { value: "select", label: "Seleção (Dropdown)" },
+    { value: "checkbox", label: "Múltipla escolha" },
+    { value: "radio", label: "Opção única" },
+    { value: "signature", label: "Assinatura" },
+  ];
+
+  const needsOptionsForType = (type: FieldType) =>
+    ["select", "checkbox", "radio"].includes(type);
+
+  const generateFieldKey = (label: string) => {
+    const base = label
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    return base || `campo_${Date.now()}`;
+  };
 
   // Sincronizar template com estado local
   useEffect(() => {
@@ -156,12 +199,17 @@ export default function FormTemplateEditor() {
 
   // Handler: Adicionar campo do snippet
   const handleAddFieldFromSnippet = async (snippetFields: any[]) => {
-    if (!id) return;
+    if (!id || !Array.isArray(snippetFields)) return;
 
-    for (const field of snippetFields) {
+    const startingIndex = fields.length;
+
+    for (const [index, field] of snippetFields.entries()) {
+      const keyBase = field?.field_key ? field.field_key : generateFieldKey(field?.label || "campo");
+      const uniqueKey = `${keyBase}_${Date.now()}_${index}`;
+
       await createField({
         template_id: id,
-        field_key: `${field.field_key}_${Date.now()}`,
+        field_key: uniqueKey,
         label: field.label,
         field_type: field.field_type,
         is_required: field.is_required || false,
@@ -171,10 +219,62 @@ export default function FormTemplateEditor() {
         validation_rules: field.validation_rules,
         conditional_logic: field.conditional_logic,
         auto_fill_source: field.auto_fill_source,
+        auto_fill_mapping: field.auto_fill_mapping,
         options: field.options,
         column_span: field.column_span || 12,
+        order_index: startingIndex + index,
+      });
+    }
+  };
+
+  const handleAddManualField = async () => {
+    if (!id || !newFieldLabel.trim()) return;
+
+    setIsAddingField(true);
+    try {
+      const label = newFieldLabel.trim();
+      const keyBase = generateFieldKey(label);
+      const uniqueKey = `${keyBase}_${Date.now()}`;
+      const options = needsOptionsForType(newFieldType)
+        ? [
+            { label: "Opção 1", value: "opcao_1" },
+            { label: "Opção 2", value: "opcao_2" },
+          ]
+        : null;
+
+      const newField = await createField({
+        template_id: id,
+        field_key: uniqueKey,
+        label,
+        field_type: newFieldType,
+        is_required: false,
+        placeholder: "",
+        help_text: null,
+        validation_rules: null,
+        options,
+        auto_fill_source: null,
+        auto_fill_mapping: null,
+        conditional_logic: null,
+        column_span: 12,
         order_index: fields.length,
       });
+
+      if (newField?.id) {
+        setSelectedFieldId(newField.id);
+        setShowFieldEditor(true);
+      }
+
+      setNewFieldLabel("");
+      setNewFieldType("text");
+    } catch (error: any) {
+      console.error("Erro ao adicionar campo:", error);
+      toast({
+        title: "Erro ao adicionar campo",
+        description: error?.message || "Não foi possível adicionar o campo.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAddingField(false);
     }
   };
 
@@ -188,13 +288,13 @@ export default function FormTemplateEditor() {
       setIsDirty(false);
       toast({
         title: "Salvo com sucesso",
-        description: "As alterações foram salvas.",
+        description: "As alteraÃ§Ãµes foram salvas.",
       });
     } catch (error: any) {
       console.error("Erro ao salvar template:", error);
       toast({
         title: "Erro ao salvar",
-        description: error?.message || "Não foi possível salvar as alterações.",
+        description: error?.message || "NÃ£o foi possÃ­vel salvar as alteraÃ§Ãµes.",
         variant: "destructive",
       });
     }
@@ -244,8 +344,8 @@ export default function FormTemplateEditor() {
     const targetSnippet = snippets.find((snippet) => snippet.id === selectedSnippetId);
     if (!targetSnippet) {
       toast({
-        title: "Snippet não encontrado",
-        description: "Selecione um snippet válido para salvar o campo.",
+        title: "Snippet nÃ£o encontrado",
+        description: "Selecione um snippet vÃ¡lido para salvar o campo.",
         variant: "destructive",
       });
       return;
@@ -266,7 +366,7 @@ export default function FormTemplateEditor() {
       console.error("Erro ao salvar campo no snippet:", error);
       toast({
         title: "Erro ao salvar",
-        description: error?.message || "Não foi possível adicionar o campo ao snippet.",
+        description: error?.message || "NÃ£o foi possÃ­vel adicionar o campo ao snippet.",
         variant: "destructive",
       });
     } finally {
@@ -293,8 +393,8 @@ export default function FormTemplateEditor() {
       <div className="container mx-auto py-8 px-4">
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">Template não encontrado</p>
-            <Button onClick={() => navigate("/admin/forms")} className="mt-4">
+            <p className="text-muted-foreground">Template nao encontrado</p>
+            <Button onClick={handleBack} className="mt-4">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Voltar
             </Button>
@@ -312,6 +412,17 @@ export default function FormTemplateEditor() {
       <div className="border-b bg-background px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
+            {onExit && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleBack}
+                className="gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Voltar
+              </Button>
+            )}
             <div className="flex flex-col">
               <Input
                 value={editedTemplate.name || ""}
@@ -363,6 +474,55 @@ export default function FormTemplateEditor() {
             <div className="flex-1 overflow-y-auto">
               <SnippetLibrary onAddFields={handleAddFieldFromSnippet} />
             </div>
+            <div className="border-t bg-background p-4 space-y-4">
+              <div>
+                <p className="text-sm font-semibold">Adicionar campo manual</p>
+                <p className="text-xs text-muted-foreground">
+                  Crie um campo rápido sem depender de snippets.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-medium uppercase tracking-wide">Rótulo</Label>
+                <Input
+                  value={newFieldLabel}
+                  onChange={(e) => setNewFieldLabel(e.target.value)}
+                  placeholder="Ex: Nome completo"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-medium uppercase tracking-wide">Tipo</Label>
+                <Select value={newFieldType} onValueChange={(value: FieldType) => setNewFieldType(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {quickAddFieldTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                size="sm"
+                onClick={handleAddManualField}
+                disabled={isAddingField || !newFieldLabel.trim() || !id}
+                className="w-full"
+              >
+                {isAddingField ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Adicionando...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Adicionar campo
+                  </>
+                )}
+              </Button>
+            </div>
             <div className="border-t bg-background p-4">
               <PDFTemplateUploader 
                 templateId={id}
@@ -391,7 +551,7 @@ export default function FormTemplateEditor() {
                     <Plus className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                     <p className="text-muted-foreground mb-2">Nenhum campo adicionado</p>
                     <p className="text-sm text-muted-foreground">
-                      Arraste campos da biblioteca à esquerda
+                      Arraste campos da biblioteca Ã  esquerda
                     </p>
                   </div>
                 ) : (
@@ -460,7 +620,7 @@ export default function FormTemplateEditor() {
           </DialogHeader>
           {snippets.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Nenhum snippet disponível. Crie um snippet na biblioteca ao lado para começar.
+              Nenhum snippet disponÃ­vel. Crie um snippet na biblioteca ao lado para comeÃ§ar.
             </p>
           ) : (
             <div className="space-y-4">
@@ -515,3 +675,5 @@ export default function FormTemplateEditor() {
     </div>
   );
 }
+
+

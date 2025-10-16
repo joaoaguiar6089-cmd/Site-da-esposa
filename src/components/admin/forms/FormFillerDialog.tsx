@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { useState, useEffect } from "react";
 import { Save, Eye, Loader2 } from "lucide-react";
+import { format } from "date-fns";
 import { useFormTemplate } from "@/hooks/forms/useFormTemplates";
 import { useFormFields } from "@/hooks/forms/useFormFields";
 import { useFormResponses, useFormResponse } from "@/hooks/forms/useFormResponses";
@@ -58,6 +59,78 @@ export default function FormFillerDialog({
   const [isSaving, setIsSaving] = useState(false);
   const [responseId, setResponseId] = useState<string | null>(existingResponseId || null);
   const [showPreview, setShowPreview] = useState(false);
+  const [autoFillContext, setAutoFillContext] = useState<{
+    client: any;
+    appointment: any;
+    procedure: any;
+  }>({ client: null, appointment: null, procedure: null });
+
+  useEffect(() => {
+    const loadAutoFillData = async () => {
+      try {
+        if (!clientId) return;
+
+        const { data: clientData } = await supabase
+          .from('clients')
+          .select('*')
+          .eq('id', clientId)
+          .single();
+
+        const { data: appointmentRows } = await supabase
+          .from('appointments')
+          .select(`
+            id,
+            appointment_date,
+            appointment_time,
+            status,
+            city_settings:city_settings ( city_name ),
+            procedures (
+              id,
+              name,
+              duration
+            ),
+            appointments_procedures (
+              id,
+              order_index,
+              procedure:procedures (
+                id,
+                name,
+                duration
+              )
+            )
+          `)
+          .eq('client_id', clientId)
+          .order('appointment_date', { ascending: false })
+          .order('appointment_time', { ascending: false })
+          .limit(1);
+
+        const latestAppointment = appointmentRows?.[0] || null;
+
+        let primaryProcedure = null;
+        if (latestAppointment?.procedures) {
+          primaryProcedure = latestAppointment.procedures;
+        } else if (
+          latestAppointment?.appointments_procedures &&
+          latestAppointment.appointments_procedures.length > 0
+        ) {
+          const sorted = [...latestAppointment.appointments_procedures].sort(
+            (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
+          );
+          primaryProcedure = sorted[0]?.procedure ?? null;
+        }
+
+        setAutoFillContext({
+          client: clientData ?? null,
+          appointment: latestAppointment,
+          procedure: primaryProcedure,
+        });
+      } catch (error) {
+        console.error("Erro ao carregar dados para auto preenchimento:", error);
+      }
+    };
+
+    loadAutoFillData();
+  }, [clientId]);
 
   // Carregar dados existentes se estiver editando
   useEffect(() => {
@@ -82,6 +155,99 @@ export default function FormFillerDialog({
       setFormData(defaultValues);
     }
   }, [existingResponse, fields]);
+
+  const formatDateValue = (value?: string | null) => {
+    if (!value) return "";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+    return format(parsed, "dd/MM/yyyy");
+  };
+
+  const formatTimeValue = (value?: string | null) => {
+    if (!value) return "";
+    if (typeof value === "string" && value.length >= 5) {
+      return value.slice(0, 5);
+    }
+    return value;
+  };
+
+  const isEmptyValue = (value: any) => {
+    if (value === undefined || value === null) return true;
+    if (typeof value === "string") return value.trim() === "";
+    if (Array.isArray(value)) return value.length === 0;
+    return false;
+  };
+
+  const resolveAutoFillValue = (source: string) => {
+    const { client, appointment, procedure } = autoFillContext;
+
+    switch (source) {
+      case "client.nome":
+        return client?.nome || "";
+      case "client.sobrenome":
+        return client?.sobrenome || "";
+      case "client.cpf":
+        return client?.cpf || "";
+      case "client.email":
+        return client?.email || "";
+      case "client.telefone":
+        return client?.telefone || client?.celular || client?.whatsapp || "";
+      case "client.whatsapp":
+        return client?.whatsapp || client?.celular || "";
+      case "client.data_nascimento":
+        return formatDateValue(client?.data_nascimento);
+      case "appointment.date":
+        return formatDateValue(appointment?.appointment_date);
+      case "appointment.time":
+        return formatTimeValue(appointment?.appointment_time);
+      case "appointment.city":
+        return appointment?.city_settings?.city_name || "";
+      case "procedure.name":
+        return procedure?.name || appointment?.procedures?.name || "";
+      case "procedure.duration":
+        return procedure?.duration != null
+          ? String(procedure.duration)
+          : appointment?.procedures?.duration != null
+          ? String(appointment.procedures.duration)
+          : "";
+      case "system.current_date":
+        return format(new Date(), "dd/MM/yyyy");
+      case "system.current_time":
+        return format(new Date(), "HH:mm");
+      case "system.current_user":
+        return "";
+      default:
+        return null;
+    }
+  };
+
+  useEffect(() => {
+    if (existingResponse) return;
+    if (fields.length === 0) return;
+
+    setFormData((prev) => {
+      const updated = { ...prev };
+      let changed = false;
+
+      fields.forEach((field) => {
+        if (!field.auto_fill_source) return;
+        const currentValue = updated[field.field_key];
+        if (!isEmptyValue(currentValue)) {
+          return;
+        }
+
+        const resolved = resolveAutoFillValue(field.auto_fill_source);
+        if (!isEmptyValue(resolved)) {
+          updated[field.field_key] = resolved;
+          changed = true;
+        }
+      });
+
+      return changed ? updated : prev;
+    });
+  }, [fields, autoFillContext, existingResponse]);
 
   const handleFieldChange = (fieldKey: string, value: any) => {
     setFormData(prev => ({ ...prev, [fieldKey]: value }));

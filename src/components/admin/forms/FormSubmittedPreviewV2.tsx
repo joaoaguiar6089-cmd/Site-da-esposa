@@ -26,7 +26,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useFormTemplate } from "@/hooks/forms/useFormTemplates";
 import { useFormFields } from "@/hooks/forms/useFormFields";
 import { FormSignatureDialog } from "./FormSignatureDialog";
-import AdvancedPDFEditor from "@/components/admin/AdvancedPDFEditor";
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -586,15 +585,7 @@ export function FormSubmittedPreview({
         </Dialog>
       )}
 
-      {/* Advanced PDF Editor placeholder (opens when requested) */}
-      {showAdvancedEditor && pdfPath && (
-        <AdvancedPDFEditor
-          document={{ id: responseId, file_name: template?.name || 'document.pdf', file_path: pdfPath, original_file_name: template?.name || 'document.pdf' }}
-          clientId={response.client_id}
-          onSave={() => setShowAdvancedEditor(false)}
-          onCancel={() => setShowAdvancedEditor(false)}
-        />
-      )}
+      {/* Advanced PDF Editor removed - feature not used */}
     </div>
   );
 }

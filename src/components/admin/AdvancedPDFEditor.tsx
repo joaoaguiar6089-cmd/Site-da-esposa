@@ -30,6 +30,8 @@ const AdvancedPDFEditor = ({ document, clientId, onSave, onCancel }: AdvancedPDF
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const [formFields, setFormFields] = useState<any[]>([]);
+  const [addingFieldType, setAddingFieldType] = useState<string | null>(null);
 
   useEffect(() => {
     loadPDFDocument();
@@ -84,6 +86,43 @@ const AdvancedPDFEditor = ({ document, clientId, onSave, onCancel }: AdvancedPDF
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Add a basic draggable form field (rectangle + label)
+  const addFormField = (type: string = 'text') => {
+    if (!fabricCanvas) return;
+    const id = `field_${Date.now()}`;
+    const rect = new (FabricCanvas as any).Rect({
+      left: 120,
+      top: 120,
+      width: 200,
+      height: 40,
+      fill: 'rgba(255, 255, 0, 0.25)',
+      stroke: '#f59e0b',
+      strokeWidth: 1,
+    });
+
+    // attach metadata
+    (rect as any).isFormField = true;
+    (rect as any).fieldMeta = { id, type, label: type === 'signature' ? 'Assinatura' : 'Campo de texto', key: id };
+
+    const label = new (FabricCanvas as any).Text((rect as any).fieldMeta.label, {
+      left: rect.left || 120,
+      top: (rect.top || 120) - 18,
+      fontSize: 12,
+      selectable: false,
+      evented: false,
+    });
+
+    const group = new (FabricCanvas as any).Group([rect, label], { left: rect.left, top: rect.top });
+    // store metadata on group
+    (group as any).isFormField = true;
+    (group as any).fieldMeta = (rect as any).fieldMeta;
+
+    fabricCanvas.add(group);
+    fabricCanvas.setActiveObject(group);
+    setFormFields(prev => [...prev, (group as any).fieldMeta]);
+    setAddingFieldType(null);
   };
 
   const initializeFabricCanvas = () => {
@@ -263,6 +302,36 @@ const AdvancedPDFEditor = ({ document, clientId, onSave, onCancel }: AdvancedPDF
           document_type: 'pdf',
           notes: `Documento editado baseado em: ${document.file_name}`
         });
+
+      // Save form fields metadata (sidecar JSON) if any form fields were placed
+      try {
+        const placedFields: any[] = [];
+        fabricCanvas.getObjects().forEach((obj: any) => {
+          if (obj && obj.isFormField && obj.fieldMeta) {
+            const left = obj.left || 0;
+            const top = obj.top || 0;
+            const width = obj.width * (obj.scaleX || 1) || obj.width || 0;
+            const height = obj.height * (obj.scaleY || 1) || obj.height || 0;
+            placedFields.push({ ...obj.fieldMeta, left, top, width, height });
+          }
+        });
+
+        if (placedFields.length > 0) {
+          const sidecarPath = `${clientId}/annotations/${document.file_path.split('/').pop()}.fields.json`;
+          const blob = new Blob([JSON.stringify(placedFields, null, 2)], { type: 'application/json' });
+          const { error: metaUploadError } = await supabase.storage
+            .from('client-documents')
+            .upload(sidecarPath, blob, { upsert: true });
+
+          if (metaUploadError) {
+            console.warn('Erro ao salvar metadata de campos:', metaUploadError);
+          } else {
+            toast({ title: 'Campos salvos', description: 'Metadados dos campos foram gravados com sucesso.' });
+          }
+        }
+      } catch (metaErr) {
+        console.error('Erro ao salvar sidecar metadata:', metaErr);
+      }
 
       if (dbError) throw dbError;
 

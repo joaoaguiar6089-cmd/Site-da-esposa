@@ -22,8 +22,11 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useFormResponse } from "@/hooks/forms/useFormResponses";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useFormTemplate } from "@/hooks/forms/useFormTemplates";
 import { useFormFields } from "@/hooks/forms/useFormFields";
+import { FormSignatureDialog } from "./FormSignatureDialog";
+import AdvancedPDFEditor from "@/components/admin/AdvancedPDFEditor";
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -48,9 +51,12 @@ export function FormSubmittedPreview({
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfPath, setPdfPath] = useState<string | null>(null);
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [pdfScale, setPdfScale] = useState<number>(1.0);
+  const [showSignatureDialog, setShowSignatureDialog] = useState(false);
+  const [showAdvancedEditor, setShowAdvancedEditor] = useState(false);
 
   const { response, isLoading: loadingResponse } = useFormResponse(responseId);
   const { template, isLoading: loadingTemplate } = useFormTemplate(
@@ -65,9 +71,42 @@ export function FormSubmittedPreview({
   // Gerar PDF automaticamente ao abrir preview
   useEffect(() => {
     if (response && template?.pdf_template_url && !pdfUrl && !isGeneratingPDF) {
-      generatePDFPreview();
+      // Primeiro, verificar se já existe um PDF assinado/preenchido
+      const filledPdfPath = (response as any).filled_pdf_path as string | null | undefined;
+      
+      if (filledPdfPath) {
+        console.log('PDF já existe, carregando:', filledPdfPath);
+        loadExistingPDF(filledPdfPath);
+      } else {
+        console.log('PDF não existe, gerando novo');
+        generatePDFPreview();
+      }
     }
   }, [response, template]);
+  
+  const loadExistingPDF = async (pdfPath: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from("form-pdfs")
+        .createSignedUrl(pdfPath, 3600);
+        
+      if (error) {
+        console.error('Erro ao carregar PDF existente:', error);
+        // Se falhar, gerar novo
+        generatePDFPreview();
+        return;
+      }
+      
+      if (data?.signedUrl) {
+        console.log('PDF carregado com sucesso:', data.signedUrl);
+        setPdfUrl(data.signedUrl);
+        setPdfPath(pdfPath);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar PDF:', error);
+      generatePDFPreview();
+    }
+  };
 
   const generatePDFPreview = async () => {
     setIsGeneratingPDF(true);
@@ -80,6 +119,10 @@ export function FormSubmittedPreview({
 
       if (data?.pdf_url) {
         setPdfUrl(data.pdf_url);
+      }
+      // optional returned storage path
+      if (data?.pdf_path || data?.file_path) {
+        setPdfPath(data?.pdf_path || data?.file_path);
       }
     } catch (error) {
       console.error("Erro ao gerar preview do PDF:", error);
@@ -487,41 +530,71 @@ export function FormSubmittedPreview({
           Fechar
         </Button>
 
-        <div className="flex items-center gap-3">
-          {/* Botão Assinar - placeholder */}
-          <Button
-            variant="outline"
-            disabled
-            title="Em breve: funcionalidade de assinatura digital"
-          >
-            <FileSignature className="h-4 w-4 mr-2" />
-            Assinar
-            <Badge variant="secondary" className="ml-2 text-xs">
-              Em breve
-            </Badge>
-          </Button>
-
-          {hasPdfTemplate && (
+          <div className="flex items-center gap-2">
+            {/* Botão Assinar - abre diálogo de assinatura */}
             <Button
               variant="outline"
-              onClick={handleDownloadPDF}
-              disabled={isGeneratingPDF}
+              onClick={() => setShowSignatureDialog(true)}
             >
-              {isGeneratingPDF ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Gerando...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-2" />
-                  Baixar PDF
-                </>
-              )}
+              <FileSignature className="h-4 w-4 mr-2" />
+              Assinar
             </Button>
+
+          {hasPdfTemplate && (
+            <>
+              <Button
+                variant="outline"
+                onClick={handleDownloadPDF}
+                disabled={isGeneratingPDF}
+              >
+                {isGeneratingPDF ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Baixar PDF
+                  </>
+                )}
+              </Button>
+              {pdfPath && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAdvancedEditor(true)}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Editar Documento
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>
+
+      {/* Signature Dialog */}
+      {showSignatureDialog && (
+        <Dialog open={showSignatureDialog} onOpenChange={(open) => setShowSignatureDialog(open)}>
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Assinar ficha</DialogTitle>
+            </DialogHeader>
+            <FormSignatureDialog responseId={responseId} onClose={() => setShowSignatureDialog(false)} onSigned={() => setShowSignatureDialog(false)} />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Advanced PDF Editor placeholder (opens when requested) */}
+      {showAdvancedEditor && pdfPath && (
+        <AdvancedPDFEditor
+          document={{ id: responseId, file_name: template?.name || 'document.pdf', file_path: pdfPath, original_file_name: template?.name || 'document.pdf' }}
+          clientId={response.client_id}
+          onSave={() => setShowAdvancedEditor(false)}
+          onCancel={() => setShowAdvancedEditor(false)}
+        />
+      )}
     </div>
   );
 }

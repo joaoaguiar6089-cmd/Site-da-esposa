@@ -1,7 +1,6 @@
 // @ts-nocheck
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
-import SignatureCanvas from "react-signature-canvas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +12,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { cleanCPF, formatCPF, isValidCPF } from "@/utils/cpfValidator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Loader2, Palette, Eraser, Download, ArrowLeft } from "lucide-react";
+import { Loader2, Download, ArrowLeft, Check } from "lucide-react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { SignaturePad, SignaturePadValue } from "@/components/ui/signature-pad/signature-pad.tsx";
+import { Checkbox } from "@/components/ui/checkbox";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -39,17 +40,17 @@ export function FormSignatureDialog({ responseId, onClose, onSigned }: FormSigna
   const queryClient = useQueryClient();
   const { response, isLoading } = useFormResponse(responseId);
 
-  const [step, setStep] = useState<"cpf" | "sign">("cpf");
+  const [step, setStep] = useState<"cpf" | "sign" | "apply">("cpf");
   const [cpfInput, setCpfInput] = useState("");
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [isPreparingPdf, setIsPreparingPdf] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [numPages, setNumPages] = useState(0);
   const [pageDimensions, setPageDimensions] = useState<Record<number, { width: number; height: number }>>({});
-  const [penColor, setPenColor] = useState(COLOR_PALETTE[0]);
-  const [strokeWidth, setStrokeWidth] = useState(2.5);
+  const [signatureValue, setSignatureValue] = useState<SignaturePadValue | null>(null);
+  const [selectedPages, setSelectedPages] = useState<number[]>([]);
+  const [signaturePositions, setSignaturePositions] = useState<Record<number, { x: number; y: number }>>({});
 
-  const signatureRefs = useRef<Record<number, SignatureCanvas | null>>({});
   const pdfPathRef = useRef<string | null>(null);
 
   const signatureLog = useMemo<SignatureLogEntry[]>(() => {
@@ -62,11 +63,12 @@ export function FormSignatureDialog({ responseId, onClose, onSigned }: FormSigna
     setCpfInput("");
     setPdfUrl(null);
     setPageDimensions({});
-    signatureRefs.current = {};
+    setSignatureValue(null);
+    setSelectedPages([]);
   }, [responseId]);
 
   useEffect(() => {
-    if (step === "sign") {
+    if (step === "sign" || step === "apply") {
       preparePdf();
     }
   }, [step, response]);
@@ -141,47 +143,37 @@ export function FormSignatureDialog({ responseId, onClose, onSigned }: FormSigna
     });
   };
 
-  const clearPage = (pageNumber: number) => {
-    signatureRefs.current[pageNumber]?.clear();
+  const handlePageToggle = (pageNumber: number) => {
+    setSelectedPages(prev => 
+      prev.includes(pageNumber) 
+        ? prev.filter(p => p !== pageNumber)
+        : [...prev, pageNumber]
+    );
   };
 
-  const clearAllPages = () => {
-    Object.values(signatureRefs.current).forEach(ref => ref?.clear());
+  const selectAllPages = () => {
+    setSelectedPages(Array.from({ length: numPages }, (_, i) => i + 1));
   };
 
-  const getSignatureBounds = (canvas: HTMLCanvasElement) => {
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    const { width, height } = canvas;
-    const { data } = ctx.getImageData(0, 0, width, height);
-
-    let minX = width;
-    let maxX = 0;
-    let minY = height;
-    let maxY = 0;
-    let hasPixel = false;
-
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const alpha = data[(y * width + x) * 4 + 3];
-        if (alpha > 0) {
-          hasPixel = true;
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
-        }
-      }
-    }
-
-    if (!hasPixel) return null;
-
-    return { minX, maxX, minY, maxY, width, height };
+  const deselectAllPages = () => {
+    setSelectedPages([]);
   };
 
   const handleDownload = () => {
     if (!pdfUrl) return;
     window.open(pdfUrl, "_blank");
+  };
+
+  const handleContinueToApply = () => {
+    if (!signatureValue || !signatureValue.value) {
+      toast({
+        title: "Assinatura vazia",
+        description: "Crie sua assinatura antes de continuar.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setStep("apply");
   };
 
   const handleSaveSignature = async () => {
@@ -195,14 +187,19 @@ export function FormSignatureDialog({ responseId, onClose, onSigned }: FormSigna
       return;
     }
 
-    const canvases = Object.entries(signatureRefs.current).filter(
-      ([, ref]) => ref && !ref.isEmpty()
-    ) as Array<[string, SignatureCanvas]>;
-
-    if (canvases.length === 0) {
+    if (!signatureValue || !signatureValue.value) {
       toast({
         title: "Sem assinatura",
-        description: "Desenhe a assinatura no documento antes de salvar.",
+        description: "Crie uma assinatura antes de salvar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedPages.length === 0) {
+      toast({
+        title: "Nenhuma página selecionada",
+        description: "Selecione pelo menos uma página para aplicar a assinatura.",
         variant: "destructive",
       });
       return;
@@ -219,66 +216,171 @@ export function FormSignatureDialog({ responseId, onClose, onSigned }: FormSigna
       const pages = pdfDoc.getPages();
       const now = new Date();
       const formattedCpf = formatCPF(cpfInput);
-      const logEntryPages: number[] = [];
 
-      for (const [pageKey, canvasRef] of canvases) {
-        const pageNumber = Number(pageKey);
+      console.log('Salvando assinatura:', {
+        selectedPages,
+        signatureValue: signatureValue?.type,
+        hasValue: !!signatureValue?.value
+      });
+
+      // Embed signature image
+      let pngImage;
+      try {
+        pngImage = await pdfDoc.embedPng(signatureValue.value);
+        console.log('Imagem PNG incorporada com sucesso');
+      } catch (error) {
+        console.error('Erro ao incorporar PNG:', error);
+        throw new Error('Erro ao processar imagem da assinatura');
+      }
+
+      for (const pageNumber of selectedPages) {
         const page = pages[pageNumber - 1];
-        if (!page) continue;
-
-        const canvas = canvasRef.getCanvas();
-        const pngDataUrl = canvas.toDataURL("image/png");
-        const pngImage = await pdfDoc.embedPng(pngDataUrl);
+        if (!page) {
+          console.warn(`Página ${pageNumber} não encontrada`);
+          continue;
+        }
 
         const { width: pageWidth, height: pageHeight } = page.getSize();
-        page.drawImage(pngImage, {
-          x: 0,
-          y: 0,
-          width: pageWidth,
-          height: pageHeight,
+        const dimensions = pageDimensions[pageNumber];
+        
+        console.log(`Processando página ${pageNumber}:`, {
+          pageWidth,
+          pageHeight,
+          dimensions
         });
+        
+        if (!dimensions) {
+          console.warn(`Dimensões não encontradas para página ${pageNumber}, usando valores padrão`);
+          // Use default position if dimensions not available
+          const signatureWidth = 180;
+          const signatureHeight = 72;
+          const margin = 20;
+          
+          const pdfX = pageWidth - signatureWidth - margin;
+          const pdfY = margin;
 
-        const bounds = getSignatureBounds(canvas);
-        if (bounds) {
-          const scaleX = pageWidth / bounds.width;
-          const scaleY = pageHeight / bounds.height;
-          const margin = 12;
-          const textX = Math.max(bounds.minX * scaleX, 10);
-          const textYPixels = Math.min(bounds.maxY + margin, bounds.height - 8);
-          const textY = pageHeight - textYPixels * scaleY;
-          const legend = `Assinado digitalmente por ${formattedCpf} em ${format(now, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`;
+          page.drawImage(pngImage, {
+            x: pdfX,
+            y: pdfY,
+            width: signatureWidth,
+            height: signatureHeight,
+          });
+
+          const legend = `Assinado digitalmente por CPF ${formattedCpf}`;
+          const legendDate = `em ${format(now, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`;
+          const legendFontSize = 7;
 
           page.drawText(legend, {
-            x: textX,
-            y: Math.max(textY, 10),
-            size: 10,
+            x: pdfX,
+            y: pdfY - 12,
+            size: legendFontSize,
             font,
             color: rgb(0.2, 0.2, 0.2),
           });
+          
+          page.drawText(legendDate, {
+            x: pdfX,
+            y: pdfY - 22,
+            size: legendFontSize,
+            font,
+            color: rgb(0.2, 0.2, 0.2),
+          });
+          
+          console.log(`Assinatura aplicada na página ${pageNumber} (posição padrão)`);
+          continue;
         }
 
-        logEntryPages.push(pageNumber);
+        // Get signature position (use custom position or default)
+        const signaturePos = signaturePositions[pageNumber] || { 
+          x: dimensions.width * 0.65, 
+          y: dimensions.height * 0.05 
+        };
+        
+        // Calculate scale factor between rendered PDF and actual PDF
+        const scaleX = pageWidth / dimensions.width;
+        const scaleY = pageHeight / dimensions.height;
+        
+        // Signature dimensions
+        const signatureWidth = 180;
+        const signatureHeight = 72;
+        
+        // Convert position from screen coordinates to PDF coordinates
+        const pdfX = signaturePos.x * scaleX;
+        const pdfY = pageHeight - (signaturePos.y * scaleY) - (signatureHeight * scaleY);
+
+        console.log(`Desenhando assinatura na página ${pageNumber}:`, {
+          signaturePos,
+          scaleX,
+          scaleY,
+          pdfX,
+          pdfY,
+          signatureWidth: signatureWidth * scaleX,
+          signatureHeight: signatureHeight * scaleY
+        });
+
+        // Draw signature
+        page.drawImage(pngImage, {
+          x: pdfX,
+          y: pdfY,
+          width: signatureWidth * scaleX,
+          height: signatureHeight * scaleY,
+        });
+
+        // Add legend below signature
+        const legend = `Assinado digitalmente por CPF ${formattedCpf}`;
+        const legendDate = `em ${format(now, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`;
+        const legendFontSize = 7;
+
+        page.drawText(legend, {
+          x: pdfX,
+          y: pdfY - 12,
+          size: legendFontSize,
+          font,
+          color: rgb(0.2, 0.2, 0.2),
+        });
+        
+        page.drawText(legendDate, {
+          x: pdfX,
+          y: pdfY - 22,
+          size: legendFontSize,
+          font,
+          color: rgb(0.2, 0.2, 0.2),
+        });
+        
+        console.log(`Assinatura aplicada com sucesso na página ${pageNumber}`);
       }
 
+      console.log('Salvando PDF modificado...');
       const signedPdfBytes = await pdfDoc.save();
       const signedBlob = new Blob([signedPdfBytes], { type: "application/pdf" });
+      
+      console.log('PDF salvo, tamanho:', signedBlob.size, 'bytes');
 
       const basePath = pdfPathRef.current || `signed-forms/${response?.client_id || "unknown"}/${responseId}_${Date.now()}.pdf`;
+      
+      console.log('Fazendo upload para:', basePath);
+      
       const { error: uploadError } = await supabase.storage
         .from("form-pdfs")
         .upload(basePath, signedBlob, { upsert: true });
 
       if (uploadError) {
+        console.error('Erro ao fazer upload:', uploadError);
         throw uploadError;
       }
+      
+      console.log('Upload concluído com sucesso!');
 
       const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from("form-pdfs")
         .createSignedUrl(basePath, 3600);
 
       if (signedUrlError) {
+        console.error('Erro ao criar URL assinada:', signedUrlError);
         throw signedUrlError;
       }
+      
+      console.log('URL assinada gerada:', signedUrlData?.signedUrl);
 
       pdfPathRef.current = basePath;
       setPdfUrl(signedUrlData?.signedUrl || null);
@@ -289,11 +391,13 @@ export function FormSignatureDialog({ responseId, onClose, onSigned }: FormSigna
         cpf: formattedCpf,
         cpf_raw: cpfInput,
         signed_at: now.toISOString(),
-        pages: logEntryPages,
+        pages: selectedPages,
         message: `Assinado por ${formattedCpf} em ${format(now, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`,
       };
+      
+      console.log('Atualizando banco de dados com caminho:', basePath);
 
-      await supabase
+      const { error: updateError } = await supabase
         .from("form_responses")
         .update({
           response_data: {
@@ -303,6 +407,13 @@ export function FormSignatureDialog({ responseId, onClose, onSigned }: FormSigna
           filled_pdf_path: basePath,
         })
         .eq("id", responseId);
+        
+      if (updateError) {
+        console.error('Erro ao atualizar banco de dados:', updateError);
+        throw updateError;
+      }
+      
+      console.log('Banco de dados atualizado com sucesso!');
 
       queryClient.invalidateQueries({ queryKey: formResponsesKeys.details() });
       queryClient.invalidateQueries({ queryKey: formResponsesKeys.lists() });
@@ -312,7 +423,11 @@ export function FormSignatureDialog({ responseId, onClose, onSigned }: FormSigna
         description: "O documento foi assinado e salvo com sucesso.",
       });
 
-      Object.values(signatureRefs.current).forEach(ref => ref?.clear());
+      // Reset signature and selections
+      setSignatureValue(null);
+      setSelectedPages([]);
+      
+      console.log('Processo de assinatura concluído!');
 
       if (onSigned) onSigned();
     } catch (error: any) {
@@ -387,9 +502,9 @@ export function FormSignatureDialog({ responseId, onClose, onSigned }: FormSigna
             </Button>
           </div>
         </div>
-      ) : (
-        <div className="space-y-5">
-          <div className="flex flex-wrap items-center gap-3 justify-between">
+      ) : step === "sign" ? (
+        <div className="flex flex-col h-full max-h-[80vh]">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm" onClick={() => setStep("cpf")}>
                 <ArrowLeft className="h-4 w-4 mr-1" />
@@ -399,44 +514,83 @@ export function FormSignatureDialog({ responseId, onClose, onSigned }: FormSigna
                 Assinando como <span className="font-medium text-foreground">{formatCPF(cpfInput)}</span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1">
-                {COLOR_PALETTE.map(color => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => setPenColor(color)}
-                    className={`h-7 w-7 rounded-full border transition-all ${
-                      penColor === color ? "scale-110 border-primary ring-2 ring-primary/40" : "border-muted"
-                    }`}
-                    style={{ backgroundColor: color }}
-                    aria-label={`Selecionar cor ${color}`}
-                  />
-                ))}
-                <Palette className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div className="flex items-center gap-2">
-                <Label className="text-xs text-muted-foreground">Espessura</Label>
-                <input
-                  type="range"
-                  min={1}
-                  max={6}
-                  step={0.5}
-                  value={strokeWidth}
-                  onChange={(event) => setStrokeWidth(parseFloat(event.target.value))}
-                  className="w-28"
-                />
-              </div>
-              <Button variant="outline" size="sm" onClick={clearAllPages}>
-                <Eraser className="h-4 w-4 mr-1" />
-                Limpar tudo
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleDownload} disabled={!pdfUrl}>
-                <Download className="h-4 w-4 mr-1" />
-                Baixar atual
-              </Button>
-            </div>
           </div>
+
+          <div className="space-y-3 flex-1 overflow-hidden flex flex-col">
+            <Label className="font-semibold">Crie sua assinatura</Label>
+            <div className="border rounded-lg bg-white flex-1 min-h-0" style={{ maxHeight: '400px' }}>
+              <SignaturePad
+                value={signatureValue}
+                onChange={setSignatureValue}
+                className="h-full"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Escolha entre desenhar, digitar ou fazer upload da sua assinatura.
+            </p>
+          </div>
+
+          <div className="flex justify-between items-center gap-4 pt-4 mt-4 border-t bg-background">
+            <Button variant="outline" onClick={onClose} size="lg">
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleContinueToApply} 
+              size="lg"
+              className="min-w-[200px]"
+              disabled={!signatureValue || !signatureValue.value}
+            >
+              Continuar para aplicar
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setStep("sign")}>
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Voltar para assinatura
+              </Button>
+              <div className="text-sm text-muted-foreground">
+                Assinando como <span className="font-medium text-foreground">{formatCPF(cpfInput)}</span>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleDownload} disabled={!pdfUrl}>
+              <Download className="h-4 w-4 mr-1" />
+              Baixar
+            </Button>
+          </div>
+
+          {signatureValue && (
+            <div className="border rounded-lg p-4 bg-muted/30">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-sm font-semibold">Assinatura criada</Label>
+                <Button variant="ghost" size="sm" onClick={() => setStep("sign")}>
+                  Editar assinatura
+                </Button>
+              </div>
+              <div className="border rounded bg-white p-4 flex items-center justify-center" style={{ height: '120px' }}>
+                {signatureValue.type === 'TYPE' ? (
+                  <div 
+                    className="text-4xl"
+                    style={{ 
+                      fontFamily: 'Dancing Script, cursive',
+                      fontWeight: 400
+                    }}
+                  >
+                    {signatureValue.value}
+                  </div>
+                ) : (
+                  <img 
+                    src={signatureValue.value} 
+                    alt="Assinatura" 
+                    className="max-h-full max-w-full object-contain"
+                  />
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="border rounded-lg overflow-hidden">
             {isPreparingPdf ? (
@@ -447,8 +601,8 @@ export function FormSignatureDialog({ responseId, onClose, onSigned }: FormSigna
                 </div>
               </div>
             ) : pdfUrl ? (
-              <ScrollArea className="max-h-[60vh]">
-                <div className="flex flex-col gap-10 p-6 items-center">
+              <ScrollArea className="h-[70vh]">
+                <div className="flex flex-col gap-6 p-6 items-center">
                   <Document
                     file={pdfUrl}
                     onLoadSuccess={handleDocumentLoad}
@@ -456,46 +610,97 @@ export function FormSignatureDialog({ responseId, onClose, onSigned }: FormSigna
                   >
                     {Array.from({ length: numPages }, (_, index) => {
                       const pageNumber = index + 1;
+                      const isSelected = selectedPages.includes(pageNumber);
                       const dimensions = pageDimensions[pageNumber];
+                      const signaturePos = signaturePositions[pageNumber] || { 
+                        x: dimensions ? dimensions.width * 0.65 : 0, 
+                        y: dimensions ? dimensions.height * 0.05 : 0 
+                      };
+                      
                       return (
-                        <div key={pageNumber} className="relative inline-block shadow border">
+                        <div 
+                          key={pageNumber} 
+                          className={`relative inline-block shadow border-2 transition-all ${
+                            isSelected ? 'border-primary ring-2 ring-primary/40' : 'border-border hover:border-primary/50'
+                          }`}
+                        >
                           <Page
                             pageNumber={pageNumber}
                             renderTextLayer={false}
                             renderAnnotationLayer={false}
                             onRenderSuccess={(page) => handlePageRenderSuccess(pageNumber, page)}
+                            scale={1.0}
                           />
-                          {dimensions && (
-                            <>
-                              <SignatureCanvas
-                                ref={(ref) => {
-                                  signatureRefs.current[pageNumber] = ref;
+                          
+                          {/* Checkbox para selecionar página */}
+                          <div className="absolute top-3 left-3 z-10">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => handlePageToggle(pageNumber)}
+                              className="bg-white"
+                            />
+                          </div>
+                          
+                          {isSelected && signatureValue && dimensions && (
+                            <div 
+                              className="absolute cursor-move group"
+                              style={{ 
+                                left: `${signaturePos.x}px`,
+                                top: `${signaturePos.y}px`,
+                              }}
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer.effectAllowed = 'move';
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                e.dataTransfer.setData('offsetX', String(e.clientX - rect.left));
+                                e.dataTransfer.setData('offsetY', String(e.clientY - rect.top));
+                              }}
+                              onDragEnd={(e) => {
+                                const pageElement = e.currentTarget.closest('.relative');
+                                if (!pageElement) return;
+                                const pageRect = pageElement.getBoundingClientRect();
+                                const offsetX = parseFloat(e.dataTransfer.getData('offsetX') || '0');
+                                const offsetY = parseFloat(e.dataTransfer.getData('offsetY') || '0');
+                                const newX = Math.max(0, Math.min(e.clientX - pageRect.left - offsetX, dimensions.width - 180));
+                                const newY = Math.max(0, Math.min(e.clientY - pageRect.top - offsetY, dimensions.height - 80));
+                                setSignaturePositions(prev => ({
+                                  ...prev,
+                                  [pageNumber]: { x: newX, y: newY }
+                                }));
+                              }}
+                            >
+                              <div 
+                                className="bg-white/95 border-2 border-primary rounded p-2 shadow-xl group-hover:shadow-2xl transition-shadow"
+                                style={{ 
+                                  width: '180px',
+                                  height: '72px'
                                 }}
-                                canvasProps={{
-                                  width: dimensions.width,
-                                  height: dimensions.height,
-                                  className: "absolute top-0 left-0 w-full h-full",
-                                  style: { width: "100%", height: "100%", touchAction: "none" },
-                                }}
-                                penColor={penColor}
-                                backgroundColor="transparent"
-                                minWidth={strokeWidth}
-                                maxWidth={strokeWidth * 1.8}
-                              />
-                              <div className="absolute top-3 right-3 flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8 px-2 text-xs"
-                                  onClick={() => clearPage(pageNumber)}
-                                >
-                                  <Eraser className="h-3 w-3 mr-1" />
-                                  Limpar
-                                </Button>
+                              >
+                                {signatureValue.type === 'TYPE' ? (
+                                  <div 
+                                    className="text-2xl flex items-center justify-center h-full"
+                                    style={{ 
+                                      fontFamily: 'Dancing Script, cursive',
+                                      fontWeight: 400
+                                    }}
+                                  >
+                                    {signatureValue.value}
+                                  </div>
+                                ) : (
+                                  <img 
+                                    src={signatureValue.value} 
+                                    alt="Preview assinatura" 
+                                    className="w-full h-full object-contain"
+                                  />
+                                )}
                               </div>
-                            </>
+                              <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground rounded-full p-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                                Arraste
+                              </div>
+                            </div>
                           )}
-                          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full">
+                          
+                          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full pointer-events-none">
                             Página {pageNumber}
                           </div>
                         </div>
@@ -511,25 +716,46 @@ export function FormSignatureDialog({ responseId, onClose, onSigned }: FormSigna
             )}
           </div>
 
-          <div className="flex justify-between items-center">
-            <div className="text-xs text-muted-foreground">
-              Use uma caneta ou o mouse para desenhar sua assinatura diretamente sobre o documento.
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="font-semibold">Páginas selecionadas: {selectedPages.length} de {numPages}</Label>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={selectAllPages}>
+                  Selecionar todas
+                </Button>
+                <Button variant="outline" size="sm" onClick={deselectAllPages}>
+                  Desmarcar todas
+                </Button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={onClose} disabled={isSaving}>
-                Cancelar
-              </Button>
-              <Button onClick={handleSaveSignature} disabled={isSaving || isPreparingPdf}>
-                {isSaving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Salvando...
-                  </>
-                ) : (
-                  "Salvar assinatura"
-                )}
-              </Button>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              ✓ <strong>Marque o checkbox</strong> nas páginas onde deseja aplicar a assinatura
+              <br />
+              ✓ <strong>Arraste a assinatura</strong> para posicioná-la no local desejado
+              <br />
+              ✓ A legenda com CPF, data e hora será adicionada automaticamente
+            </p>
+          </div>
+
+          <div className="flex justify-between items-center gap-4 pt-2">
+            <Button variant="outline" onClick={onClose} disabled={isSaving} size="lg">
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleSaveSignature} 
+              disabled={isSaving || isPreparingPdf || selectedPages.length === 0}
+              size="lg"
+              className="min-w-[200px]"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  Salvando assinatura...
+                </>
+              ) : (
+                "Salvar assinatura no documento"
+              )}
+            </Button>
           </div>
         </div>
       )}

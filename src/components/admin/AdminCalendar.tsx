@@ -1064,7 +1064,7 @@ Aguardamos você!`;
 
     try {
       const paymentData: Record<string, any> = {
-        payment_status: paymentStatus,
+        payment_status: paymentStatus === 'retorno' ? 'pago' : paymentStatus,
       };
 
       // Se deve marcar como realizado, incluir o status
@@ -1802,7 +1802,15 @@ Aguardamos você!`;
 
               <div>
                 <label className="text-sm font-medium">Status do Pagamento *</label>
-                <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+                <Select value={paymentStatus} onValueChange={(value) => {
+                  setPaymentStatus(value);
+                  if (value === 'retorno') {
+                    setPaymentMethod('pix');
+                    setPaymentValue('0');
+                    setPaymentInstallments('1');
+                    setPaymentNotes('Retorno - valor zerado');
+                  }
+                }}>
                   <SelectTrigger className="mt-2">
                     <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
@@ -1811,6 +1819,7 @@ Aguardamos você!`;
                     <SelectItem value="nao_pago">Não Pago</SelectItem>
                     <SelectItem value="pago_parcialmente">Pago Parcialmente</SelectItem>
                     <SelectItem value="pago">Pago</SelectItem>
+                    <SelectItem value="retorno">Retorno</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

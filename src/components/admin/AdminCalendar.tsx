@@ -1196,12 +1196,16 @@ Aguardamos você!`;
               onSelect={(date) => date && setSelectedDate(date)}
               className="rounded-md border w-full"
               locale={ptBR}
+              classNames={{
+                day_selected: "",
+              }}
               modifiers={{
                 future: (date) => getDayPaymentStatus(date) === 'future',
                 paid: (date) => getDayPaymentStatus(date) === 'paid',
                 unpaid: (date) => getDayPaymentStatus(date) === 'unpaid',
                 partial: (date) => getDayPaymentStatus(date) === 'partial',
                 noPaymentInfo: (date) => getDayPaymentStatus(date) === 'no-payment-info',
+                selected: (date) => selectedDate && isSameDay(date, selectedDate),
               }}
               modifiersClassNames={{
                 future: 'bg-blue-50 hover:bg-blue-100',
@@ -1209,6 +1213,7 @@ Aguardamos você!`;
                 unpaid: 'bg-red-100 hover:bg-red-200 font-semibold',
                 partial: 'bg-yellow-100 hover:bg-yellow-200 font-semibold',
                 noPaymentInfo: 'relative font-semibold after:content-["*"] after:absolute after:top-0 after:right-1 after:text-orange-500 after:text-sm',
+                selected: 'border-2 border-black',
               }}
             />
             <div className="mt-4 space-y-2 text-xs">

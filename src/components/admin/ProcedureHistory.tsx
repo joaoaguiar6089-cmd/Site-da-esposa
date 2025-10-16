@@ -567,12 +567,12 @@ const ProcedureHistory = ({
                     </div>
                   </div>
 
-                  {/* InformaÃ§Ãµes de Pagamento */}
+                  {/* Informações de Pagamento */}
                   {(appointment.payment_status || appointment.payment_method || appointment.payment_value) && (
                     <div className="mb-4 p-3 bg-muted/30 rounded-lg border border-muted">
                       <div className="flex items-center gap-2 mb-2">
                         <DollarSign className="h-4 w-4 text-primary" />
-                        <span className="text-sm font-semibold">InformaÃ§Ãµes de Pagamento</span>
+                        <span className="text-sm font-semibold">Informações de Pagamento</span>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
                         {appointment.payment_status && (
@@ -585,7 +585,7 @@ const ProcedureHistory = ({
                         )}
                         {appointment.payment_method && (
                           <div>
-                            <span className="text-muted-foreground">MÃ©todo: </span>
+                            <span className="text-muted-foreground">Método: </span>
                             <span className="font-medium">{appointment.payment_method}</span>
                           </div>
                         )}

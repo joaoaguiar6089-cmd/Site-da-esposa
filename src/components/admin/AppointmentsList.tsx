@@ -1438,7 +1438,7 @@ Aguardamos você!`;
                     {selectedAppointment.payment_method && (
                       <p>Forma: {
                         selectedAppointment.payment_method === 'pix' ? 'PIX' :
-                        selectedAppointment.payment_method === 'cartao' ? 'Cart�o' :
+                        selectedAppointment.payment_method === 'cartao' ? 'Cartão' :
                         'Dinheiro'
                       }</p>
                     )}

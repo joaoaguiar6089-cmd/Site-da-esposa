@@ -219,7 +219,7 @@ export default function FormTemplatesList({ onEditTemplate }: FormTemplatesListP
               onEdit={() => openTemplateEditor(template.id)}
               onClone={() => {
                 setTemplateToClone(template);
-                setCloneName(`${template.name} (cÃ³pia)`);
+                setCloneName(`${template.name} (cópia)`);
               }}
               onDelete={() => setTemplateToDelete(template)}
               onTogglePublish={() => handleTogglePublish(template)}
@@ -292,16 +292,16 @@ export default function FormTemplatesList({ onEditTemplate }: FormTemplatesListP
           <DialogHeader>
             <DialogTitle>Clonar Ficha</DialogTitle>
             <DialogDescription>
-              SerÃ¡ criada uma cÃ³pia da ficha "{templateToClone?.name}" com todos os campos
+              Será criada uma cópia da ficha "{templateToClone?.name}" com todos os campos
             </DialogDescription>
           </DialogHeader>
           <div>
-            <Label htmlFor="clone-name">Nome da CÃ³pia *</Label>
+            <Label htmlFor="clone-name">Nome da Cópia *</Label>
             <Input
               id="clone-name"
               value={cloneName}
               onChange={(e) => setCloneName(e.target.value)}
-              placeholder="Digite o nome da cÃ³pia"
+              placeholder="Digite o nome da cópia"
             />
           </div>
           <DialogFooter>

@@ -120,6 +120,7 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
   const [paymentValue, setPaymentValue] = useState("");
   const [paymentInstallments, setPaymentInstallments] = useState("1");
   const [paymentNotes, setPaymentNotes] = useState("");
+  const [markAsRealizado, setMarkAsRealizado] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [appointmentToReturn, setAppointmentToReturn] = useState<Appointment | null>(null);
   const { toast } = useToast();
@@ -291,14 +292,14 @@ const AdminCalendar = ({ initialDate }: AdminCalendarProps = {}) => {
       return 'future';
     }
 
-    // Verificar se tem pagamentos passados (data/hora já passou)
-    const pastAppts = dayAppts.filter(apt => isAppointmentPast(apt));
+    // Verificar se tem pagamentos passados (data/hora já passou) apenas para agendamentos realizados
+    const pastAppts = dayAppts.filter(apt => isAppointmentPast(apt) && apt.status === 'realizado');
     
     if (pastAppts.length === 0) {
-      return 'future'; // Se não passou ainda, considerar futuro
+      return 'future'; // Se não passou ainda ou não foi realizado, considerar futuro
     }
 
-    // Verificar status de pagamento dos agendamentos passados
+    // Verificar status de pagamento dos agendamentos passados realizados
     const hasPaymentInfo = pastAppts.some(apt => apt.payment_status && apt.payment_status !== 'aguardando');
     
     if (!hasPaymentInfo) {
@@ -880,6 +881,11 @@ Aguardamos você!`;
 
   // Badge de status de pagamento
   const getPaymentStatusBadge = (appointment: Appointment) => {
+    // Só mostrar status de pagamento para agendamentos realizados
+    if (appointment.status !== 'realizado') {
+      return null;
+    }
+    
     const status = appointment.payment_status || 'aguardando';
     
     const statusConfig = {
@@ -905,7 +911,10 @@ Aguardamos você!`;
   };
 
   // Abrir dialog de confirmação de cancelamento
-  const handleOpenCancelDialog = () => {
+  const handleOpenCancelDialog = (appointment?: Appointment) => {
+    if (appointment) {
+      setSelectedAppointment(appointment);
+    }
     setSendCancelNotification(true);
     setCancelDialogOpen(true);
   };
@@ -1030,10 +1039,11 @@ Aguardamos você!`;
   };
 
   // Abrir dialog de pagamento
-  const handleOpenPaymentDialog = (appointment: Appointment, statusOverride?: string) => {
+  const handleOpenPaymentDialog = (appointment: Appointment, statusOverride?: string, markAsRealizado: boolean = false) => {
     setSelectedAppointment(appointment);
     const resolvedStatus = statusOverride || appointment.payment_status || 'aguardando';
     setPaymentStatus(resolvedStatus);
+    setMarkAsRealizado(markAsRealizado);
     if (statusOverride === 'nao_pago') {
       setPaymentMethod('');
       setPaymentValue('');
@@ -1056,6 +1066,11 @@ Aguardamos você!`;
       const paymentData: Record<string, any> = {
         payment_status: paymentStatus,
       };
+
+      // Se deve marcar como realizado, incluir o status
+      if (markAsRealizado) {
+        paymentData.status = 'realizado';
+      }
 
       if (paymentStatus !== 'aguardando') {
         paymentData.payment_method = paymentMethod || null;
@@ -1198,6 +1213,9 @@ Aguardamos você!`;
             />
             <div className="mt-4 space-y-2 text-xs">
               <p className="font-semibold mb-2">Legenda:</p>
+              <p className="text-muted-foreground mb-3 italic">
+                * Cores baseadas apenas em agendamentos realizados
+              </p>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 bg-green-100 rounded border"></div>
                 <span>Todos pagos</span>
@@ -1239,12 +1257,21 @@ Aguardamos você!`;
               </p>
             ) : (
               <div className="space-y-3">
-                {dayAppointments.map((appointment) => (
-                  <div
-                    key={appointment.id}
-                    className="p-3 border rounded-lg cursor-pointer transition-colors bg-white hover:bg-muted/50"
-                    onClick={() => handleAppointmentClick(appointment)}
-                  >
+                {dayAppointments.map((appointment) => {
+                  // Verificar se é um agendamento passado que precisa de ação (não realizado nem cancelado)
+                  const needsAction = isAppointmentPast(appointment) && 
+                                    appointment.status !== 'realizado' && 
+                                    appointment.status !== 'cancelado';
+                  
+                  return (
+                    <div
+                      key={appointment.id}
+                      className={cn(
+                        "p-3 border rounded-lg cursor-pointer transition-colors bg-white hover:bg-muted/50",
+                        needsAction && "border-orange-200 bg-orange-50/50"
+                      )}
+                      onClick={() => !needsAction && handleAppointmentClick(appointment)}
+                    >
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium text-sm">
                         {appointment.appointment_time}
@@ -1252,6 +1279,34 @@ Aguardamos você!`;
                       <div className="flex gap-2">
                         {renderStatusBadgeForList(appointment)}
                         {getPaymentStatusBadge(appointment)}
+                        {/* Botões de ação para agendamentos que passaram e precisam de ação */}
+                        {needsAction && (
+                          <div className="flex gap-1 ml-2">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenCancelDialog(appointment);
+                              }}
+                              title="Não Realizado"
+                              className="h-6 w-6 p-0"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 h-6 w-6 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenPaymentDialog(appointment, undefined, true);
+                              }}
+                              title="Marcar como Realizado"
+                            >
+                              <Check className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <p className="text-sm font-medium">
@@ -1333,7 +1388,8 @@ Aguardamos você!`;
                       </div>
                     )}
                   </div>
-                ))}
+                );
+                })}
               </div>
             )}
 
@@ -1716,10 +1772,17 @@ Aguardamos você!`;
       </Dialog>
 
       {/* Dialog de pagamento */}
-      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+      <Dialog open={paymentDialogOpen} onOpenChange={(open) => {
+        setPaymentDialogOpen(open);
+        if (!open) {
+          setMarkAsRealizado(false);
+        }
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Informações de Pagamento</DialogTitle>
+            <DialogTitle>
+              {markAsRealizado ? 'Marcar como Realizado - Informações de Pagamento' : 'Informações de Pagamento'}
+            </DialogTitle>
           </DialogHeader>
           
           {selectedAppointment && (

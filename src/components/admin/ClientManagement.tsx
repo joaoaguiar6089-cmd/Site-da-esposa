@@ -246,7 +246,7 @@ const ClientManagement = () => {
 
   const renderPaymentStatusBadge = (status?: string | null) => {
     const config = {
-      nao_pago: { label: 'NÃ£o pago', className: 'bg-red-100 text-red-700' },
+      nao_pago: { label: 'Não pago', className: 'bg-red-100 text-red-700' },
       pago_parcialmente: { label: 'Pago parcialmente', className: 'bg-yellow-100 text-yellow-700' },
       pago: { label: 'Pago', className: 'bg-green-100 text-green-700' },
       aguardando: { label: 'Aguardando', className: 'bg-gray-200 text-gray-700' },
@@ -318,8 +318,8 @@ const ClientManagement = () => {
         <div className="flex items-center gap-3">
           <Users className="h-8 w-8 text-primary" />
           <div>
-            <h2 className="text-3xl font-bold text-foreground">GestÃ£o de Clientes</h2>
-            <p className="text-muted-foreground">Gerencie seus clientes e visualize seus histÃ³ricos</p>
+            <h2 className="text-3xl font-bold text-foreground">Gestão de Clientes</h2>
+            <p className="text-muted-foreground">Gerencie seus clientes e visualize seus históricos</p>
           </div>
         </div>
         <Button 

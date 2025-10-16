@@ -294,7 +294,7 @@ export default function FormTemplateEditor({ templateId: externalTemplateId = nu
       console.error("Erro ao salvar template:", error);
       toast({
         title: "Erro ao salvar",
-        description: error?.message || "NÃ£o foi possÃ­vel salvar as alteraÃ§Ãµes.",
+        description: error?.message || "Não foi possível salvar as alterações.",
         variant: "destructive",
       });
     }
@@ -344,8 +344,8 @@ export default function FormTemplateEditor({ templateId: externalTemplateId = nu
     const targetSnippet = snippets.find((snippet) => snippet.id === selectedSnippetId);
     if (!targetSnippet) {
       toast({
-        title: "Snippet nÃ£o encontrado",
-        description: "Selecione um snippet vÃ¡lido para salvar o campo.",
+        title: "Snippet não encontrado",
+        description: "Selecione um snippet válido para salvar o campo.",
         variant: "destructive",
       });
       return;
@@ -366,7 +366,7 @@ export default function FormTemplateEditor({ templateId: externalTemplateId = nu
       console.error("Erro ao salvar campo no snippet:", error);
       toast({
         title: "Erro ao salvar",
-        description: error?.message || "NÃ£o foi possÃ­vel adicionar o campo ao snippet.",
+        description: error?.message || "Não foi possível adicionar o campo ao snippet.",
         variant: "destructive",
       });
     } finally {

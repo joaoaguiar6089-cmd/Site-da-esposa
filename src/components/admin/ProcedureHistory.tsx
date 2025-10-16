@@ -128,11 +128,11 @@ const ProcedureHistory = ({
     const dateB = new Date(`${b.appointment_date}T${b.appointment_time}`);
     const now = new Date();
     
-    // Futuros primeiro (ordenaÃ§Ã£o crescente)
+    // Futuros primeiro (ordenação crescente)
     if (dateA >= now && dateB >= now) {
       return dateA.getTime() - dateB.getTime();
     }
-    // Passados depois (ordenaÃ§Ã£o decrescente)
+    // Passados depois (ordenação decrescente)
     if (dateA < now && dateB < now) {
       return dateB.getTime() - dateA.getTime();
     }
@@ -241,7 +241,7 @@ const ProcedureHistory = ({
 
       if (insertError) throw insertError;
 
-      // Atualizar status do agendamento para "realizado" apenas se nÃ£o foi um upload adicional
+      // Atualizar status do agendamento para "realizado" apenas se não foi um upload adicional
       if (selectedAppointment.status !== 'realizado') {
         await supabase
           .from('appointments')
@@ -323,7 +323,7 @@ const ProcedureHistory = ({
   };
 
   const handleDeleteAppointment = async (appointmentId: string) => {
-    if (!confirm('Tem certeza que deseja excluir este agendamento? Esta aÃ§Ã£o nÃ£o pode ser desfeita.')) return;
+    if (!confirm('Tem certeza que deseja excluir este agendamento? Esta ação não pode ser desfeita.')) return;
 
     try {
       setLoading(true);
@@ -465,7 +465,7 @@ const ProcedureHistory = ({
             Nenhum procedimento encontrado
           </h3>
           <p className="text-muted-foreground mb-4">
-            Este cliente ainda nÃ£o possui procedimentos agendados.
+            Este cliente ainda não possui procedimentos agendados.
           </p>
           <div className="flex gap-3 justify-center">
             <Button 
@@ -778,7 +778,7 @@ const ProcedureHistory = ({
         </DialogContent>
       </Dialog>
 
-      {/* Modal de prÃ©-visualizaÃ§Ã£o de imagem */}
+      {/* Modal de pré-visualização de imagem */}
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -788,7 +788,7 @@ const ProcedureHistory = ({
             <div className="flex justify-center">
               <img
                 src={previewImage}
-                alt="VisualizaÃ§Ã£o do resultado"
+                alt="Visualização do resultado"
                 className="max-w-full max-h-96 object-contain rounded border"
               />
             </div>

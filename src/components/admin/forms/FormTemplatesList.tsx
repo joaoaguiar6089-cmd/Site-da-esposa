@@ -147,7 +147,7 @@ export default function FormTemplatesList({ onEditTemplate }: FormTemplatesListP
           <div>
             <h1 className="text-3xl font-bold">Fichas Personalizadas</h1>
             <p className="text-muted-foreground mt-1">
-              Crie e gerencie formulÃ¡rios personalizados para seus clientes
+              Crie e gerencie formulários personalizados para seus clientes
             </p>
           </div>
           <Button onClick={() => setShowCreateDialog(true)} size="lg">
@@ -174,7 +174,7 @@ export default function FormTemplatesList({ onEditTemplate }: FormTemplatesListP
               <SelectItem value="all">Todas as categorias</SelectItem>
               <SelectItem value="anamnese">Anamnese</SelectItem>
               <SelectItem value="consentimento">Consentimento</SelectItem>
-              <SelectItem value="avaliacao">AvaliaÃ§Ã£o</SelectItem>
+              <SelectItem value="avaliacao">Avaliação</SelectItem>
               <SelectItem value="cadastro">Cadastro</SelectItem>
             </SelectContent>
           </Select>
@@ -269,7 +269,7 @@ export default function FormTemplatesList({ onEditTemplate }: FormTemplatesListP
                 <SelectContent>
                   <SelectItem value="anamnese">Anamnese</SelectItem>
                   <SelectItem value="consentimento">Consentimento</SelectItem>
-                  <SelectItem value="avaliacao">AvaliaÃ§Ã£o</SelectItem>
+                  <SelectItem value="avaliacao">Avaliação</SelectItem>
                   <SelectItem value="cadastro">Cadastro</SelectItem>
                 </SelectContent>
               </Select>
@@ -322,7 +322,7 @@ export default function FormTemplatesList({ onEditTemplate }: FormTemplatesListP
             <AlertDialogTitle>Deletar Ficha?</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja deletar "{templateToDelete?.name}"? 
-              Esta aÃ§Ã£o nÃ£o pode ser desfeita e todos os campos serÃ£o permanentemente removidos.
+              Esta ação não pode ser desfeita e todos os campos serão permanentemente removidos.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -378,7 +378,7 @@ function TemplateCard({ template, onEdit, onClone, onDelete, onTogglePublish }: 
       </CardHeader>
       <CardContent>
         <div className="text-sm text-muted-foreground space-y-1">
-          <p>VersÃ£o: {template.version}</p>
+          <p>Versão: {template.version}</p>
           <p>Editado: {template.edit_count} {template.edit_count === 1 ? 'vez' : 'vezes'}</p>
           <p>
             Criado em: {format(new Date(template.created_at), "dd/MM/yyyy", { locale: ptBR })}

@@ -167,7 +167,7 @@ export default function SnippetLibrary({ onAddFields }: SnippetLibraryProps) {
         </Button>
       </div>
 
-      {/* Dialog de CriaÃ§Ã£o */}
+      {/* Dialog de Criação */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
           <DialogHeader>
@@ -290,10 +290,10 @@ function getCategoryLabel(category: string): string {
   const labels: Record<string, string> = {
     personal_data: "Dados Pessoais",
     contact: "Contato",
-    address: "EndereÃ§o",
-    medical: "MÃ©dico",
+    address: "Endereço",
+    medical: "Médico",
     consent: "Consentimento",
-    evaluation: "AvaliaÃ§Ã£o",
+    evaluation: "Avaliação",
     other: "Outros",
   };
   return labels[category] || category;

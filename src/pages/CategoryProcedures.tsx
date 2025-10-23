@@ -167,19 +167,18 @@ const CategoryProcedures = () => {
           {procedures.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {procedures.map((procedure) => (
-                <div key={procedure.id} id={`procedure-${procedure.id}`}>
-                  <ProcedureCard
-                    title={procedure.name}
-                    description={procedure.description || ''}
-                    price={procedure.price ? `A partir de R$ ${procedure.price.toFixed(2)}` : 'Consulte valores'}
-                    image={procedure.image_url || '/placeholder.svg'}
-                    duration={`${procedure.duration} min`}
-                    benefits={procedure.benefits || []}
-                    sessions={procedure.sessions}
-                    indication={procedure.indication || undefined}
-                    procedureId={procedure.id}
-                  />
-                </div>
+                <ProcedureCard
+                  key={procedure.id}
+                  title={procedure.name}
+                  description={procedure.description || ''}
+                  price={procedure.price ? `A partir de R$ ${procedure.price.toFixed(2)}` : 'Consulte valores'}
+                  image={procedure.image_url || '/placeholder.svg'}
+                  duration={`${procedure.duration} min`}
+                  benefits={procedure.benefits || []}
+                  sessions={procedure.sessions}
+                  indication={procedure.indication || undefined}
+                  procedureId={procedure.id}
+                />
               ))}
             </div>
           ) : (

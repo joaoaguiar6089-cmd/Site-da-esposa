@@ -45,10 +45,11 @@ const ProcedureSearch = () => {
 
   const loadProcedures = async () => {
     try {
-      // Query procedures
+      // Query procedures - only those with categories
       const { data: proceduresData, error: proceduresError } = await supabaseClient
         .from("procedures")
         .select("*")
+        .not("category_id", "is", null)
         .order("name");
 
       if (proceduresError) throw proceduresError;
@@ -87,7 +88,10 @@ const ProcedureSearch = () => {
 
   const handleProcedureClick = (procedure: Procedure) => {
     const categorySlug = createSlug(procedure.categories?.name || "");
-    window.location.href = `/categoria/${categorySlug}#procedure-${createSlug(procedure.name)}`;
+    const procedureSlug = createSlug(procedure.name);
+    
+    // Navigate with hash to trigger scroll
+    window.location.href = `/categoria/${categorySlug}#procedure-${procedureSlug}`;
   };
 
   return (

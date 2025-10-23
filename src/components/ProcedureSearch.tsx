@@ -49,7 +49,6 @@ const ProcedureSearch = () => {
       const { data: proceduresData, error: proceduresError } = await supabaseClient
         .from("procedures")
         .select("*")
-        .eq("is_active", true)
         .order("name");
 
       if (proceduresError) throw proceduresError;

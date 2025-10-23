@@ -92,42 +92,42 @@ const ProcedureSearch = () => {
   };
 
   return (
-    <div className="relative w-full max-w-xs">
+    <div className="relative w-full max-w-md">
       <div className="relative group">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/70 group-hover:text-white transition-colors" />
         <input
           type="text"
-          placeholder="Buscar..."
+          placeholder="Buscar procedimento..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="h-8 w-full rounded-full border border-white/20 bg-white/10 backdrop-blur-md px-3 py-1 pl-8 pr-8 text-xs text-white placeholder:text-white/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40 focus-visible:bg-white/20 transition-all hover:bg-white/15"
+          className="h-11 w-full rounded-full border border-white/30 bg-white/10 backdrop-blur-md px-4 py-2 pl-11 pr-11 text-sm text-white placeholder:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:bg-white/20 transition-all hover:bg-white/15 hover:border-white/40"
         />
         {searchTerm && (
           <button
             onClick={handleClearSearch}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/60 hover:text-white transition-colors"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white transition-colors"
           >
-            <X className="h-3 w-3" />
+            <X className="h-4 w-4" />
           </button>
         )}
       </div>
 
       {isOpen && filteredProcedures.length > 0 && (
-        <div className="absolute top-full mt-2 w-80 bg-white/95 backdrop-blur-lg rounded-xl shadow-2xl border border-white/20 z-50 max-h-96 overflow-y-auto">
+        <div className="absolute top-full mt-3 w-full bg-white/95 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 z-50 max-h-96 overflow-y-auto">
           {filteredProcedures.map((procedure) => (
             <button
               key={procedure.id}
               onClick={() => handleProcedureClick(procedure)}
-              className="w-full px-4 py-2.5 text-left hover:bg-red-50/80 transition-all border-b border-gray-100/50 last:border-b-0 first:rounded-t-xl last:rounded-b-xl group"
+              className="w-full px-5 py-3 text-left hover:bg-red-50/80 transition-all border-b border-gray-100/50 last:border-b-0 first:rounded-t-2xl last:rounded-b-2xl group"
             >
-              <div className="font-medium text-gray-800 text-sm group-hover:text-red-600 transition-colors">{procedure.name}</div>
+              <div className="font-semibold text-gray-900 text-base group-hover:text-red-600 transition-colors">{procedure.name}</div>
               {procedure.categories && (
-                <div className="text-xs text-gray-500 mt-0.5">
+                <div className="text-sm text-gray-600 mt-1">
                   {procedure.categories.name}
                 </div>
               )}
               {procedure.description && (
-                <div className="text-xs text-gray-600 mt-1 line-clamp-1">
+                <div className="text-sm text-gray-500 mt-1.5 line-clamp-2">
                   {procedure.description}
                 </div>
               )}
@@ -137,7 +137,7 @@ const ProcedureSearch = () => {
       )}
 
       {isOpen && searchTerm && filteredProcedures.length === 0 && (
-        <div className="absolute top-full mt-2 w-80 bg-white/95 backdrop-blur-lg rounded-xl shadow-2xl border border-white/20 z-50 px-4 py-3 text-center text-sm text-gray-500">
+        <div className="absolute top-full mt-3 w-full bg-white/95 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 z-50 px-5 py-4 text-center text-sm text-gray-500">
           Nenhum procedimento encontrado
         </div>
       )}

@@ -4,7 +4,6 @@ import { Menu, Instagram, ChevronDown, ChevronRight, User } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { createSlug } from "@/lib/utils";
-import ProcedureSearch from "@/components/ProcedureSearch";
 
 interface Category {
   id: string;
@@ -163,7 +162,7 @@ const Header = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           {/* Logo Elegante - Canto Esquerdo */}
-          <div className="flex-shrink-0 flex items-center gap-6">
+          <div className="flex-shrink-0">
             <a href="/" className="flex flex-col">
               <h1 className="text-2xl font-bold bg-gradient-to-r from-red-400 to-red-600 bg-clip-text text-transparent drop-shadow-lg tracking-wide">
                 Dra. Karoline Ferreira
@@ -172,9 +171,6 @@ const Header = () => {
                 Estética e Saúde Integrativa
               </p>
             </a>
-            <div className="hidden lg:block">
-              <ProcedureSearch />
-            </div>
           </div>
 
           {/* Spacer para empurrar navegação para direita */}

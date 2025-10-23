@@ -3,6 +3,7 @@ import { Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import ProcedureSearch from "./ProcedureSearch";
 
 const Hero = () => {
   const [heroImage, setHeroImage] = useState('/lovable-uploads/648c7c53-0d63-4091-b28f-2ded7b542feb.png');
@@ -61,9 +62,13 @@ const Hero = () => {
             Clínica Dra Karoline Ferreira
           </h1>
           
-          <h2 className="text-2xl md:text-3xl text-accent mb-6 animate-fade-in">
+          <h2 className="text-2xl md:text-3xl text-accent mb-4 animate-fade-in">
             Estética e Saúde Integrativa
           </h2>
+          
+          <div className="mb-6 animate-fade-in">
+            <ProcedureSearch />
+          </div>
           
           <p className="text-xl text-gray-200 mb-8 leading-relaxed animate-fade-in">
             Transforme sua beleza com procedimentos estéticos de alta qualidade. 

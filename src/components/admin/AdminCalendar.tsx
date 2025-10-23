@@ -1692,7 +1692,7 @@ Aguardamos você!`;
                   {!isAppointmentPast(selectedAppointment) && selectedAppointment.status !== 'cancelado' && (
                     <Button
                       size="sm"
-                      onClick={handleOpenCancelDialog}
+                      onClick={() => handleOpenCancelDialog(selectedAppointment)}
                       className="flex items-center gap-1 flex-1 bg-red-600 hover:bg-red-700 text-white"
                     >
                       Cancelar

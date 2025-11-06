@@ -348,7 +348,12 @@ const AppointmentsList = ({
   const startConfirmationProcess = (appointment: Appointment) => {
     if (appointment.status === 'agendado') {
       setConfirmingAppointment(appointment);
-      setSelectedProfessional("");
+      // Auto-seleciona se houver apenas um profissional
+      if (professionals.length === 1) {
+        setSelectedProfessional(professionals[0].id);
+      } else {
+        setSelectedProfessional("");
+      }
     } else {
       updateAppointmentStatus(appointment.id, 'confirmado');
     }
@@ -1677,24 +1682,30 @@ Aguardamos você!`;
                 <p><strong>Horário:</strong> {confirmingAppointment.appointment_time}</p>
               </div>
               
-              <div>
-                <label className="text-sm font-medium">Selecione o Profissional *</label>
-                <Select
-                  value={selectedProfessional}
-                  onValueChange={setSelectedProfessional}
-                >
-                  <SelectTrigger className="mt-2">
-                    <SelectValue placeholder="Escolha um profissional" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {professionals.map((professional) => (
-                      <SelectItem key={professional.id} value={professional.id}>
-                        {professional.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {professionals.length > 1 ? (
+                <div>
+                  <label className="text-sm font-medium">Selecione o Profissional *</label>
+                  <Select
+                    value={selectedProfessional}
+                    onValueChange={setSelectedProfessional}
+                  >
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Escolha um profissional" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {professionals.map((professional) => (
+                        <SelectItem key={professional.id} value={professional.id}>
+                          {professional.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : professionals.length === 1 ? (
+                <div className="text-sm p-3 bg-muted rounded-lg">
+                  <p><strong>Profissional:</strong> {professionals[0].name}</p>
+                </div>
+              ) : null}
               
               <div className="flex gap-2 pt-4">
                 <Button

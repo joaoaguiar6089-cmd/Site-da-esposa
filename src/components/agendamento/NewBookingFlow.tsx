@@ -702,9 +702,10 @@ const NewBookingFlow = ({
           console.error('Erro ao carregar profissionais:', professionalsError);
         } else {
           setProfessionals(professionalsData || []);
-          // is_primary column removed from database
-          // const primary = professionalsData?.find(pro => pro.is_primary);
-          // setPrimaryProfessionalId(prev => primary?.id ?? prev ?? null);
+          // Auto-seleciona se houver apenas um profissional
+          if (professionalsData && professionalsData.length === 1) {
+            setFormData(prev => ({ ...prev, professional_id: professionalsData[0].id }));
+          }
         }
       }
     } catch (error) {
@@ -2058,7 +2059,7 @@ Olá {clientName}!
                   </Card>
                 )}
 
-                {adminMode && (
+                {adminMode && professionals.length > 1 && (
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-foreground">
                       Profissional (opcional)
@@ -2066,16 +2067,9 @@ Olá {clientName}!
                     <Select
                       value={formData.professional_id || ""}
                       onValueChange={(value) => setFormData(prev => ({ ...prev, professional_id: value, appointment_time: "" }))}
-                      disabled={professionals.length === 0}
                     >
                       <SelectTrigger className="h-14 border-2 hover:border-primary/50 transition-all duration-200 bg-background">
-                        <SelectValue
-                          placeholder={
-                            professionals.length === 0
-                              ? "Nenhum profissional cadastrado"
-                              : "Selecione um profissional (opcional)"
-                          }
-                        />
+                        <SelectValue placeholder="Selecione um profissional (opcional)" />
                       </SelectTrigger>
                       <SelectContent>
                         {professionals.map((professional) => (
@@ -2087,19 +2081,9 @@ Olá {clientName}!
                         ))}
                       </SelectContent>
                     </Select>
-                    {professionals.length === 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        Cadastre profissionais na area administrativa para habilitar esta selecao.
-                      </p>
-                    )}
-                    {professionals.length > 0 && !formData.professional_id && (
+                    {!formData.professional_id && (
                       <p className="text-xs text-muted-foreground">
                         Sem selecionar, usaremos automaticamente o profissional principal configurado.
-                      </p>
-                    )}
-                    {professionals.length > 0 && !primaryProfessionalId && (
-                      <p className="text-xs text-destructive">
-                        Nenhum profissional principal foi definido ainda. Configure um na area admin ou selecione manualmente.
                       </p>
                     )}
                   </div>

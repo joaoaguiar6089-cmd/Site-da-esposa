@@ -107,18 +107,9 @@ const ProfessionalsList = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este profissional? Os agendamentos associados serão mantidos sem profissional definido.")) return;
+    if (!confirm("Tem certeza que deseja excluir este profissional? O histórico de agendamentos será mantido.")) return;
 
     try {
-      // Primeiro, remover a associação do profissional dos agendamentos
-      const { error: updateError } = await supabase
-        .from('appointments')
-        .update({ professional_id: null })
-        .eq('professional_id', id);
-
-      if (updateError) throw updateError;
-
-      // Agora deletar o profissional
       const { error } = await supabase
         .from('professionals')
         .delete()
@@ -128,7 +119,7 @@ const ProfessionalsList = () => {
       
       toast({
         title: "Profissional removido",
-        description: "O profissional foi excluído com sucesso. Os agendamentos foram mantidos sem profissional definido.",
+        description: "O profissional foi excluído com sucesso.",
       });
       
       loadProfessionals();
